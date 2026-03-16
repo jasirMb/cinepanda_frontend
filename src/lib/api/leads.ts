@@ -70,3 +70,16 @@ export async function createLead(
   return data;
 }
 
+export async function fetchLead(id: string): Promise<Lead> {
+  const { data } = await api.get<{ success: boolean; data: Lead }>(`/leads/${id}`);
+  return data.data;
+}
+
+export async function updateLead(
+  id: string,
+  payload: CreateLeadPayload
+): Promise<CreateLeadResponse> {
+  const { data } = await api.put<CreateLeadResponse>(`/leads/${id}`, payload);
+  return data;
+}
+

@@ -1,14 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { leadsKeys } from "@/hooks/useLeads";
-import { createLead, type CreateLeadPayload } from "@/lib/api/leads";
+import {
+  createLead,
+  fetchLead,
+  updateLead,
+  type CreateLeadPayload
+} from "@/lib/api/leads";
 
 type ToastVariant = "success" | "error";
 
@@ -85,7 +90,11 @@ function Select({
 
 export default function NewLeadPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+
+  const editId = searchParams.get("edit");
+  const isEditMode = Boolean(editId);
 
   const [formValues, setFormValues] =
     useState<CreateLeadPayload>(initialFormValues);
@@ -96,9 +105,15 @@ export default function NewLeadPage() {
     variant: "success"
   });
 
+  const leadQuery = useQuery({
+    queryKey: ["lead", editId],
+    queryFn: () => fetchLead(editId as string),
+    enabled: isEditMode
+  });
+
   const createMutation = useMutation({
     mutationFn: createLead,
-    onSuccess: (result) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: leadsKeys.all });
       router.push("/leads?created=1");
     },
@@ -122,10 +137,46 @@ export default function NewLeadPage() {
     }
   });
 
+  const updateMutation = useMutation({
+    mutationFn: (payload: CreateLeadPayload) => updateLead(editId as string, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: leadsKeys.all });
+      router.push("/leads?updated=1");
+    },
+    onError: () => {
+      setToast({
+        open: true,
+        message: "Failed to update lead. Please try again.",
+        variant: "error"
+      });
+    }
+  });
+
   const hasValidationErrors = useMemo(
     () => Object.keys(formErrors).length > 0,
     [formErrors]
   );
+
+  useEffect(() => {
+    if (leadQuery.data) {
+      const lead = leadQuery.data;
+      setFormValues({
+        customerName: lead.customerName ?? "",
+        place: lead.place ?? "",
+        contactNumber: lead.contactNumber ?? "",
+        leadSource: lead.leadSource ?? "",
+        leadDate: lead.leadDate ? lead.leadDate.slice(0, 10) : "",
+        lastUpdate: lead.lastUpdate ? lead.lastUpdate.slice(0, 10) : "",
+        priorityType: lead.priorityType ?? "",
+        requirement: lead.requirement ?? "",
+        statusDescription: lead.statusDescription ?? "",
+        status: lead.status ?? "OPEN",
+        nextCallTime: lead.nextCallTime
+          ? lead.nextCallTime.slice(0, 16)
+          : null
+      });
+    }
+  }, [leadQuery.data]);
 
   function validate(values: CreateLeadPayload) {
     const errors: Record<string, string> = {};
@@ -180,18 +231,26 @@ export default function NewLeadPage() {
     setFormErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
-    createMutation.mutate(normalized);
+    if (isEditMode) {
+      updateMutation.mutate(normalized);
+    } else {
+      createMutation.mutate(normalized);
+    }
   }
+
+  const isSaving = createMutation.isLoading || updateMutation.isLoading;
 
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
-            Add lead
+            {isEditMode ? "Edit lead" : "Add lead"}
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Create a new lead.
+            {isEditMode
+              ? "Update lead details and follow-up plan."
+              : "Create a new lead."}
           </p>
         </div>
         <Button variant="outline" asChild>
@@ -200,6 +259,11 @@ export default function NewLeadPage() {
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        {isEditMode && leadQuery.isLoading && (
+          <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">
+            Loading lead details...
+          </p>
+        )}
         <form className="space-y-3" onSubmit={handleSubmit} noValidate>
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
@@ -258,19 +322,19 @@ export default function NewLeadPage() {
                 Lead date *
               </label>
               <Input type="date" value={formValues.leadDate} onChange={(e) => handleChange("leadDate", e.target.value)} />
-              {formErrors.leadDate && (
-                <p className="text-xs text-red-500">{formErrors.leadDate}</p>
-              )}
+              {formErrors.leadDate && <p className="text-xs text-red-500">{formErrors.leadDate}</p>}
             </div>
 
             <div className="space-y-1">
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
                 Last update *
               </label>
-              <Input type="date" value={formValues.lastUpdate} onChange={(e) => handleChange("lastUpdate", e.target.value)} />
-              {formErrors.lastUpdate && (
-                <p className="text-xs text-red-500">{formErrors.lastUpdate}</p>
-              )}
+              <Input
+                type="date"
+                value={formValues.lastUpdate}
+                onChange={(e) => handleChange("lastUpdate", e.target.value)}
+              />
+              {formErrors.lastUpdate && <p className="text-xs text-red-500">{formErrors.lastUpdate}</p>}
             </div>
 
             <div className="space-y-1">
@@ -293,7 +357,7 @@ export default function NewLeadPage() {
                 Status *
               </label>
               <Select
-                value={formValues.status ?? ""}
+                value={formValues.status || "OPEN"}
                 onChange={(v) => handleChange("status", v)}
                 options={statusOptions}
                 placeholder="Select status"
@@ -309,7 +373,7 @@ export default function NewLeadPage() {
               </label>
               <Input
                 type="datetime-local"
-                value={(formValues.nextCallTime as string | null) ?? ""}
+                value={formValues.nextCallTime ?? ""}
                 onChange={(e) => handleChange("nextCallTime", e.target.value)}
               />
             </div>
@@ -320,7 +384,7 @@ export default function NewLeadPage() {
               Requirement *
             </label>
             <textarea
-              className="min-h-[80px] w-full resize-y rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+              className="min-h-[90px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
               value={formValues.requirement}
               onChange={(e) => handleChange("requirement", e.target.value)}
             />
@@ -334,7 +398,7 @@ export default function NewLeadPage() {
               Status description *
             </label>
             <textarea
-              className="min-h-[60px] w-full resize-y rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+              className="min-h-[90px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
               value={formValues.statusDescription}
               onChange={(e) => handleChange("statusDescription", e.target.value)}
             />
@@ -343,15 +407,18 @@ export default function NewLeadPage() {
             )}
           </div>
 
-          {hasValidationErrors && (
-            <p className="text-xs text-red-500">
-              Please fix the highlighted fields before submitting.
-            </p>
-          )}
-
-          <div className="flex items-center justify-end gap-2 pt-1">
-            <Button type="submit" disabled={createMutation.isPending}>
-              {createMutation.isPending ? "Saving..." : "Save lead"}
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              Fields marked * are required.
+            </div>
+            <Button type="submit" disabled={hasValidationErrors || isSaving}>
+              {isEditMode
+                ? updateMutation.isLoading
+                  ? "Updating..."
+                  : "Update lead"
+                : createMutation.isLoading
+                ? "Creating..."
+                : "Create lead"}
             </Button>
           </div>
         </form>
@@ -379,7 +446,7 @@ export default function NewLeadPage() {
               <button
                 type="button"
                 className="text-xs text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
-                onClick={() => setToast((p) => ({ ...p, open: false }))}
+                onClick={() => setToast((prev) => ({ ...prev, open: false }))}
               >
                 Close
               </button>
