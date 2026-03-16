@@ -16,13 +16,14 @@ interface LeadsTableProps {
 
 export function LeadsTable({ leads }: LeadsTableProps) {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-900/60">
+    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Phone</TableHead>
+            <TableHead>Customer</TableHead>
+            <TableHead>Place</TableHead>
+            <TableHead>Contact</TableHead>
+            <TableHead>Source</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Created At</TableHead>
           </TableRow>
@@ -30,9 +31,10 @@ export function LeadsTable({ leads }: LeadsTableProps) {
         <TableBody>
           {leads.map((lead) => (
             <TableRow key={lead._id}>
-              <TableCell>{lead.name}</TableCell>
-              <TableCell>{lead.email}</TableCell>
-              <TableCell>{lead.phone || "-"}</TableCell>
+              <TableCell>{lead.customerName}</TableCell>
+              <TableCell>{lead.place}</TableCell>
+              <TableCell>{lead.contactNumber}</TableCell>
+              <TableCell>{lead.leadSource}</TableCell>
               <TableCell>{lead.status}</TableCell>
               <TableCell>
                 {new Date(lead.createdAt).toLocaleDateString()}
@@ -42,8 +44,8 @@ export function LeadsTable({ leads }: LeadsTableProps) {
           {leads.length === 0 && (
             <TableRow>
               <TableCell
-                colSpan={5}
-                className="text-center text-slate-400"
+                colSpan={6}
+                className="text-center text-slate-500 dark:text-slate-400"
               >
                 No leads found.
               </TableCell>

@@ -14,14 +14,21 @@ export const Table = (
 
 export const TableHeader = (
   props: React.HTMLAttributes<HTMLTableSectionElement>
-) => <thead className="bg-slate-900/80 text-slate-400" {...props} />;
+) => (
+  <thead
+    className="bg-slate-50 text-slate-600 dark:bg-slate-900/80 dark:text-slate-400"
+    {...props}
+  />
+);
 
 export const TableBody = (
   props: React.HTMLAttributes<HTMLTableSectionElement>
-) => <tbody className="divide-y divide-slate-800" {...props} />;
+) => (
+  <tbody className="divide-y divide-slate-200 dark:divide-slate-800" {...props} />
+);
 
 export const TableRow = (props: React.HTMLAttributes<HTMLTableRowElement>) => (
-  <tr className="hover:bg-slate-900/60" {...props} />
+  <tr className="hover:bg-slate-50 dark:hover:bg-slate-900/60" {...props} />
 );
 
 export const TableHead = (

@@ -24,7 +24,7 @@ export default function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const { token } = await loginAdmin({ email, password });
+      const { token } = await loginAdmin({ username: email, password });
       login(token);
       router.replace(redirectTo);
     } catch (err: any) {
@@ -38,41 +38,41 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950">
-      <div className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900/70 p-8 shadow-xl">
-        <h1 className="mb-2 text-2xl font-semibold text-slate-50">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
+      <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-xl dark:border-slate-800 dark:bg-slate-900/70">
+        <h1 className="mb-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
           CinePanda Admin
         </h1>
-        <p className="mb-6 text-sm text-slate-400">
+        <p className="mb-6 text-sm text-slate-600 dark:text-slate-400">
           Sign in to manage leads, projects, and more.
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm text-slate-300">Email</label>
+            <label className="mb-1 block text-sm text-slate-700 dark:text-slate-300">
+              Email
+            </label>
             <Input
-              type="email"
+              type="text"
               autoComplete="email"
-              required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@cinepanda.com"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm text-slate-300">
+            <label className="mb-1 block text-sm text-slate-700 dark:text-slate-300">
               Password
             </label>
             <Input
               type="password"
               autoComplete="current-password"
-              required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
             />
           </div>
           {error && (
-            <p className="text-sm text-red-400">
+            <p className="text-sm text-red-600 dark:text-red-400">
               {error}
             </p>
           )}
