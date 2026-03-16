@@ -1,0 +1,34 @@
+"use client";
+
+import * as React from "react";
+import { cn } from "@/lib/utils";
+
+export const Table = (
+  props: React.TableHTMLAttributes<HTMLTableElement>
+) => (
+  <table
+    className={cn("w-full border-collapse text-left text-sm", props.className)}
+    {...props}
+  />
+);
+
+export const TableHeader = (
+  props: React.HTMLAttributes<HTMLTableSectionElement>
+) => <thead className="bg-slate-900/80 text-slate-400" {...props} />;
+
+export const TableBody = (
+  props: React.HTMLAttributes<HTMLTableSectionElement>
+) => <tbody className="divide-y divide-slate-800" {...props} />;
+
+export const TableRow = (props: React.HTMLAttributes<HTMLTableRowElement>) => (
+  <tr className="hover:bg-slate-900/60" {...props} />
+);
+
+export const TableHead = (
+  props: React.ThHTMLAttributes<HTMLTableCellElement>
+) => <th className="px-3 py-2 font-medium" {...props} />;
+
+export const TableCell = (
+  props: React.TdHTMLAttributes<HTMLTableCellElement>
+) => <td className="px-3 py-2 align-middle" {...props} />;
+
