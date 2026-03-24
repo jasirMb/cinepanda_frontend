@@ -6,6 +6,7 @@ import { loginAdmin } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/auth-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import Image from "next/image";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -40,12 +41,22 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
       <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-xl dark:border-slate-800 dark:bg-slate-900/70">
-        <h1 className="mb-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
-          CinePanda Admin
-        </h1>
-        <p className="mb-6 text-sm text-slate-600 dark:text-slate-400">
-          Sign in to manage leads, projects, and more.
-        </p>
+        <div className="mb-6 flex flex-col items-center text-center">
+          <Image
+            src="/cinepanda-logo.png"
+            alt="CinePanda Entertainment logo"
+            width={96}
+            height={96}
+            priority
+            className="mb-3 drop-shadow-sm"
+          />
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+            CinePanda Admin
+          </h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Sign in to manage leads, projects, and more.
+          </p>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm text-slate-700 dark:text-slate-300">

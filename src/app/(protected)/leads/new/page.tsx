@@ -238,7 +238,7 @@ export default function NewLeadPage() {
     }
   }
 
-  const isSaving = createMutation.isLoading || updateMutation.isLoading;
+  const isSaving = createMutation.isPending || updateMutation.isPending;
 
   return (
     <div className="space-y-4">
@@ -413,10 +413,10 @@ export default function NewLeadPage() {
             </div>
             <Button type="submit" disabled={hasValidationErrors || isSaving}>
               {isEditMode
-                ? updateMutation.isLoading
+                ? updateMutation.isPending
                   ? "Updating..."
                   : "Update lead"
-                : createMutation.isLoading
+                : createMutation.isPending
                 ? "Creating..."
                 : "Create lead"}
             </Button>
@@ -457,4 +457,3 @@ export default function NewLeadPage() {
     </div>
   );
 }
-

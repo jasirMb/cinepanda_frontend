@@ -42,6 +42,42 @@ export async function fetchLeads(
   return data;
 }
 
+export interface FollowupQuery {
+  date: string;
+  period?: string;
+}
+
+export interface FollowupResponse {
+  success: boolean;
+  data: Lead[];
+  count: number;
+  filters: {
+    date: string;
+    period: string;
+    status: string;
+  };
+}
+
+export async function fetchFollowupLeads(
+  params: FollowupQuery
+): Promise<FollowupResponse> {
+  const { data } = await api.get<FollowupResponse>("/leads/followup", { params });
+  return data;
+}
+
+export interface UpdateLeadStatusPayload {
+  status: string;
+  statusDescription?: string;
+}
+
+export async function updateLeadStatus(
+  id: string,
+  payload: UpdateLeadStatusPayload
+): Promise<CreateLeadResponse> {
+  const { data } = await api.patch<CreateLeadResponse>(`/leads/${id}/status`, payload);
+  return data;
+}
+
 export interface CreateLeadPayload {
   customerName: string;
   place: string;

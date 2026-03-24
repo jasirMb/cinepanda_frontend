@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Image from "next/image";
 import clsx from "clsx";
 
 const navItems = [
@@ -18,7 +19,14 @@ export function Sidebar() {
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950/70">
       <div className="flex items-center gap-2 border-b border-slate-200 px-6 py-4 dark:border-slate-800">
-        <div className="h-8 w-8 rounded bg-cine-primary" />
+        <Image
+          src="/cinepanda-logo.png"
+          alt="CinePanda logo"
+          width={36}
+          height={36}
+          priority
+          className="shrink-0 drop-shadow-sm"
+        />
         <span className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-50">
           CinePanda
         </span>

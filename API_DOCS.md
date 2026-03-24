@@ -2,7 +2,7 @@
 
 This document describes all REST APIs exposed by the CinePanda backend for use by frontend clients and agents.
 
-- **Base URL (local)**: `http://localhost:3000`
+- **Base URL (local)**: `http://localhost:3000` (or `http://localhost:${PORT}` if you override `PORT` in `.env`; current `.env` uses `8000`)
 - **API prefix**: all routes start with `/api/...`
 - **Auth scheme**: JWT in the `Authorization` header as `Bearer <token>` for all routes except `/api/auth/login`.
 - **Content type**: all requests/JSON bodies are `application/json`.
@@ -95,6 +95,7 @@ All lead routes require authentication. Lead objects follow the `Lead` model:
 - `requirement` (string, required)
 - `statusDescription` (string, required)
 - `createdAt` / `updatedAt` (server timestamps)
+- Unique key: (`customerName`, `contactNumber`)
 
 ### GET `/api/leads`
 
@@ -137,10 +138,10 @@ All lead routes require authentication. Lead objects follow the `Lead` model:
 
 ### GET `/api/leads/followup`
 
-- **Description**: Leads requiring follow-up around a given date and period.
+- **Description**: Open leads whose `nextCallTime` is on or before the target date (optionally shifted by a period).
 - **Query params**:
   - `date` (ISO date string, required, `YYYY-MM-DD`)
-  - `period` (string, optional; interpreted by service, e.g. `day`, `week`, etc.)
+  - `period` (string, optional; add offset to `date` using pattern `\\d+[DMY]`, e.g. `1D`, `7D`, `1M`, `3Y`)
 - **Responses**:
   - `200 OK`
     - Body:
@@ -242,6 +243,21 @@ All lead routes require authentication. Lead objects follow the `Lead` model:
     - `{ success: true, message: "Lead deleted successfully" }`
   - `404 Not Found`
     - `{ success: false, error: "Lead not found" }`
+
+### GET `/api/leads/enums/sources`
+
+- **Description**: List active lead sources (from `leadsources` collection).
+- **Responses**: `200 OK` â€“ `{ success: true, data: LeadSource[], count: number }`
+
+### GET `/api/leads/enums/statuses`
+
+- **Description**: List active lead statuses (from `leadstatuses` collection).
+- **Responses**: `200 OK` â€“ `{ success: true, data: LeadStatus[], count: number }`
+
+### GET `/api/leads/enums/priorities`
+
+- **Description**: List active priority types (from `prioritytypes` collection).
+- **Responses**: `200 OK` â€“ `{ success: true, data: PriorityType[], count: number }`
 
 ---
 

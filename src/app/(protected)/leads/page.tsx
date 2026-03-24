@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { useLeads } from "@/hooks/useLeads";
+import { leadsKeys, useFollowupLeads, useLeads } from "@/hooks/useLeads";
 import { LeadsTable } from "@/components/tables/LeadsTable";
 import { Button } from "@/components/ui/button";
-import { type Lead } from "@/lib/api/leads";
+import { type Lead, updateLeadStatus } from "@/lib/api/leads";
+import { Input } from "@/components/ui/input";
 
 type ToastVariant = "success" | "error";
 type LeadCategory = "overdue" | "today" | "upcoming" | "unscheduled";
@@ -79,14 +81,78 @@ function categoryTone(category: LeadCategory) {
 export default function LeadsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const [toast, setToast] = useState<ToastState>({
     open: false,
     message: "",
     variant: "success"
   });
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
+  const [filters, setFilters] = useState({
+    search: "",
+    status: "",
+    priorityType: "",
+    leadSource: "",
+    startDate: "",
+    endDate: "",
+    sort: "nextCallTime_asc" as
+      | "createdAt_desc"
+      | "createdAt_asc"
+      | "leadDate_desc"
+      | "leadDate_asc"
+      | "lastUpdate_desc"
+      | "lastUpdate_asc"
+      | "nextCallTime_desc"
+      | "nextCallTime_asc"
+  });
 
-  const { data, isLoading, isError } = useLeads({ page: 1, limit: 20 });
+  const todayDate = useMemo(() => {
+    const now = new Date();
+    return now.toISOString().slice(0, 10);
+  }, []);
+
+  const statusOptions = [
+    { label: "All statuses", value: "" },
+    { label: "Open", value: "OPEN" },
+    { label: "Closed Won", value: "CLOSED_WON" },
+    { label: "Closed Lost", value: "CLOSED_LOST" },
+    { label: "On Hold", value: "ON_HOLD" },
+    { label: "Follow up", value: "FOLLOW_UP" }
+  ];
+
+  const priorityTypeOptions = [
+    { label: "All priorities", value: "" },
+    { label: "Enquired", value: "ENQUIRED" },
+    { label: "Takes time", value: "TAKES_TIME" },
+    { label: "Urgent building", value: "URGENT_BUILD" }
+  ];
+
+  const leadSourceOptions = [
+    { label: "All sources", value: "" },
+    { label: "Meta", value: "META" },
+    { label: "Youtube", value: "YOUTUBE" },
+    { label: "Walk-in", value: "WALK_IN" },
+    { label: "Referral", value: "REFERRAL" },
+    { label: "Other", value: "OTHER" }
+  ];
+
+  const followupQuery = useFollowupLeads({ date: todayDate });
+
+  const leadsParams = useMemo(
+    () => ({
+      page: 1,
+      limit: 50,
+      search: filters.search || undefined,
+      status: filters.status || undefined,
+      priorityType: filters.priorityType || undefined,
+      leadSource: filters.leadSource || undefined,
+      startDate: filters.startDate || undefined,
+      endDate: filters.endDate || undefined
+    }),
+    [filters]
+  );
+
+  const leadsQuery = useLeads(leadsParams);
 
   useEffect(() => {
     const created = searchParams.get("created");
@@ -121,8 +187,31 @@ export default function LeadsPage() {
     setToast((prev) => ({ ...prev, open: false }));
   }
 
-  const leads = data?.data ?? [];
+  const attentionLeads = followupQuery.data?.data ?? [];
+  const allLeadsRaw = leadsQuery.data?.data ?? [];
+  const sortedAllLeads = useMemo(() => {
+    const [field, dir] = filters.sort.split("_") as [keyof Lead | string, "asc" | "desc"];
+    const factor = dir === "asc" ? 1 : -1;
+    return [...allLeadsRaw].sort((a, b) => {
+      const aVal = (a as any)[field];
+      const bVal = (b as any)[field];
 
+      const aDate = aVal ? new Date(aVal).getTime() : dir === "asc" ? Infinity : -Infinity;
+      const bDate = bVal ? new Date(bVal).getTime() : dir === "asc" ? Infinity : -Infinity;
+
+      return (aDate - bDate) * factor;
+    });
+  }, [allLeadsRaw, filters.sort]);
+
+  const allLeads = sortedAllLeads;
+  const attentionIds = useMemo(
+    () => new Set(attentionLeads.map((lead) => lead._id)),
+    [attentionLeads]
+  );
+  const leads = useMemo(
+    () => allLeads.filter((lead) => !attentionIds.has(lead._id)),
+    [allLeads, attentionIds]
+  );
   const grouped = useMemo(() => {
     const buckets: Record<LeadCategory, Lead[]> = {
       overdue: [],
@@ -152,10 +241,30 @@ export default function LeadsPage() {
     return buckets;
   }, [leads]);
 
-  const attentionLeads = [...grouped.overdue, ...grouped.today];
-
   function LeadCard({ lead }: { lead: Lead }) {
     const category = getCategory(lead);
+    const [statusValue, setStatusValue] = useState(lead.status);
+    const statusMutation = useMutation({
+      mutationFn: (nextStatus: string) =>
+        updateLeadStatus(lead._id, { status: nextStatus, statusDescription: lead.statusDescription }),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: leadsKeys.all });
+        setToast({
+          open: true,
+          message: "Status updated",
+          variant: "success"
+        });
+      },
+      onError: () => {
+        setToast({
+          open: true,
+          message: "Failed to update status",
+          variant: "error"
+        });
+        setStatusValue(lead.status);
+      }
+    });
+
     return (
       <div
         className={`flex h-full flex-col justify-between rounded-xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${categoryTone(
@@ -205,6 +314,29 @@ export default function LeadsPage() {
           <span className="rounded-full bg-slate-200/70 px-3 py-1 dark:bg-slate-800/70">
             Created {new Date(lead.createdAt).toLocaleDateString()}
           </span>
+          <div className="flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+            <label className="text-slate-500">Status</label>
+            <select
+              className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-800 dark:text-slate-50"
+              value={statusValue}
+              onChange={(e) => setStatusValue(e.target.value)}
+              disabled={statusMutation.isPending}
+            >
+              {statusOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={statusMutation.isPending || statusValue === lead.status}
+              onClick={() => statusMutation.mutate(statusValue)}
+            >
+              {statusMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </div>
           <Link
             href={`/leads/new?edit=${lead._id}`}
             className="ml-auto inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-cine-primary"
@@ -215,6 +347,9 @@ export default function LeadsPage() {
       </div>
     );
   }
+
+  const isLoading = followupQuery.isLoading || leadsQuery.isLoading;
+  const isError = followupQuery.isError || leadsQuery.isError;
 
   if (isLoading) {
     return (
@@ -262,8 +397,97 @@ export default function LeadsPage() {
         </div>
       </div>
 
+      {viewMode === "table" && (
+        <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 md:grid-cols-3 lg:grid-cols-6">
+          <Input
+            placeholder="Search name, place, contact"
+            value={filters.search}
+            onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+          />
+          <select
+            className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+            value={filters.status}
+            onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
+          >
+            {statusOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+            value={filters.priorityType}
+            onChange={(e) => setFilters((prev) => ({ ...prev, priorityType: e.target.value }))}
+          >
+            {priorityTypeOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+            value={filters.leadSource}
+            onChange={(e) => setFilters((prev) => ({ ...prev, leadSource: e.target.value }))}
+          >
+            {leadSourceOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <Input
+            type="date"
+            value={filters.startDate}
+            onChange={(e) => setFilters((prev) => ({ ...prev, startDate: e.target.value }))}
+            placeholder="Start date"
+          />
+          <Input
+            type="date"
+            value={filters.endDate}
+            onChange={(e) => setFilters((prev) => ({ ...prev, endDate: e.target.value }))}
+            placeholder="End date"
+          />
+          <select
+            className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 lg:col-span-2"
+            value={filters.sort}
+            onChange={(e) =>
+              setFilters((prev) => ({ ...prev, sort: e.target.value as typeof prev.sort }))
+            }
+          >
+            <option value="nextCallTime_asc">Next call (soonest)</option>
+            <option value="nextCallTime_desc">Next call (latest)</option>
+            <option value="createdAt_desc">Created (newest)</option>
+            <option value="createdAt_asc">Created (oldest)</option>
+            <option value="leadDate_desc">Lead date (newest)</option>
+            <option value="leadDate_asc">Lead date (oldest)</option>
+            <option value="lastUpdate_desc">Last update (newest)</option>
+            <option value="lastUpdate_asc">Last update (oldest)</option>
+          </select>
+          <Button
+            variant="outline"
+            size="sm"
+            className="md:col-span-1 lg:col-span-1"
+            onClick={() =>
+              setFilters({
+                search: "",
+                status: "",
+                priorityType: "",
+                leadSource: "",
+                startDate: "",
+                endDate: "",
+                sort: "nextCallTime_asc"
+              })
+            }
+          >
+            Reset filters
+          </Button>
+        </div>
+      )}
+
       {viewMode === "table" ? (
-        <LeadsTable leads={leads} />
+        <LeadsTable leads={allLeads} />
       ) : (
         <div className="space-y-10">
           <section className="space-y-3">
