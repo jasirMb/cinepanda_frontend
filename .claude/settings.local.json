@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls \"c:/dev/cinepanda/cinepanda-frontend/cinepanda_frontend/src/app/\\(protected\\)/\")",
+      "Bash(npx next:*)"
+    ]
+  }
+}

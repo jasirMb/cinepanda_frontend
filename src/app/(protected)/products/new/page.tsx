@@ -4,9 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   productsKeys,
   useCategories,
@@ -21,45 +23,7 @@ import {
   type SpecificationField
 } from "@/lib/api/products";
 
-type ToastVariant = "success" | "error";
-
-interface ToastState {
-  open: boolean;
-  message: string;
-  variant: ToastVariant;
-}
-
 type Option = { label: string; value: string };
-
-function Select({
-  value,
-  onChange,
-  options,
-  placeholder,
-  disabled
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  options: Option[];
-  placeholder: string;
-  disabled?: boolean;
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      disabled={disabled}
-      className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-    >
-      <option value="">{placeholder}</option>
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
-  );
-}
 
 const unitOptions: Option[] = [
   { label: "Per piece", value: "per piece" },
@@ -107,11 +71,6 @@ export default function NewProductPage() {
 
   const [formValues, setFormValues] = useState<FormValues>(initialFormValues);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [toast, setToast] = useState<ToastState>({
-    open: false,
-    message: "",
-    variant: "success"
-  });
 
   // Fetch categories for dropdown
   const categoriesQuery = useCategories();
@@ -186,7 +145,7 @@ export default function NewProductPage() {
       ) {
         message = (error as any).response.data.error;
       }
-      setToast({ open: true, message, variant: "error" });
+      toast.error(message);
     }
   });
 
@@ -198,11 +157,7 @@ export default function NewProductPage() {
       router.push("/products?updated=1");
     },
     onError: () => {
-      setToast({
-        open: true,
-        message: "Failed to update product. Please try again.",
-        variant: "error"
-      });
+      toast.error("Failed to update product. Please try again.");
     }
   });
 
@@ -276,28 +231,30 @@ export default function NewProductPage() {
 
     if (field.type === "select" && field.options) {
       return (
-        <Select
-          value={String(value)}
-          onChange={(v) => handleSpecChange(key, v)}
-          options={field.options.map((o) => ({ label: o, value: o }))}
-          placeholder={`Select ${field.label}`}
-        />
+        <Select value={String(value) || undefined} onValueChange={(v) => handleSpecChange(key, v)}>
+          <SelectTrigger>
+            <SelectValue placeholder={`Select ${field.label}`} />
+          </SelectTrigger>
+          <SelectContent>
+            {field.options.map((o) => (
+              <SelectItem key={o} value={o}>{o}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       );
     }
 
     if (field.type === "boolean") {
       return (
-        <select
-          value={value === true ? "true" : value === false ? "false" : ""}
-          onChange={(e) =>
-            handleSpecChange(key, e.target.value === "" ? undefined : e.target.value === "true")
-          }
-          className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-        >
-          <option value="">Not specified</option>
-          <option value="true">Yes</option>
-          <option value="false">No</option>
-        </select>
+        <Select value={value === true ? "true" : value === false ? "false" : undefined} onValueChange={(v) => handleSpecChange(key, v === "" ? undefined : v === "true")}>
+          <SelectTrigger>
+            <SelectValue placeholder="Not specified" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="true">Yes</SelectItem>
+            <SelectItem value="false">No</SelectItem>
+          </SelectContent>
+        </Select>
       );
     }
 
@@ -367,12 +324,16 @@ export default function NewProductPage() {
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
                 Category *
               </label>
-              <Select
-                value={formValues.category}
-                onChange={(v) => handleChange("category", v)}
-                options={categoryOptions}
-                placeholder="Select category"
-              />
+              <Select value={formValues.category || undefined} onValueChange={(v) => handleChange("category", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categoryOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {formErrors.category && (
                 <p className="text-xs text-red-500">{formErrors.category}</p>
               )}
@@ -382,13 +343,16 @@ export default function NewProductPage() {
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
                 Subcategory *
               </label>
-              <Select
-                value={formValues.subcategory}
-                onChange={(v) => handleChange("subcategory", v)}
-                options={subcategoryOptions}
-                placeholder="Select subcategory"
-                disabled={!formValues.category}
-              />
+              <Select value={formValues.subcategory || undefined} onValueChange={(v) => handleChange("subcategory", v)}>
+                <SelectTrigger disabled={!formValues.category}>
+                  <SelectValue placeholder="Select subcategory" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subcategoryOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {formErrors.subcategory && (
                 <p className="text-xs text-red-500">{formErrors.subcategory}</p>
               )}
@@ -435,12 +399,16 @@ export default function NewProductPage() {
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
                 Unit *
               </label>
-              <Select
-                value={formValues.unit}
-                onChange={(v) => handleChange("unit", v)}
-                options={unitOptions}
-                placeholder="Select unit"
-              />
+              <Select value={formValues.unit || undefined} onValueChange={(v) => handleChange("unit", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {unitOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {formErrors.unit && (
                 <p className="text-xs text-red-500">{formErrors.unit}</p>
               )}
@@ -509,37 +477,6 @@ export default function NewProductPage() {
         </form>
       </div>
 
-      {/* Toast */}
-      {toast.open && (
-        <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-md border px-4 py-3 text-sm shadow-lg backdrop-blur-sm dark:border-slate-700">
-          <div
-            className={
-              toast.variant === "success"
-                ? "border-l-4 border-emerald-500 pl-3"
-                : "border-l-4 border-red-500 pl-3"
-            }
-          >
-            <div className="flex items-start justify-between gap-3">
-              <p
-                className={
-                  toast.variant === "success"
-                    ? "text-emerald-700 dark:text-emerald-400"
-                    : "text-red-700 dark:text-red-400"
-                }
-              >
-                {toast.message}
-              </p>
-              <button
-                type="button"
-                className="text-xs text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
-                onClick={() => setToast((prev) => ({ ...prev, open: false }))}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

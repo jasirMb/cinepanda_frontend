@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { leadsKeys, useFollowupLeads, useLeads } from "@/hooks/useLeads";
@@ -10,15 +11,11 @@ import { LeadsTable } from "@/components/tables/LeadsTable";
 import { Button } from "@/components/ui/button";
 import { type Lead, updateLeadStatus } from "@/lib/api/leads";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { DatePicker } from "@/components/ui/date-picker";
 
-type ToastVariant = "success" | "error";
 type LeadCategory = "overdue" | "today" | "upcoming" | "unscheduled";
-
-interface ToastState {
-  open: boolean;
-  message: string;
-  variant: ToastVariant;
-}
 
 function humanize(value?: string) {
   if (!value) return "Not set";
@@ -82,11 +79,6 @@ export default function LeadsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const [toast, setToast] = useState<ToastState>({
-    open: false,
-    message: "",
-    variant: "success"
-  });
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [filters, setFilters] = useState({
     search: "",
@@ -160,32 +152,16 @@ export default function LeadsPage() {
     const updated = searchParams.get("updated");
 
     if (created === "1") {
-      setToast({
-        open: true,
-        message: "Lead created successfully",
-        variant: "success"
-      });
+      toast.success("Lead created successfully");
       router.replace("/leads");
     } else if (updated === "1") {
-      setToast({
-        open: true,
-        message: "Lead updated successfully",
-        variant: "success"
-      });
+      toast.success("Lead updated successfully");
       router.replace("/leads");
     } else if (typeof error === "string" && error.trim().length > 0) {
-      setToast({
-        open: true,
-        message: decodeURIComponent(error),
-        variant: "error"
-      });
+      toast.error(decodeURIComponent(error));
       router.replace("/leads");
     }
   }, [router, searchParams]);
-
-  function closeToast() {
-    setToast((prev) => ({ ...prev, open: false }));
-  }
 
   const attentionLeads = followupQuery.data?.data ?? [];
   const allLeadsRaw = leadsQuery.data?.data ?? [];
@@ -249,18 +225,10 @@ export default function LeadsPage() {
         updateLeadStatus(lead._id, { status: nextStatus, statusDescription: lead.statusDescription }),
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: leadsKeys.all });
-        setToast({
-          open: true,
-          message: "Status updated",
-          variant: "success"
-        });
+        toast.success("Status updated");
       },
       onError: () => {
-        setToast({
-          open: true,
-          message: "Failed to update status",
-          variant: "error"
-        });
+        toast.error("Failed to update status");
         setStatusValue(lead.status);
       }
     });
@@ -316,18 +284,16 @@ export default function LeadsPage() {
           </span>
           <div className="flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
             <label className="text-slate-500">Status</label>
-            <select
-              className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-800 dark:text-slate-50"
-              value={statusValue}
-              onChange={(e) => setStatusValue(e.target.value)}
-              disabled={statusMutation.isPending}
-            >
-              {statusOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+            <Select value={statusValue || "__all__"} onValueChange={(v) => setStatusValue(v === "__all__" ? "" : v)} disabled={statusMutation.isPending}>
+              <SelectTrigger className="h-auto rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {statusOptions.map((opt) => (
+                  <SelectItem key={opt.value || "__all__"} value={opt.value || "__all__"}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               variant="outline"
               size="sm"
@@ -353,7 +319,20 @@ export default function LeadsPage() {
 
   if (isLoading) {
     return (
-      <p className="text-slate-700 dark:text-slate-300">Loading leads...</p>
+      <div className="space-y-4">
+        <div className="flex items-start justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <Skeleton className="h-9 w-28" />
+        </div>
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-lg" />
+          ))}
+        </div>
+      </div>
     );
   }
 
@@ -404,67 +383,61 @@ export default function LeadsPage() {
             value={filters.search}
             onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
           />
-          <select
-            className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-            value={filters.status}
-            onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
-          >
-            {statusOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <select
-            className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-            value={filters.priorityType}
-            onChange={(e) => setFilters((prev) => ({ ...prev, priorityType: e.target.value }))}
-          >
-            {priorityTypeOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <select
-            className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-            value={filters.leadSource}
-            onChange={(e) => setFilters((prev) => ({ ...prev, leadSource: e.target.value }))}
-          >
-            {leadSourceOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <Input
-            type="date"
+          <Select value={filters.status || "__all__"} onValueChange={(v) => setFilters((prev) => ({ ...prev, status: v === "__all__" ? "" : v }))}>
+            <SelectTrigger>
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              {statusOptions.map((opt) => (
+                <SelectItem key={opt.value || "__all__"} value={opt.value || "__all__"}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filters.priorityType || "__all__"} onValueChange={(v) => setFilters((prev) => ({ ...prev, priorityType: v === "__all__" ? "" : v }))}>
+            <SelectTrigger>
+              <SelectValue placeholder="All priorities" />
+            </SelectTrigger>
+            <SelectContent>
+              {priorityTypeOptions.map((opt) => (
+                <SelectItem key={opt.value || "__all__"} value={opt.value || "__all__"}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filters.leadSource || "__all__"} onValueChange={(v) => setFilters((prev) => ({ ...prev, leadSource: v === "__all__" ? "" : v }))}>
+            <SelectTrigger>
+              <SelectValue placeholder="All sources" />
+            </SelectTrigger>
+            <SelectContent>
+              {leadSourceOptions.map((opt) => (
+                <SelectItem key={opt.value || "__all__"} value={opt.value || "__all__"}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <DatePicker
             value={filters.startDate}
-            onChange={(e) => setFilters((prev) => ({ ...prev, startDate: e.target.value }))}
+            onChange={(v) => setFilters((prev) => ({ ...prev, startDate: v }))}
             placeholder="Start date"
           />
-          <Input
-            type="date"
+          <DatePicker
             value={filters.endDate}
-            onChange={(e) => setFilters((prev) => ({ ...prev, endDate: e.target.value }))}
+            onChange={(v) => setFilters((prev) => ({ ...prev, endDate: v }))}
             placeholder="End date"
           />
-          <select
-            className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 lg:col-span-2"
-            value={filters.sort}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, sort: e.target.value as typeof prev.sort }))
-            }
-          >
-            <option value="nextCallTime_asc">Next call (soonest)</option>
-            <option value="nextCallTime_desc">Next call (latest)</option>
-            <option value="createdAt_desc">Created (newest)</option>
-            <option value="createdAt_asc">Created (oldest)</option>
-            <option value="leadDate_desc">Lead date (newest)</option>
-            <option value="leadDate_asc">Lead date (oldest)</option>
-            <option value="lastUpdate_desc">Last update (newest)</option>
-            <option value="lastUpdate_asc">Last update (oldest)</option>
-          </select>
+          <Select value={filters.sort} onValueChange={(v) => setFilters((prev) => ({ ...prev, sort: v as typeof prev.sort }))}>
+            <SelectTrigger className="lg:col-span-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="nextCallTime_asc">Next call (soonest)</SelectItem>
+              <SelectItem value="nextCallTime_desc">Next call (latest)</SelectItem>
+              <SelectItem value="createdAt_desc">Created (newest)</SelectItem>
+              <SelectItem value="createdAt_asc">Created (oldest)</SelectItem>
+              <SelectItem value="leadDate_desc">Lead date (newest)</SelectItem>
+              <SelectItem value="leadDate_asc">Lead date (oldest)</SelectItem>
+              <SelectItem value="lastUpdate_desc">Last update (newest)</SelectItem>
+              <SelectItem value="lastUpdate_asc">Last update (oldest)</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             variant="outline"
             size="sm"
@@ -573,36 +546,6 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {toast.open && (
-        <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-md border px-4 py-3 text-sm shadow-lg backdrop-blur-sm dark:border-slate-700">
-          <div
-            className={
-              toast.variant === "success"
-                ? "border-l-4 border-emerald-500 pl-3"
-                : "border-l-4 border-red-500 pl-3"
-            }
-          >
-            <div className="flex items-start justify-between gap-3">
-              <p
-                className={
-                  toast.variant === "success"
-                    ? "text-emerald-700 dark:text-emerald-400"
-                    : "text-red-700 dark:text-red-400"
-                }
-              >
-                {toast.message}
-              </p>
-              <button
-                type="button"
-                className="text-xs text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
-                onClick={closeToast}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

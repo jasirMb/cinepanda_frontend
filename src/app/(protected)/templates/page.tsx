@@ -1,0 +1,895 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
+import { templatesKeys, useTemplates } from "@/hooks/useTemplates";
+import { useCategories } from "@/hooks/useProducts";
+import {
+  createTemplate,
+  deleteTemplate,
+  suggestProducts,
+  type CreateTemplatePayload,
+  type SuggestResponse,
+  type Template,
+} from "@/lib/api/templates";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+
+/* ────────────────────────────────────────────
+   Types
+   ──────────────────────────────────────────── */
+
+type Step = "list" | "budget" | "requirements" | "review" | "creating";
+
+interface ProductOption {
+  _id: string;
+  name: string;
+  category: string;
+  subcategory: string;
+  price: number;
+  rank: number; // 1-based priority (1 = most recommended)
+}
+
+// Top-5 products per category key
+type CategoryProducts = Record<string, ProductOption[]>;
+
+// One selected product ID per category
+type CategorySelection = Record<string, string>;
+
+/* ────────────────────────────────────────────
+   Helpers
+   ──────────────────────────────────────────── */
+
+const MAX_PER_CATEGORY = 20;
+const TOP_HIGHLIGHTED = 3;
+
+const INR = (n: number) =>
+  n.toLocaleString("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  });
+
+const PRIORITY_LABELS: Record<number, string> = {
+  1: "Most Recommended",
+  2: "Recommended",
+  3: "Good Choice",
+};
+
+const PRIORITY_COLORS: Record<number, string> = {
+  1: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+  2: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
+  3: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+};
+
+/* ────────────────────────────────────────────
+   Page
+   ──────────────────────────────────────────── */
+
+export default function TemplatesPage() {
+  const queryClient = useQueryClient();
+  const templatesQuery = useTemplates();
+  const categoriesQuery = useCategories();
+
+  const templates = templatesQuery.data?.data ?? [];
+  const categories = categoriesQuery.data?.data ?? [];
+
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
+  // ── wizard state ──────────────────────────
+  const [step, setStep] = useState<Step>("list");
+  const [templateName, setTemplateName] = useState("");
+  const [templateDescription, setTemplateDescription] = useState("");
+  const [budget, setBudget] = useState("");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+
+  // Top-5 products per category (from suggest API, priority-sorted)
+  const [allCategoryProducts, setAllCategoryProducts] =
+    useState<CategoryProducts>({});
+  // One selected product per category
+  const [categorySelection, setCategorySelection] =
+    useState<CategorySelection>({});
+
+  // Discount & GST
+  const [discountType, setDiscountType] = useState<"flat" | "percent">("percent");
+  const [discountValue, setDiscountValue] = useState("");
+  const [gstPercent, setGstPercent] = useState("18");
+
+  const [isFetchingProducts, setIsFetchingProducts] = useState(false);
+
+  const budgetNum = Number(budget) || 0;
+  const discountNum = Number(discountValue) || 0;
+  const gstNum = Number(gstPercent) || 0;
+
+  // Derive selected products from categorySelection
+  const selectedProducts = useMemo(() => {
+    const products: (ProductOption & { quantity: number })[] = [];
+    Object.entries(categorySelection).forEach(([cat, productId]) => {
+      const options = allCategoryProducts[cat] ?? [];
+      const found = options.find((o) => o._id === productId);
+      if (found) products.push({ ...found, quantity: 1 });
+    });
+    return products;
+  }, [categorySelection, allCategoryProducts]);
+
+  // Totals
+  const subtotal = useMemo(
+    () => selectedProducts.reduce((s, p) => s + p.price * p.quantity, 0),
+    [selectedProducts]
+  );
+
+  const discountAmount = useMemo(() => {
+    if (discountNum <= 0) return 0;
+    return discountType === "percent"
+      ? Math.round((discountNum / 100) * subtotal)
+      : Math.min(discountNum, subtotal);
+  }, [discountNum, discountType, subtotal]);
+
+  const afterDiscount = subtotal - discountAmount;
+
+  const gstAmount = useMemo(
+    () => (gstNum > 0 ? Math.round((gstNum / 100) * afterDiscount) : 0),
+    [gstNum, afterDiscount]
+  );
+
+  const grandTotal = afterDiscount + gstAmount;
+
+  // Category keys derived from fetched data
+  const productCategories = useMemo(
+    () => Object.keys(allCategoryProducts),
+    [allCategoryProducts]
+  );
+
+  // ── mutations ─────────────────────────────
+  const createMutation = useMutation({
+    mutationFn: createTemplate,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: templatesKeys.all });
+      resetWizard();
+      toast.success("Template created successfully");
+    },
+    onError: () => {
+      setStep("review");
+      toast.error("Failed to create template");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteTemplate,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: templatesKeys.all });
+      toast.success("Template deleted");
+    },
+    onError: () => {
+      toast.error("Failed to delete template");
+    },
+  });
+
+  // ── wizard helpers ────────────────────────
+  function resetWizard() {
+    setStep("list");
+    setTemplateName("");
+    setTemplateDescription("");
+    setBudget("");
+    setSelectedCategories([]);
+    setAllCategoryProducts({});
+    setCategorySelection({});
+    setDiscountType("percent");
+    setDiscountValue("");
+    setGstPercent("18");
+  }
+
+  function toggleCategory(name: string) {
+    setSelectedCategories((prev) =>
+      prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name]
+    );
+  }
+
+  async function fetchRecommendations() {
+    setIsFetchingProducts(true);
+    try {
+      const results = await Promise.all(
+        selectedCategories.map((cat) =>
+          suggestProducts({ category: cat, limit: MAX_PER_CATEGORY })
+        )
+      );
+
+      const catMap: CategoryProducts = {};
+      const selection: CategorySelection = {};
+
+      results.forEach((res: SuggestResponse) => {
+        res.data.forEach((p, index) => {
+          const option: ProductOption = {
+            _id: p._id,
+            name: p.name,
+            category: p.category,
+            subcategory: p.subcategory,
+            price: p.price,
+            rank: index + 1,
+          };
+
+          if (!catMap[p.category]) catMap[p.category] = [];
+          if (catMap[p.category].length < MAX_PER_CATEGORY) {
+            catMap[p.category].push(option);
+          }
+
+          // Auto-select the first (most recommended) product per category
+          if (!selection[p.category]) {
+            selection[p.category] = p._id;
+          }
+        });
+      });
+
+      setAllCategoryProducts(catMap);
+      setCategorySelection(selection);
+      setStep("review");
+    } catch {
+      toast.error("Failed to fetch product recommendations");
+    } finally {
+      setIsFetchingProducts(false);
+    }
+  }
+
+  function selectProduct(category: string, productId: string) {
+    setCategorySelection((prev) => ({ ...prev, [category]: productId }));
+  }
+
+  function handleConfirmCreate() {
+    const manualItems: CreateTemplatePayload["manualItems"] = [];
+
+    if (discountAmount > 0) {
+      manualItems.push({
+        name: discountType === "percent"
+          ? `Discount ${discountNum}%`
+          : `Discount (flat)`,
+        type: "discount",
+        amount: discountNum,
+        isPercentage: discountType === "percent",
+      });
+    }
+
+    if (gstAmount > 0) {
+      manualItems.push({
+        name: `GST ${gstNum}%`,
+        type: "tax",
+        amount: gstNum,
+        isPercentage: true,
+      });
+    }
+
+    const groups: CreateTemplatePayload["groups"] = selectedProducts.map(
+      (product) => ({
+        name: product.category,
+        productItems: [
+          {
+            productId: product._id,
+            productName: product.name,
+            category: product.category,
+            subcategory: product.subcategory,
+            quantity: product.quantity,
+            unitPrice: product.price,
+          },
+        ],
+        manualItems: [],
+      })
+    );
+
+    const payload: CreateTemplatePayload = {
+      name: templateName,
+      description: templateDescription || undefined,
+      groups,
+      manualItems,
+    };
+
+    setStep("creating");
+    createMutation.mutate(payload);
+  }
+
+  function handleDeleteTemplate(id: string) {
+    setDeleteTarget(id);
+  }
+
+  // ── loading / error states ────────────────
+  if (templatesQuery.isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-start justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <Skeleton className="h-9 w-28" />
+        </div>
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-lg" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (templatesQuery.isError) {
+    return (
+      <p className="text-red-400">Failed to load templates. Please try again.</p>
+    );
+  }
+
+  // ── RENDER: wizard steps ──────────────────
+
+  // Step 1: Budget + template info
+  if (step === "budget") {
+    return (
+      <div className="mx-auto max-w-lg space-y-6">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
+            Create New Template
+          </h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Step 1 of 3 — Enter template details and budget
+          </p>
+        </div>
+
+        <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Template Name *
+            </label>
+            <Input
+              placeholder="e.g. Premium Home Cinema"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Description
+            </label>
+            <Input
+              placeholder="e.g. Full 4K setup with Dolby Atmos"
+              value={templateDescription}
+              onChange={(e) => setTemplateDescription(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Budget (INR) *
+            </label>
+            <Input
+              type="number"
+              placeholder="e.g. 500000"
+              value={budget}
+              onChange={(e) => setBudget(e.target.value)}
+              min={0}
+            />
+            {budgetNum > 0 && (
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {INR(budgetNum)}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={resetWizard}>
+            Cancel
+          </Button>
+          <Button
+            disabled={!templateName.trim() || budgetNum <= 0}
+            onClick={() => setStep("requirements")}
+          >
+            Next — Select Requirements
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 2: Select requirement categories
+  if (step === "requirements") {
+    return (
+      <div className="mx-auto max-w-lg space-y-6">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
+            Select Requirements
+          </h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Step 2 of 3 — Choose the product categories needed for this setup
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          {categoriesQuery.isLoading ? (
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Loading categories...
+            </p>
+          ) : categories.length === 0 ? (
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              No categories found.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {categories.map((cat) => {
+                const isSelected = selectedCategories.includes(cat.name);
+                return (
+                  <button
+                    key={cat._id}
+                    type="button"
+                    onClick={() => toggleCategory(cat.name)}
+                    className={`rounded-lg border px-4 py-3 text-left text-sm font-medium transition ${
+                      isSelected
+                        ? "border-cine-primary bg-cine-primary/10 text-cine-primary dark:border-cine-primary dark:bg-cine-primary/20 dark:text-slate-50"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600"
+                    }`}
+                  >
+                    {cat.name}
+                    {cat.subcategories.length > 0 && (
+                      <span className="mt-0.5 block text-xs font-normal text-slate-500 dark:text-slate-400">
+                        {cat.subcategories.length} subcategories
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={() => setStep("budget")}>
+            Back
+          </Button>
+          <Button
+            disabled={selectedCategories.length === 0 || isFetchingProducts}
+            onClick={fetchRecommendations}
+          >
+            {isFetchingProducts
+              ? "Fetching products..."
+              : "Next — View Recommendations"}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 3: Review recommended products
+  if (step === "review") {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
+            Review Recommended Products
+          </h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Step 3 of 3 — Select one product per category. #1 is the most
+            recommended.
+          </p>
+        </div>
+
+        {/* Products grouped by category — radio selection */}
+        {productCategories.length === 0 ? (
+          <div className="rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              No products found for the selected categories.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {productCategories.map((cat) => {
+              const options = allCategoryProducts[cat] ?? [];
+              const selectedId = categorySelection[cat];
+
+              return (
+                <div
+                  key={cat}
+                  className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
+                >
+                  {/* Category header */}
+                  <div className="border-b border-slate-200 px-6 py-3 dark:border-slate-800">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                      {cat}
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Select one product — showing top {options.length}
+                    </p>
+                  </div>
+
+                  {/* Product options — top 3 highlighted, rest scrollable */}
+                  <div>
+                    {/* Top recommendations */}
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {options.slice(0, TOP_HIGHLIGHTED).map((product) => (
+                        <ProductRadioRow
+                          key={product._id}
+                          product={product}
+                          isSelected={selectedId === product._id}
+                          catKey={cat}
+                          onSelect={selectProduct}
+                          showBadge
+                        />
+                      ))}
+                    </div>
+
+                    {/* Scrollable area for remaining options */}
+                    {options.length > TOP_HIGHLIGHTED && (
+                      <>
+                        <div className="border-t border-dashed border-slate-200 px-6 py-1.5 dark:border-slate-700">
+                          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                            More options — scroll to browse
+                          </p>
+                        </div>
+                        <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                          {options.slice(TOP_HIGHLIGHTED).map((product) => (
+                            <ProductRadioRow
+                              key={product._id}
+                              product={product}
+                              isSelected={selectedId === product._id}
+                              catKey={cat}
+                              onSelect={selectProduct}
+                              showBadge={false}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Discount & GST */}
+        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <h3 className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-50">
+            Adjustments
+          </h3>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {/* Discount */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+                Discount
+              </label>
+              <div className="flex gap-2">
+                <Select value={discountType} onValueChange={(v) => setDiscountType(v as "flat" | "percent")}>
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percent">%</SelectItem>
+                    <SelectItem value="flat">Flat (INR)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  min={0}
+                  value={discountValue}
+                  onChange={(e) => setDiscountValue(e.target.value)}
+                />
+              </div>
+              {discountAmount > 0 && (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  -{INR(discountAmount)}
+                </p>
+              )}
+            </div>
+
+            {/* GST */}
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+                GST %
+              </label>
+              <Input
+                type="number"
+                placeholder="18"
+                min={0}
+                max={100}
+                value={gstPercent}
+                onChange={(e) => setGstPercent(e.target.value)}
+              />
+              {gstAmount > 0 && (
+                <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
+                  +{INR(gstAmount)}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Totals */}
+        <div className="rounded-lg border border-slate-200 bg-white px-6 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between text-slate-600 dark:text-slate-400">
+              <span>
+                Subtotal ({selectedProducts.length} product
+                {selectedProducts.length !== 1 ? "s" : ""})
+              </span>
+              <span className="font-medium text-slate-900 dark:text-slate-50">
+                {INR(subtotal)}
+              </span>
+            </div>
+
+            {discountAmount > 0 && (
+              <div className="flex justify-between text-red-600 dark:text-red-400">
+                <span>
+                  Discount{" "}
+                  {discountType === "percent" ? `(${discountNum}%)` : "(flat)"}
+                </span>
+                <span>-{INR(discountAmount)}</span>
+              </div>
+            )}
+
+            {gstAmount > 0 && (
+              <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                <span>GST ({gstNum}%)</span>
+                <span>+{INR(gstAmount)}</span>
+              </div>
+            )}
+
+            <div className="flex justify-between border-t border-slate-200 pt-2 dark:border-slate-700">
+              <span className="text-base font-bold text-slate-900 dark:text-slate-50">
+                Grand Total
+              </span>
+              <span
+                className={`text-base font-bold ${
+                  grandTotal > budgetNum
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-emerald-700 dark:text-emerald-400"
+                }`}
+              >
+                {INR(grandTotal)}
+              </span>
+            </div>
+
+            {grandTotal > budgetNum && (
+              <p className="text-xs text-red-500 dark:text-red-400">
+                Exceeds budget by {INR(grandTotal - budgetNum)}
+              </p>
+            )}
+
+            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+              <span>Budget</span>
+              <span>{INR(budgetNum)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={() => setStep("requirements")}>
+            Back
+          </Button>
+          <Button
+            disabled={selectedProducts.length === 0}
+            onClick={handleConfirmCreate}
+          >
+            Confirm & Create Template
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Creating state
+  if (step === "creating") {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <p className="text-slate-700 dark:text-slate-300">
+          Creating template...
+        </p>
+      </div>
+    );
+  }
+
+  // ── RENDER: template list (default) ───────
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
+            Templates
+          </h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Reusable price blueprints for quotations.
+          </p>
+        </div>
+        <Button onClick={() => setStep("budget")}>Create New Template</Button>
+      </div>
+
+      {/* Templates grid */}
+      {templates.length === 0 ? (
+        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            No templates yet. Create your first template to get started.
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {templates.map((template) => (
+            <TemplateCard
+              key={template._id}
+              template={template}
+              onDelete={handleDeleteTemplate}
+            />
+          ))}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Delete template"
+        description="Are you sure you want to delete this template? This action cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate(deleteTarget);
+          setDeleteTarget(null);
+        }}
+      />
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────
+   Product Radio Row
+   ──────────────────────────────────────────── */
+
+function ProductRadioRow({
+  product,
+  isSelected,
+  catKey,
+  onSelect,
+  showBadge,
+}: {
+  product: ProductOption;
+  isSelected: boolean;
+  catKey: string;
+  onSelect: (category: string, productId: string) => void;
+  showBadge: boolean;
+}) {
+  const priorityLabel = PRIORITY_LABELS[product.rank] ?? "";
+  const priorityColor = PRIORITY_COLORS[product.rank] ?? PRIORITY_COLORS[3];
+
+  return (
+    <label
+      className={`flex cursor-pointer items-center gap-4 px-6 py-3 transition ${
+        isSelected
+          ? "bg-cine-primary/5 dark:bg-cine-primary/10"
+          : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+      }`}
+    >
+      <input
+        type="radio"
+        name={`cat-${catKey}`}
+        checked={isSelected}
+        onChange={() => onSelect(catKey, product._id)}
+        className="h-4 w-4 shrink-0 accent-cine-primary"
+      />
+
+      {showBadge ? (
+        <span
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${priorityColor}`}
+        >
+          #{product.rank} {priorityLabel}
+        </span>
+      ) : (
+        <span className="shrink-0 w-6 text-center text-[10px] font-semibold text-slate-400 dark:text-slate-500">
+          #{product.rank}
+        </span>
+      )}
+
+      <div className="flex-1 min-w-0">
+        <p
+          className={`text-sm truncate ${
+            isSelected
+              ? "font-semibold text-slate-900 dark:text-slate-50"
+              : "font-medium text-slate-700 dark:text-slate-300"
+          }`}
+        >
+          {product.name}
+        </p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          {product.subcategory}
+        </p>
+      </div>
+
+      <p
+        className={`shrink-0 text-sm font-semibold ${
+          isSelected
+            ? "text-cine-primary"
+            : "text-slate-700 dark:text-slate-300"
+        }`}
+      >
+        {INR(product.price)}
+      </p>
+    </label>
+  );
+}
+
+/* ────────────────────────────────────────────
+   Template Card Component
+   ──────────────────────────────────────────── */
+
+function TemplateCard({
+  template,
+  onDelete,
+}: {
+  template: Template;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <div className="flex h-full flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800/70 dark:bg-slate-900/60">
+      <Link href={`/templates/${template._id}`} className="block">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {template.name}
+            </h3>
+            {template.description && (
+              <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">
+                {template.description}
+              </p>
+            )}
+          </div>
+          <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
+            {template.grandTotal.toLocaleString("en-IN", {
+              style: "currency",
+              currency: "INR",
+              maximumFractionDigits: 0,
+            })}
+          </span>
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {template.groups.map((group) => (
+            <span
+              key={group.name}
+              className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+            >
+              {group.name} ({group.productItems.length})
+            </span>
+          ))}
+        </div>
+
+        <div className="mt-3 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+          <p>
+            {template.groups.reduce(
+              (sum, g) => sum + g.productItems.length,
+              0
+            )}{" "}
+            products across {template.groups.length} group
+            {template.groups.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+      </Link>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+        <span className="rounded-full bg-slate-200/70 px-3 py-1 dark:bg-slate-800/70">
+          Created {new Date(template.createdAt).toLocaleDateString()}
+        </span>
+        <Link
+          href={`/templates/${template._id}`}
+          className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-cine-primary"
+        >
+          View / Edit
+        </Link>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            onDelete(template._id);
+          }}
+          className="ml-auto inline-flex items-center gap-1 rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-semibold text-red-600 shadow-sm transition hover:bg-red-50 dark:border-red-800 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-900/30"
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  );
+}

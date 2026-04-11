@@ -3,10 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { leadsKeys } from "@/hooks/useLeads";
 import {
   createLead,
@@ -14,14 +17,6 @@ import {
   updateLead,
   type CreateLeadPayload
 } from "@/lib/api/leads";
-
-type ToastVariant = "success" | "error";
-
-interface ToastState {
-  open: boolean;
-  message: string;
-  variant: ToastVariant;
-}
 
 type Option = { label: string; value: string };
 
@@ -61,33 +56,6 @@ const initialFormValues: CreateLeadPayload = {
   nextCallTime: null
 };
 
-function Select({
-  value,
-  onChange,
-  options,
-  placeholder
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  options: Option[];
-  placeholder: string;
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-    >
-      <option value="">{placeholder}</option>
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
-  );
-}
-
 export default function NewLeadPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -99,11 +67,6 @@ export default function NewLeadPage() {
   const [formValues, setFormValues] =
     useState<CreateLeadPayload>(initialFormValues);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [toast, setToast] = useState<ToastState>({
-    open: false,
-    message: "",
-    variant: "success"
-  });
 
   const leadQuery = useQuery({
     queryKey: ["lead", editId],
@@ -129,11 +92,7 @@ export default function NewLeadPage() {
         message = (error as any).response.data.error;
       }
 
-      setToast({
-        open: true,
-        message,
-        variant: "error"
-      });
+      toast.error(message);
     }
   });
 
@@ -144,11 +103,7 @@ export default function NewLeadPage() {
       router.push("/leads?updated=1");
     },
     onError: () => {
-      setToast({
-        open: true,
-        message: "Failed to update lead. Please try again.",
-        variant: "error"
-      });
+      toast.error("Failed to update lead. Please try again.");
     }
   });
 
@@ -306,12 +261,16 @@ export default function NewLeadPage() {
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
                 Lead source *
               </label>
-              <Select
-                value={formValues.leadSource}
-                onChange={(v) => handleChange("leadSource", v)}
-                options={leadSourceOptions}
-                placeholder="Select lead source"
-              />
+              <Select value={formValues.leadSource || undefined} onValueChange={(v) => handleChange("leadSource", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select lead source" />
+                </SelectTrigger>
+                <SelectContent>
+                  {leadSourceOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {formErrors.leadSource && (
                 <p className="text-xs text-red-500">{formErrors.leadSource}</p>
               )}
@@ -321,7 +280,7 @@ export default function NewLeadPage() {
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
                 Lead date *
               </label>
-              <Input type="date" value={formValues.leadDate} onChange={(e) => handleChange("leadDate", e.target.value)} />
+              <DatePicker value={formValues.leadDate} onChange={(v) => handleChange("leadDate", v)} placeholder="Select lead date" />
               {formErrors.leadDate && <p className="text-xs text-red-500">{formErrors.leadDate}</p>}
             </div>
 
@@ -329,11 +288,7 @@ export default function NewLeadPage() {
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
                 Last update *
               </label>
-              <Input
-                type="date"
-                value={formValues.lastUpdate}
-                onChange={(e) => handleChange("lastUpdate", e.target.value)}
-              />
+              <DatePicker value={formValues.lastUpdate} onChange={(v) => handleChange("lastUpdate", v)} placeholder="Select last update" />
               {formErrors.lastUpdate && <p className="text-xs text-red-500">{formErrors.lastUpdate}</p>}
             </div>
 
@@ -341,12 +296,16 @@ export default function NewLeadPage() {
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
                 Priority type *
               </label>
-              <Select
-                value={formValues.priorityType}
-                onChange={(v) => handleChange("priorityType", v)}
-                options={priorityTypeOptions}
-                placeholder="Select priority"
-              />
+              <Select value={formValues.priorityType || undefined} onValueChange={(v) => handleChange("priorityType", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  {priorityTypeOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {formErrors.priorityType && (
                 <p className="text-xs text-red-500">{formErrors.priorityType}</p>
               )}
@@ -356,12 +315,16 @@ export default function NewLeadPage() {
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
                 Status *
               </label>
-              <Select
-                value={formValues.status || "OPEN"}
-                onChange={(v) => handleChange("status", v)}
-                options={statusOptions}
-                placeholder="Select status"
-              />
+              <Select value={formValues.status || undefined} onValueChange={(v) => handleChange("status", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {formErrors.status && (
                 <p className="text-xs text-red-500">{formErrors.status}</p>
               )}
@@ -424,36 +387,6 @@ export default function NewLeadPage() {
         </form>
       </div>
 
-      {toast.open && (
-        <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-md border px-4 py-3 text-sm shadow-lg backdrop-blur-sm dark:border-slate-700">
-          <div
-            className={
-              toast.variant === "success"
-                ? "border-l-4 border-emerald-500 pl-3"
-                : "border-l-4 border-red-500 pl-3"
-            }
-          >
-            <div className="flex items-start justify-between gap-3">
-              <p
-                className={
-                  toast.variant === "success"
-                    ? "text-emerald-700 dark:text-emerald-400"
-                    : "text-red-700 dark:text-red-400"
-                }
-              >
-                {toast.message}
-              </p>
-              <button
-                type="button"
-                className="text-xs text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
-                onClick={() => setToast((prev) => ({ ...prev, open: false }))}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -4,31 +4,23 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import { productsKeys, useProducts, useCategories } from "@/hooks/useProducts";
 import { ProductsTable } from "@/components/tables/ProductsTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { deleteProduct, type Product } from "@/lib/api/products";
-
-type ToastVariant = "success" | "error";
-
-interface ToastState {
-  open: boolean;
-  message: string;
-  variant: ToastVariant;
-}
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ProductsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
-  const [toast, setToast] = useState<ToastState>({
-    open: false,
-    message: "",
-    variant: "success"
-  });
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({
@@ -67,17 +59,15 @@ export default function ProductsPage() {
     mutationFn: deleteProduct,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: productsKeys.all });
-      setToast({ open: true, message: "Product deleted", variant: "success" });
+      toast.success("Product deleted");
     },
     onError: () => {
-      setToast({ open: true, message: "Failed to delete product", variant: "error" });
+      toast.error("Failed to delete product");
     }
   });
 
   function handleDelete(id: string) {
-    if (confirm("Are you sure you want to delete this product?")) {
-      deleteMutation.mutate(id);
-    }
+    setDeleteTarget(id);
   }
 
   // Toast from URL params (after create/update)
@@ -87,13 +77,13 @@ export default function ProductsPage() {
     const error = searchParams.get("error");
 
     if (created === "1") {
-      setToast({ open: true, message: "Product created successfully", variant: "success" });
+      toast.success("Product created successfully");
       router.replace("/products");
     } else if (updated === "1") {
-      setToast({ open: true, message: "Product updated successfully", variant: "success" });
+      toast.success("Product updated successfully");
       router.replace("/products");
     } else if (typeof error === "string" && error.trim().length > 0) {
-      setToast({ open: true, message: decodeURIComponent(error), variant: "error" });
+      toast.error(decodeURIComponent(error));
       router.replace("/products");
     }
   }, [router, searchParams]);
@@ -112,7 +102,22 @@ export default function ProductsPage() {
   const isError = productsQuery.isError;
 
   if (isLoading) {
-    return <p className="text-slate-700 dark:text-slate-300">Loading products...</p>;
+    return (
+      <div className="space-y-4">
+        <div className="flex items-start justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <Skeleton className="h-9 w-28" />
+        </div>
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-lg" />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   if (isError) {
@@ -167,7 +172,7 @@ export default function ProductsPage() {
           )}
         </div>
 
-        {Object.keys(product.specifications).length > 0 && (
+        {product.specifications && Object.keys(product.specifications).length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {Object.entries(product.specifications)
               .slice(0, 4)
@@ -249,31 +254,28 @@ export default function ProductsPage() {
           value={filters.search}
           onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
         />
-        <select
-          className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-          value={filters.category}
-          onChange={(e) => setFilters((prev) => ({ ...prev, category: e.target.value }))}
-        >
-          <option value="">All categories</option>
-          {categories.map((cat) => (
-            <option key={cat._id} value={cat.name}>
-              {cat.name}
-            </option>
-          ))}
-        </select>
-        <select
-          className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-          value={filters.subcategory}
-          onChange={(e) => setFilters((prev) => ({ ...prev, subcategory: e.target.value }))}
-          disabled={!filters.category}
-        >
-          <option value="">All subcategories</option>
-          {selectedCategorySubs.map((sub) => (
-            <option key={sub} value={sub}>
-              {sub}
-            </option>
-          ))}
-        </select>
+        <Select value={filters.category || "__all__"} onValueChange={(v) => setFilters((prev) => ({ ...prev, category: v === "__all__" ? "" : v }))}>
+          <SelectTrigger>
+            <SelectValue placeholder="All categories" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">All categories</SelectItem>
+            {categories.map((cat) => (
+              <SelectItem key={cat._id} value={cat.name}>{cat.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filters.subcategory || "__all__"} onValueChange={(v) => setFilters((prev) => ({ ...prev, subcategory: v === "__all__" ? "" : v }))}>
+          <SelectTrigger disabled={!filters.category}>
+            <SelectValue placeholder="All subcategories" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">All subcategories</SelectItem>
+            {selectedCategorySubs.map((sub) => (
+              <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Input
           placeholder="Filter by brand..."
           value={filters.brand}
@@ -344,37 +346,17 @@ export default function ProductsPage() {
         </div>
       )}
 
-      {/* Toast */}
-      {toast.open && (
-        <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-md border px-4 py-3 text-sm shadow-lg backdrop-blur-sm dark:border-slate-700">
-          <div
-            className={
-              toast.variant === "success"
-                ? "border-l-4 border-emerald-500 pl-3"
-                : "border-l-4 border-red-500 pl-3"
-            }
-          >
-            <div className="flex items-start justify-between gap-3">
-              <p
-                className={
-                  toast.variant === "success"
-                    ? "text-emerald-700 dark:text-emerald-400"
-                    : "text-red-700 dark:text-red-400"
-                }
-              >
-                {toast.message}
-              </p>
-              <button
-                type="button"
-                className="text-xs text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
-                onClick={() => setToast((prev) => ({ ...prev, open: false }))}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Delete product"
+        description="Are you sure you want to delete this product? This action cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate(deleteTarget);
+          setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }
