@@ -11,6 +11,7 @@ import {
   updateQuotation,
   updateQuotationStatus,
   deleteQuotation,
+  downloadServerPdf,
   type Quotation,
 } from "@/lib/api/quotations";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,7 @@ export default function QuotationDetailPage() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [notes, setNotes] = useState("");
   const [termsAndConditions, setTermsAndConditions] = useState("");
   const [validUntil, setValidUntil] = useState("");
@@ -115,6 +117,17 @@ export default function QuotationDetailPage() {
       toast.error("Failed to delete quotation");
     },
   });
+
+  async function handleDownloadPdf() {
+    setDownloadingPdf(true);
+    try {
+      await downloadServerPdf(quotationId);
+    } catch {
+      toast.error("Failed to download PDF");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
 
   function handleCancel() {
     if (quotation) {
@@ -183,9 +196,16 @@ export default function QuotationDetailPage() {
           <Button variant="outline" asChild>
             <Link href="/quotations">Back</Link>
           </Button>
+          <Button
+            variant="outline"
+            onClick={handleDownloadPdf}
+            disabled={downloadingPdf}
+          >
+            {downloadingPdf ? "Downloading..." : "Download PDF"}
+          </Button>
           <Button variant="outline" asChild>
             <Link href={`/quotations/${quotationId}/preview`}>
-              Preview & Download PDF
+              Preview PDF
             </Link>
           </Button>
           {isEditing ? (

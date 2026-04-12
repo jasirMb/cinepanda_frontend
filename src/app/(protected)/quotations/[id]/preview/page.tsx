@@ -3,10 +3,11 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { toast } from "sonner";
 
 import { useQuotation } from "@/hooks/useQuotations";
 import { QuotationPreview } from "@/components/quotation/QuotationPreview";
-import { generatePdf } from "@/lib/generate-pdf";
+import { downloadHtmlToPdf } from "@/lib/api/quotations";
 import { Button } from "@/components/ui/button";
 
 export default function QuotationPreviewPage() {
@@ -26,10 +27,11 @@ export default function QuotationPreviewPage() {
         .replace(/\s+/g, "-")
         .toLowerCase();
       const idSuffix = quotation._id.slice(-6);
-      await generatePdf({
-        element: previewRef.current,
-        filename: `CinePanda-Quotation-${customerName}-${idSuffix}`,
-      });
+      const filename = `CinePanda-Quotation-${customerName}-${idSuffix}.pdf`;
+      const html = previewRef.current.outerHTML;
+      await downloadHtmlToPdf(html, filename);
+    } catch {
+      toast.error("Failed to generate PDF");
     } finally {
       setDownloading(false);
     }

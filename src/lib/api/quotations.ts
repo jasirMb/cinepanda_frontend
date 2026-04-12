@@ -143,3 +143,40 @@ export function getQuotationPdfUrl(id: string): string {
     process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL;
   return `${baseURL}/quotations/${id}/pdf`;
 }
+
+/**
+ * Download the server-generated PDF (PDFKit) for a quotation.
+ */
+export async function downloadServerPdf(id: string): Promise<void> {
+  const response = await api.get(`/quotations/${id}/pdf`, {
+    responseType: "blob",
+  });
+  const blob = new Blob([response.data], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `quotation-${id}.pdf`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Send custom HTML to the backend, which converts it to PDF via Puppeteer.
+ */
+export async function downloadHtmlToPdf(
+  html: string,
+  filename = "quotation.pdf"
+): Promise<void> {
+  const response = await api.post(
+    "/quotations/html-to-pdf",
+    { html, filename },
+    { responseType: "blob" }
+  );
+  const blob = new Blob([response.data], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}

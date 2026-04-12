@@ -1,0 +1,407 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+
+import { ledgerKeys } from "@/hooks/useLedger";
+import { useProjects } from "@/hooks/useProjects";
+import { useCustomers } from "@/hooks/useCustomers";
+import {
+  createLedgerEntry,
+  type CreateLedgerPayload,
+  type EntryType,
+  type PaymentMethod,
+  type PaymentStatus,
+  type RecurrenceFrequency,
+} from "@/lib/api/ledger";
+import type { ProjectPopulated } from "@/lib/api/projects";
+import type { Customer } from "@/lib/api/customers";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+export default function NewLedgerEntryPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
+
+  const preProjectId = searchParams.get("projectId") ?? "";
+  const preCustomerId = searchParams.get("customerId") ?? "";
+
+  const projectsQuery = useProjects();
+  const projects = projectsQuery.data?.data ?? [];
+  const customersQuery = useCustomers();
+  const customers = customersQuery.data?.data ?? [];
+
+  const [form, setForm] = useState({
+    entryType: "EXPENSE" as EntryType,
+    category: "",
+    amount: 0,
+    description: "",
+    entryDate: "",
+    paymentMethod: "" as PaymentMethod | "",
+    paymentStatus: "PAID" as PaymentStatus,
+    projectId: preProjectId,
+    customerId: preCustomerId,
+    invoiceRef: "",
+    isRecurring: false,
+    frequency: "MONTHLY" as RecurrenceFrequency,
+    interval: 1,
+    nextDueDate: "",
+    endDate: "",
+  });
+
+  const createMutation = useMutation({
+    mutationFn: createLedgerEntry,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ledgerKeys.all });
+      toast.success("Ledger entry created");
+      router.push("/ledger");
+    },
+    onError: () => toast.error("Failed to create entry"),
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.category.trim() || !form.description.trim() || !form.entryDate) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+    if (form.amount <= 0) {
+      toast.error("Amount must be greater than 0");
+      return;
+    }
+
+    const payload: CreateLedgerPayload = {
+      entryType: form.entryType,
+      category: form.category,
+      amount: form.amount,
+      description: form.description,
+      entryDate: form.entryDate,
+      paymentStatus: form.paymentStatus,
+    };
+    if (form.paymentMethod) payload.paymentMethod = form.paymentMethod;
+    if (form.projectId) payload.projectId = form.projectId;
+    if (form.customerId) payload.customerId = form.customerId;
+    if (form.invoiceRef) payload.invoiceRef = form.invoiceRef;
+    if (form.isRecurring) {
+      payload.isRecurring = true;
+      payload.recurrenceRule = {
+        frequency: form.frequency,
+        interval: form.interval,
+        nextDueDate: form.nextDueDate,
+        ...(form.endDate ? { endDate: form.endDate } : {}),
+      };
+    }
+
+    createMutation.mutate(payload);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
+          New Ledger Entry
+        </h2>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          Record a new income or expense entry.
+        </p>
+      </div>
+
+      <form
+        onSubmit={handleSubmit}
+        className="max-w-2xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
+      >
+        {/* Type toggle */}
+        <Field label="Entry Type *">
+          <div className="flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
+            {(["INCOME", "EXPENSE"] as EntryType[]).map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={`flex-1 rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+                  form.entryType === t
+                    ? t === "INCOME"
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "bg-red-600 text-white shadow-sm"
+                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400"
+                }`}
+                onClick={() => setForm((f) => ({ ...f, entryType: t }))}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Category *">
+            <Input
+              value={form.category}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, category: e.target.value }))
+              }
+              placeholder="e.g. Equipment Sale, Materials, Labor"
+              required
+            />
+          </Field>
+          <Field label="Amount (INR) *">
+            <Input
+              type="number"
+              min={1}
+              value={form.amount || ""}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, amount: Number(e.target.value) }))
+              }
+              placeholder="0"
+              required
+            />
+          </Field>
+        </div>
+
+        <Field label="Description *">
+          <textarea
+            className="flex w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 dark:border-slate-800 dark:bg-slate-950 dark:ring-offset-slate-950 dark:placeholder:text-slate-400 dark:focus-visible:ring-slate-300"
+            rows={3}
+            value={form.description}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, description: e.target.value }))
+            }
+            placeholder="Description of the transaction"
+            required
+          />
+        </Field>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Entry Date *">
+            <DatePicker
+              value={form.entryDate}
+              onChange={(v) => setForm((f) => ({ ...f, entryDate: v }))}
+              placeholder="Transaction date"
+            />
+          </Field>
+          <Field label="Invoice / Reference">
+            <Input
+              value={form.invoiceRef}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, invoiceRef: e.target.value }))
+              }
+              placeholder="INV-2026-001"
+            />
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Payment Method">
+            <Select
+              value={form.paymentMethod || "NONE"}
+              onValueChange={(v) =>
+                setForm((f) => ({
+                  ...f,
+                  paymentMethod: v === "NONE" ? ("" as PaymentMethod | "") : (v as PaymentMethod),
+                }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select method" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NONE">Not specified</SelectItem>
+                <SelectItem value="CASH">Cash</SelectItem>
+                <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
+                <SelectItem value="UPI">UPI</SelectItem>
+                <SelectItem value="CHEQUE">Cheque</SelectItem>
+                <SelectItem value="OTHER">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Payment Status">
+            <Select
+              value={form.paymentStatus}
+              onValueChange={(v) =>
+                setForm((f) => ({ ...f, paymentStatus: v as PaymentStatus }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="PAID">Paid</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="PARTIAL">Partial</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Project (optional)">
+            <Select
+              value={form.projectId || "NONE"}
+              onValueChange={(v) =>
+                setForm((f) => ({ ...f, projectId: v === "NONE" ? "" : v }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select project" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NONE">No project</SelectItem>
+                {projects.map((p: ProjectPopulated) => (
+                  <SelectItem key={p._id} value={p._id}>
+                    {p.clientName} — {p.serviceType}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Customer (optional)">
+            <Select
+              value={form.customerId || "NONE"}
+              onValueChange={(v) =>
+                setForm((f) => ({ ...f, customerId: v === "NONE" ? "" : v }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select customer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NONE">No customer</SelectItem>
+                {customers.map((c: Customer) => (
+                  <SelectItem key={c._id} value={c._id}>
+                    {c.name} — {c.place}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+
+        {/* Recurring toggle */}
+        <div className="flex items-center gap-3">
+          <label className="relative inline-flex cursor-pointer items-center">
+            <input
+              type="checkbox"
+              checked={form.isRecurring}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, isRecurring: e.target.checked }))
+              }
+              className="peer sr-only"
+            />
+            <div className="h-5 w-9 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-cine-primary peer-checked:after:translate-x-full dark:bg-slate-600" />
+          </label>
+          <span className="text-sm text-slate-700 dark:text-slate-300">
+            Recurring entry
+          </span>
+        </div>
+
+        {form.isRecurring && (
+          <div className="space-y-4 rounded-md border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="Frequency *">
+                <Select
+                  value={form.frequency}
+                  onValueChange={(v) =>
+                    setForm((f) => ({
+                      ...f,
+                      frequency: v as RecurrenceFrequency,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DAILY">Daily</SelectItem>
+                    <SelectItem value="WEEKLY">Weekly</SelectItem>
+                    <SelectItem value="MONTHLY">Monthly</SelectItem>
+                    <SelectItem value="QUARTERLY">Quarterly</SelectItem>
+                    <SelectItem value="YEARLY">Yearly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Interval">
+                <Input
+                  type="number"
+                  min={1}
+                  value={form.interval}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      interval: Math.max(1, Number(e.target.value)),
+                    }))
+                  }
+                />
+              </Field>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="Next Due Date *">
+                <DatePicker
+                  value={form.nextDueDate}
+                  onChange={(v) =>
+                    setForm((f) => ({ ...f, nextDueDate: v }))
+                  }
+                  placeholder="Next due date"
+                />
+              </Field>
+              <Field label="End Date (optional)">
+                <DatePicker
+                  value={form.endDate}
+                  onChange={(v) => setForm((f) => ({ ...f, endDate: v }))}
+                  placeholder="End date"
+                />
+              </Field>
+            </div>
+          </div>
+        )}
+
+        {/* Info about approval */}
+        {form.entryType === "EXPENSE" && form.amount >= 10000 && (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+            This expense entry will require approval (amount exceeds the
+            threshold).
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-2">
+          <Button type="submit" disabled={createMutation.isPending}>
+            {createMutation.isPending ? "Creating..." : "Create Entry"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.back()}
+          >
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
