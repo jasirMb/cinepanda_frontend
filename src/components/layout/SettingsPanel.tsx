@@ -4,6 +4,7 @@ import { Check, Moon, Sun, User } from "lucide-react";
 import clsx from "clsx";
 import {
   BACKGROUND_PRESETS,
+  PATTERN_PRESETS,
   SIDEBAR_PRESETS,
   getBackgroundPreset,
   useSettingsStore,
@@ -14,11 +15,16 @@ export function SettingsPanel() {
   const theme = useSettingsStore((s) => s.theme);
   const backgroundId = useSettingsStore((s) => s.backgroundId);
   const sidebarId = useSettingsStore((s) => s.sidebarId);
+  const patternId = useSettingsStore((s) => s.patternId);
   const profile = useSettingsStore((s) => s.profile);
   const setTheme = useSettingsStore((s) => s.setTheme);
   const setBackgroundId = useSettingsStore((s) => s.setBackgroundId);
   const setSidebarId = useSettingsStore((s) => s.setSidebarId);
+  const setPatternId = useSettingsStore((s) => s.setPatternId);
   const setProfile = useSettingsStore((s) => s.setProfile);
+
+  const currentBg = getBackgroundPreset(backgroundId);
+  const currentBgColor = theme === "dark" ? currentBg.dark : currentBg.light;
 
   return (
     <div className="space-y-5 text-slate-900 dark:text-slate-100">
@@ -100,6 +106,45 @@ export function SettingsPanel() {
         <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
           Current: {getBackgroundPreset(backgroundId).label}
         </p>
+      </Section>
+
+      <Section title="Background pattern">
+        <div className="grid grid-cols-3 gap-2">
+          {PATTERN_PRESETS.map((preset) => {
+            const active = patternId === preset.id;
+            const image = theme === "dark" ? preset.dark : preset.light;
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => setPatternId(preset.id)}
+                title={preset.label}
+                aria-label={`Pattern ${preset.label}`}
+                className={clsx(
+                  "relative h-16 overflow-hidden rounded-md border text-[10px] font-medium transition",
+                  active
+                    ? "border-cine-primary ring-2 ring-cine-primary/40"
+                    : "border-slate-200 hover:border-slate-400 dark:border-slate-700 dark:hover:border-slate-500"
+                )}
+                style={{
+                  backgroundColor: currentBgColor,
+                  backgroundImage: image ? `url("${image}")` : undefined,
+                  backgroundRepeat: "repeat",
+                  backgroundSize: image ? "120px 120px" : undefined,
+                }}
+              >
+                <span
+                  className="absolute inset-x-0 bottom-0 bg-black/40 px-1 py-0.5 text-center text-white"
+                >
+                  {preset.label}
+                </span>
+                {active && (
+                  <Check className="absolute right-1 top-1 h-3.5 w-3.5 text-cine-primary" />
+                )}
+              </button>
+            );
+          })}
+        </div>
       </Section>
 
       <Section title="Sidebar color">

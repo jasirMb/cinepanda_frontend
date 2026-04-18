@@ -3,12 +3,14 @@
 import { useEffect } from "react";
 import {
   getBackgroundPreset,
+  getPatternPreset,
   useSettingsStore,
 } from "@/store/settings-store";
 
 export function ThemeApplier() {
   const theme = useSettingsStore((s) => s.theme);
   const backgroundId = useSettingsStore((s) => s.backgroundId);
+  const patternId = useSettingsStore((s) => s.patternId);
   const hasHydrated = useSettingsStore((s) => s.hasHydrated);
 
   useEffect(() => {
@@ -20,10 +22,15 @@ export function ThemeApplier() {
 
   useEffect(() => {
     if (!hasHydrated) return;
-    const preset = getBackgroundPreset(backgroundId);
-    const color = theme === "dark" ? preset.dark : preset.light;
+    const bg = getBackgroundPreset(backgroundId);
+    const pattern = getPatternPreset(patternId);
+    const color = theme === "dark" ? bg.dark : bg.light;
+    const image = theme === "dark" ? pattern.dark : pattern.light;
     document.body.style.backgroundColor = color;
-  }, [theme, backgroundId, hasHydrated]);
+    document.body.style.backgroundImage = image ? `url("${image}")` : "";
+    document.body.style.backgroundRepeat = "repeat";
+    document.body.style.backgroundAttachment = "fixed";
+  }, [theme, backgroundId, patternId, hasHydrated]);
 
   return null;
 }
