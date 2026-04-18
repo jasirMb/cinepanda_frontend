@@ -4,6 +4,32 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  Briefcase,
+  Check,
+  Clock,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Scale,
+  Trash2,
+  Wallet,
+  X,
+} from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import { ledgerKeys, useLedger, useLedgerSummary } from "@/hooks/useLedger";
 import {
@@ -41,7 +67,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 /* ────────────────────────────────────────────
-   Helpers
+   Helpers / tokens
    ──────────────────────────────────────────── */
 
 function formatINR(amount: number) {
@@ -49,6 +75,15 @@ function formatINR(amount: number) {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function formatINRCompact(amount: number) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    notation: "compact",
+    maximumFractionDigits: 1,
   }).format(amount);
 }
 
@@ -61,7 +96,8 @@ function formatDate(iso: string) {
 }
 
 const APPROVAL_BADGE: Record<ApprovalStatus, string> = {
-  NOT_REQUIRED: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+  NOT_REQUIRED:
+    "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
   PENDING_APPROVAL:
     "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
   APPROVED:
@@ -71,8 +107,39 @@ const APPROVAL_BADGE: Record<ApprovalStatus, string> = {
 
 const PAYMENT_BADGE: Record<PaymentStatus, string> = {
   PAID: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
-  PENDING: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  PENDING:
+    "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
   PARTIAL: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
+};
+
+const EXPENSE_PALETTE = [
+  "#ef4444",
+  "#f97316",
+  "#f59e0b",
+  "#eab308",
+  "#a855f7",
+  "#ec4899",
+  "#64748b",
+];
+
+const INCOME_PALETTE = [
+  "#10b981",
+  "#14b8a6",
+  "#3076A1",
+  "#0ea5e9",
+  "#6366f1",
+  "#84cc16",
+  "#64748b",
+];
+
+const tooltipStyle: React.CSSProperties = {
+  backgroundColor: "#ffffff",
+  border: "1px solid #e2e8f0",
+  borderRadius: 8,
+  color: "#0f172a",
+  fontSize: 12,
+  padding: "8px 12px",
+  boxShadow: "0 6px 16px rgba(15, 23, 42, 0.08)",
 };
 
 /* ────────────────────────────────────────────
@@ -143,480 +210,127 @@ export default function LedgerPage() {
     onError: () => toast.error("Failed to generate recurring entries"),
   });
 
-  /* ── Loading ── */
-  if (ledgerQuery.isLoading) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-start justify-between">
-          <div className="space-y-2">
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-4 w-48" />
-          </div>
-          <Skeleton className="h-9 w-32" />
-        </div>
-        <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full rounded-lg" />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const hasFilters = Boolean(
+    filters.entryType ||
+      filters.paymentStatus ||
+      filters.approvalStatus ||
+      filters.startDate ||
+      filters.endDate
+  );
 
-  if (ledgerQuery.isError) {
-    return (
-      <p className="text-red-400">Failed to load ledger. Please try again.</p>
-    );
-  }
+  const totalIncome = summary?.profitLoss?.totalIncome ?? 0;
+  const totalExpense = summary?.profitLoss?.totalExpense ?? 0;
+  const netProfitLoss = summary?.profitLoss?.netProfitLoss ?? 0;
+  const pendingCount = entries.filter(
+    (e) => e.approvalStatus === "PENDING_APPROVAL"
+  ).length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
+          <h2 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
             Ledger
           </h2>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            View and manage CinePanda income and expenses.
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Track income, expenses and approvals across projects.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             size="sm"
+            className="gap-1.5"
             disabled={recurringMutation.isPending}
             onClick={() => recurringMutation.mutate()}
           >
-            {recurringMutation.isPending ? "Generating..." : "Generate Due Recurring"}
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${
+                recurringMutation.isPending ? "animate-spin" : ""
+              }`}
+            />
+            {recurringMutation.isPending ? "Generating..." : "Generate Recurring"}
           </Button>
           <Link href="/ledger/new">
-            <Button>New Entry</Button>
+            <Button className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              New Entry
+            </Button>
           </Link>
         </div>
       </div>
 
+      {/* KPI strip */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <KpiTile
+          label="Total Income"
+          value={formatINR(totalIncome)}
+          icon={<ArrowUpRight className="h-4 w-4" />}
+          tone="success"
+          loading={summaryQuery.isLoading}
+        />
+        <KpiTile
+          label="Total Expense"
+          value={formatINR(totalExpense)}
+          icon={<ArrowDownRight className="h-4 w-4" />}
+          tone="danger"
+          loading={summaryQuery.isLoading}
+        />
+        <KpiTile
+          label="Net Profit / Loss"
+          value={formatINR(netProfitLoss)}
+          icon={<Scale className="h-4 w-4" />}
+          tone={netProfitLoss >= 0 ? "success" : "danger"}
+          loading={summaryQuery.isLoading}
+        />
+        <KpiTile
+          label="Pending Approvals"
+          value={String(pendingCount)}
+          icon={<Clock className="h-4 w-4" />}
+          tone={pendingCount > 0 ? "warning" : "neutral"}
+          loading={ledgerQuery.isLoading}
+        />
+      </div>
+
       {/* Tabs */}
-      <div className="flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
-        <button
-          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-            tab === "entries"
-              ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-50"
-              : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
-          }`}
+      <div className="inline-flex gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <TabButton
+          label="Entries"
+          active={tab === "entries"}
           onClick={() => setTab("entries")}
-        >
-          Entries
-        </button>
-        <button
-          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
-            tab === "summary"
-              ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-50"
-              : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
-          }`}
+          count={entries.length}
+        />
+        <TabButton
+          label="Summary"
+          active={tab === "summary"}
           onClick={() => setTab("summary")}
-        >
-          Summary
-        </button>
+        />
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-        <div className="min-w-[140px]">
-          <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
-            Type
-          </label>
-          <Select
-            value={filters.entryType ?? "ALL"}
-            onValueChange={(v) =>
-              setFilters((f) => ({
-                ...f,
-                entryType: v === "ALL" ? undefined : (v as EntryType),
-              }))
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All</SelectItem>
-              <SelectItem value="INCOME">Income</SelectItem>
-              <SelectItem value="EXPENSE">Expense</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="min-w-[140px]">
-          <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
-            Payment
-          </label>
-          <Select
-            value={filters.paymentStatus ?? "ALL"}
-            onValueChange={(v) =>
-              setFilters((f) => ({
-                ...f,
-                paymentStatus: v === "ALL" ? undefined : (v as PaymentStatus),
-              }))
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All</SelectItem>
-              <SelectItem value="PAID">Paid</SelectItem>
-              <SelectItem value="PENDING">Pending</SelectItem>
-              <SelectItem value="PARTIAL">Partial</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="min-w-[160px]">
-          <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
-            Approval
-          </label>
-          <Select
-            value={filters.approvalStatus ?? "ALL"}
-            onValueChange={(v) =>
-              setFilters((f) => ({
-                ...f,
-                approvalStatus:
-                  v === "ALL" ? undefined : (v as ApprovalStatus),
-              }))
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All</SelectItem>
-              <SelectItem value="PENDING_APPROVAL">Pending Approval</SelectItem>
-              <SelectItem value="APPROVED">Approved</SelectItem>
-              <SelectItem value="REJECTED">Rejected</SelectItem>
-              <SelectItem value="NOT_REQUIRED">Not Required</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="min-w-[150px]">
-          <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
-            From
-          </label>
-          <DatePicker
-            value={filters.startDate ?? ""}
-            onChange={(v) =>
-              setFilters((f) => ({ ...f, startDate: v || undefined }))
-            }
-            placeholder="Start date"
-          />
-        </div>
-        <div className="min-w-[150px]">
-          <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
-            To
-          </label>
-          <DatePicker
-            value={filters.endDate ?? ""}
-            onChange={(v) =>
-              setFilters((f) => ({ ...f, endDate: v || undefined }))
-            }
-            placeholder="End date"
-          />
-        </div>
-        {(filters.entryType ||
-          filters.paymentStatus ||
-          filters.approvalStatus ||
-          filters.startDate ||
-          filters.endDate) && (
-          <Button variant="ghost" size="sm" onClick={() => setFilters({})}>
-            Clear
-          </Button>
-        )}
-      </div>
+      <FilterBar
+        filters={filters}
+        setFilters={setFilters}
+        hasFilters={hasFilters}
+      />
 
-      {/* Entries tab */}
-      {tab === "entries" && (
-        <>
-          {entries.length === 0 ? (
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              No ledger entries found.
-            </p>
-          ) : (
-            <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/80">
-                    <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300">
-                      Date
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300">
-                      Type
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300">
-                      Category
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300">
-                      Description
-                    </th>
-                    <th className="px-4 py-3 text-right font-medium text-slate-700 dark:text-slate-300">
-                      Amount
-                    </th>
-                    <th className="px-4 py-3 text-center font-medium text-slate-700 dark:text-slate-300">
-                      Payment
-                    </th>
-                    <th className="px-4 py-3 text-center font-medium text-slate-700 dark:text-slate-300">
-                      Approval
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300">
-                      Project
-                    </th>
-                    <th className="px-4 py-3 text-right font-medium text-slate-700 dark:text-slate-300">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entries.map((entry: LedgerEntryPopulated) => (
-                    <tr
-                      key={entry._id}
-                      className={`border-b border-slate-100 last:border-0 dark:border-slate-800/50 ${
-                        entry.approvalStatus === "PENDING_APPROVAL"
-                          ? "bg-amber-50/50 dark:bg-amber-900/10"
-                          : ""
-                      }`}
-                    >
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
-                        {formatDate(entry.entryDate)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`text-xs font-semibold ${
-                            entry.entryType === "INCOME"
-                              ? "text-emerald-600 dark:text-emerald-400"
-                              : "text-red-600 dark:text-red-400"
-                          }`}
-                        >
-                          {entry.entryType}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
-                        {entry.category}
-                      </td>
-                      <td className="max-w-[200px] truncate px-4 py-3 text-slate-700 dark:text-slate-300">
-                        {entry.description}
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium text-slate-900 dark:text-slate-50">
-                        {formatINR(entry.amount)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span
-                          className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${PAYMENT_BADGE[entry.paymentStatus]}`}
-                        >
-                          {entry.paymentStatus}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span
-                          className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${APPROVAL_BADGE[entry.approvalStatus]}`}
-                        >
-                          {entry.approvalStatus.replace("_", " ")}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
-                        {entry.projectId &&
-                        typeof entry.projectId === "object"
-                          ? entry.projectId.clientName
-                          : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {entry.approvalStatus === "PENDING_APPROVAL" && (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
-                                disabled={approveMutation.isPending}
-                                onClick={() =>
-                                  approveMutation.mutate(entry._id)
-                                }
-                              >
-                                Approve
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-red-600 hover:text-red-700 dark:text-red-400"
-                                onClick={() => setRejectTarget(entry._id)}
-                              >
-                                Reject
-                              </Button>
-                            </>
-                          )}
-                          <Link href={`/ledger/${entry._id}/edit`}>
-                            <Button variant="ghost" size="sm">
-                              Edit
-                            </Button>
-                          </Link>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700 dark:text-red-400"
-                            onClick={() => setDeleteTarget(entry._id)}
-                          >
-                            Del
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Summary tab */}
-      {tab === "summary" && (
-        <div className="space-y-6">
-          {/* P&L card */}
-          {summary?.profitLoss && (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <SummaryCard
-                label="Total Income"
-                value={formatINR(summary.profitLoss.totalIncome)}
-                accent="text-emerald-600 dark:text-emerald-400"
-              />
-              <SummaryCard
-                label="Total Expense"
-                value={formatINR(summary.profitLoss.totalExpense)}
-                accent="text-red-600 dark:text-red-400"
-              />
-              <SummaryCard
-                label="Net Profit / Loss"
-                value={formatINR(summary.profitLoss.netProfitLoss)}
-                accent={
-                  summary.profitLoss.netProfitLoss >= 0
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : "text-red-600 dark:text-red-400"
-                }
-              />
-            </div>
-          )}
-
-          {/* By category */}
-          {summary?.byCategory && summary.byCategory.length > 0 && (
-            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-              <h3 className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-50">
-                By Category
-              </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800">
-                      <th className="px-3 py-2 text-left font-medium text-slate-700 dark:text-slate-300">
-                        Type
-                      </th>
-                      <th className="px-3 py-2 text-left font-medium text-slate-700 dark:text-slate-300">
-                        Category
-                      </th>
-                      <th className="px-3 py-2 text-right font-medium text-slate-700 dark:text-slate-300">
-                        Total
-                      </th>
-                      <th className="px-3 py-2 text-right font-medium text-slate-700 dark:text-slate-300">
-                        Count
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {summary.byCategory.map((cat, i) => (
-                      <tr
-                        key={i}
-                        className="border-b border-slate-100 last:border-0 dark:border-slate-800/50"
-                      >
-                        <td className="px-3 py-2">
-                          <span
-                            className={`text-xs font-semibold ${
-                              cat._id.entryType === "INCOME"
-                                ? "text-emerald-600 dark:text-emerald-400"
-                                : "text-red-600 dark:text-red-400"
-                            }`}
-                          >
-                            {cat._id.entryType}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
-                          {cat._id.category}
-                        </td>
-                        <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">
-                          {formatINR(cat.total)}
-                        </td>
-                        <td className="px-3 py-2 text-right text-slate-500 dark:text-slate-400">
-                          {cat.count}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* By project */}
-          {summary?.byProject && summary.byProject.length > 0 && (
-            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-              <h3 className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-50">
-                By Project
-              </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800">
-                      <th className="px-3 py-2 text-left font-medium text-slate-700 dark:text-slate-300">
-                        Project
-                      </th>
-                      <th className="px-3 py-2 text-left font-medium text-slate-700 dark:text-slate-300">
-                        Type
-                      </th>
-                      <th className="px-3 py-2 text-right font-medium text-slate-700 dark:text-slate-300">
-                        Total
-                      </th>
-                      <th className="px-3 py-2 text-right font-medium text-slate-700 dark:text-slate-300">
-                        Count
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {summary.byProject.map((proj, i) => (
-                      <tr
-                        key={i}
-                        className="border-b border-slate-100 last:border-0 dark:border-slate-800/50"
-                      >
-                        <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
-                          {proj.project?.clientName ?? "—"}
-                        </td>
-                        <td className="px-3 py-2">
-                          <span
-                            className={`text-xs font-semibold ${
-                              proj._id.entryType === "INCOME"
-                                ? "text-emerald-600 dark:text-emerald-400"
-                                : "text-red-600 dark:text-red-400"
-                            }`}
-                          >
-                            {proj._id.entryType}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-right text-slate-700 dark:text-slate-300">
-                          {formatINR(proj.total)}
-                        </td>
-                        <td className="px-3 py-2 text-right text-slate-500 dark:text-slate-400">
-                          {proj.count}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
+      {/* Tabs content */}
+      {tab === "entries" ? (
+        <EntriesTable
+          loading={ledgerQuery.isLoading}
+          error={ledgerQuery.isError}
+          entries={entries}
+          onApprove={(id) => approveMutation.mutate(id)}
+          approving={approveMutation.isPending}
+          onReject={(id) => setRejectTarget(id)}
+          onDelete={(id) => setDeleteTarget(id)}
+        />
+      ) : (
+        <SummaryPanel
+          loading={summaryQuery.isLoading}
+          summary={summary}
+        />
       )}
 
       {/* Delete dialog */}
@@ -681,27 +395,709 @@ export default function LedgerPage() {
   );
 }
 
-function SummaryCard({
+/* ────────────────────────────────────────────
+   Sub-components
+   ──────────────────────────────────────────── */
+
+type Tone = "primary" | "success" | "danger" | "warning" | "neutral";
+
+const TONES: Record<Tone, { bg: string; text: string; ring: string }> = {
+  primary: {
+    bg: "bg-cine-primary/10 dark:bg-cine-primary/20",
+    text: "text-cine-primary",
+    ring: "ring-cine-primary/20",
+  },
+  success: {
+    bg: "bg-emerald-500/10 dark:bg-emerald-500/15",
+    text: "text-emerald-600 dark:text-emerald-400",
+    ring: "ring-emerald-500/20",
+  },
+  danger: {
+    bg: "bg-red-500/10 dark:bg-red-500/15",
+    text: "text-red-600 dark:text-red-400",
+    ring: "ring-red-500/20",
+  },
+  warning: {
+    bg: "bg-amber-500/10 dark:bg-amber-500/15",
+    text: "text-amber-600 dark:text-amber-400",
+    ring: "ring-amber-500/20",
+  },
+  neutral: {
+    bg: "bg-slate-500/10 dark:bg-slate-500/15",
+    text: "text-slate-600 dark:text-slate-300",
+    ring: "ring-slate-500/20",
+  },
+};
+
+function KpiTile({
   label,
   value,
-  accent,
+  icon,
+  tone = "neutral",
+  loading,
 }: {
   label: string;
   value: string;
-  accent?: string;
+  icon: React.ReactNode;
+  tone?: Tone;
+  loading?: boolean;
+}) {
+  const t = TONES[tone];
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+      <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+        <span
+          className={`flex h-6 w-6 items-center justify-center rounded-md ${t.bg} ${t.text}`}
+        >
+          {icon}
+        </span>
+        {label}
+      </div>
+      {loading ? (
+        <Skeleton className="mt-2 h-7 w-28" />
+      ) : (
+        <p className="mt-2 truncate text-xl font-semibold text-slate-900 dark:text-slate-50">
+          {value}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function TabButton({
+  label,
+  active,
+  onClick,
+  count,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  count?: number;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+    <button
+      className={`inline-flex items-center gap-2 rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+        active
+          ? "bg-cine-primary/10 text-cine-primary"
+          : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+      }`}
+      onClick={onClick}
+    >
+      {label}
+      {typeof count === "number" ? (
+        <span
+          className={`rounded-full px-1.5 text-[10px] font-semibold ${
+            active
+              ? "bg-cine-primary/20 text-cine-primary"
+              : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+          }`}
+        >
+          {count}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function FilterBar({
+  filters,
+  setFilters,
+  hasFilters,
+}: {
+  filters: LedgerListQuery;
+  setFilters: React.Dispatch<React.SetStateAction<LedgerListQuery>>;
+  hasFilters: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+      <FilterField label="Type" width="140px">
+        <Select
+          value={filters.entryType ?? "ALL"}
+          onValueChange={(v) =>
+            setFilters((f) => ({
+              ...f,
+              entryType: v === "ALL" ? undefined : (v as EntryType),
+            }))
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All</SelectItem>
+            <SelectItem value="INCOME">Income</SelectItem>
+            <SelectItem value="EXPENSE">Expense</SelectItem>
+          </SelectContent>
+        </Select>
+      </FilterField>
+
+      <FilterField label="Payment" width="140px">
+        <Select
+          value={filters.paymentStatus ?? "ALL"}
+          onValueChange={(v) =>
+            setFilters((f) => ({
+              ...f,
+              paymentStatus: v === "ALL" ? undefined : (v as PaymentStatus),
+            }))
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All</SelectItem>
+            <SelectItem value="PAID">Paid</SelectItem>
+            <SelectItem value="PENDING">Pending</SelectItem>
+            <SelectItem value="PARTIAL">Partial</SelectItem>
+          </SelectContent>
+        </Select>
+      </FilterField>
+
+      <FilterField label="Approval" width="160px">
+        <Select
+          value={filters.approvalStatus ?? "ALL"}
+          onValueChange={(v) =>
+            setFilters((f) => ({
+              ...f,
+              approvalStatus:
+                v === "ALL" ? undefined : (v as ApprovalStatus),
+            }))
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All</SelectItem>
+            <SelectItem value="PENDING_APPROVAL">Pending Approval</SelectItem>
+            <SelectItem value="APPROVED">Approved</SelectItem>
+            <SelectItem value="REJECTED">Rejected</SelectItem>
+            <SelectItem value="NOT_REQUIRED">Not Required</SelectItem>
+          </SelectContent>
+        </Select>
+      </FilterField>
+
+      <FilterField label="From" width="150px">
+        <DatePicker
+          value={filters.startDate ?? ""}
+          onChange={(v) =>
+            setFilters((f) => ({ ...f, startDate: v || undefined }))
+          }
+          placeholder="Start date"
+        />
+      </FilterField>
+
+      <FilterField label="To" width="150px">
+        <DatePicker
+          value={filters.endDate ?? ""}
+          onChange={(v) =>
+            setFilters((f) => ({ ...f, endDate: v || undefined }))
+          }
+          placeholder="End date"
+        />
+      </FilterField>
+
+      {hasFilters && (
+        <Button variant="ghost" size="sm" onClick={() => setFilters({})}>
+          <X className="mr-1 h-3.5 w-3.5" />
+          Clear filters
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function FilterField({
+  label,
+  width,
+  children,
+}: {
+  label: string;
+  width: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ minWidth: width }}>
+      <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
         {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function EntriesTable({
+  loading,
+  error,
+  entries,
+  onApprove,
+  approving,
+  onReject,
+  onDelete,
+}: {
+  loading: boolean;
+  error: boolean;
+  entries: LedgerEntryPopulated[];
+  onApprove: (id: string) => void;
+  approving: boolean;
+  onReject: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-14 w-full rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <p className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-400">
+        Failed to load ledger. Please try again.
       </p>
-      <p
-        className={`mt-1 text-lg font-semibold ${
-          accent ?? "text-slate-900 dark:text-slate-50"
-        }`}
-      >
-        {value}
-      </p>
+    );
+  }
+
+  if (entries.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white py-16 text-slate-400 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-500">
+        <Wallet className="mb-3 h-10 w-10 opacity-50" />
+        <p className="text-sm font-medium">No ledger entries</p>
+        <p className="mt-1 text-xs">
+          Try adjusting filters or create a new entry.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+              <th className="px-4 py-3 text-left font-medium">Date</th>
+              <th className="px-4 py-3 text-left font-medium">Entry</th>
+              <th className="px-4 py-3 text-left font-medium">Project</th>
+              <th className="px-4 py-3 text-right font-medium">Amount</th>
+              <th className="px-4 py-3 text-center font-medium">Payment</th>
+              <th className="px-4 py-3 text-center font-medium">Approval</th>
+              <th className="px-4 py-3 text-right font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            {entries.map((entry) => {
+              const isIncome = entry.entryType === "INCOME";
+              const highlight =
+                entry.approvalStatus === "PENDING_APPROVAL"
+                  ? "bg-amber-50/50 dark:bg-amber-900/10"
+                  : "bg-white dark:bg-transparent";
+              return (
+                <tr
+                  key={entry._id}
+                  className={`${highlight} transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40`}
+                >
+                  <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">
+                    {formatDate(entry.entryDate)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <span
+                        className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${
+                          isIncome
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                            : "bg-red-500/10 text-red-600 dark:text-red-400"
+                        }`}
+                      >
+                        {isIncome ? (
+                          <ArrowUpRight className="h-4 w-4" />
+                        ) : (
+                          <ArrowDownRight className="h-4 w-4" />
+                        )}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-slate-900 dark:text-slate-50">
+                          {entry.category || "Uncategorised"}
+                        </p>
+                        {entry.description ? (
+                          <p className="mt-0.5 max-w-[360px] truncate text-xs text-slate-500 dark:text-slate-400">
+                            {entry.description}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                    {entry.projectId && typeof entry.projectId === "object" ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Briefcase className="h-3.5 w-3.5 text-slate-400" />
+                        <span className="truncate">
+                          {entry.projectId.clientName}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </td>
+                  <td
+                    className={`whitespace-nowrap px-4 py-3 text-right font-semibold ${
+                      isIncome
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-red-600 dark:text-red-400"
+                    }`}
+                  >
+                    {isIncome ? "+" : "-"}
+                    {formatINR(entry.amount)}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-center">
+                    <span
+                      className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                        PAYMENT_BADGE[entry.paymentStatus]
+                      }`}
+                    >
+                      {entry.paymentStatus}
+                    </span>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-center">
+                    <span
+                      className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                        APPROVAL_BADGE[entry.approvalStatus]
+                      }`}
+                    >
+                      {entry.approvalStatus.replace("_", " ")}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1">
+                      {entry.approvalStatus === "PENDING_APPROVAL" && (
+                        <>
+                          <IconButton
+                            title="Approve"
+                            tone="success"
+                            disabled={approving}
+                            onClick={() => onApprove(entry._id)}
+                          >
+                            <Check className="h-4 w-4" />
+                          </IconButton>
+                          <IconButton
+                            title="Reject"
+                            tone="danger"
+                            onClick={() => onReject(entry._id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </IconButton>
+                        </>
+                      )}
+                      <Link href={`/ledger/${entry._id}/edit`}>
+                        <IconButton title="Edit" tone="neutral">
+                          <Pencil className="h-4 w-4" />
+                        </IconButton>
+                      </Link>
+                      <IconButton
+                        title="Delete"
+                        tone="danger"
+                        onClick={() => onDelete(entry._id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </IconButton>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+const ICON_BUTTON_HOVER: Record<Tone, string> = {
+  primary: "hover:bg-cine-primary/10 hover:text-cine-primary",
+  success:
+    "hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400",
+  danger: "hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400",
+  warning:
+    "hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400",
+  neutral: "hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50",
+};
+
+function IconButton({
+  children,
+  onClick,
+  title,
+  disabled,
+  tone = "neutral",
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  title: string;
+  disabled?: boolean;
+  tone?: Tone;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      disabled={disabled}
+      onClick={onClick}
+      className={`flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 ${ICON_BUTTON_HOVER[tone]}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SummaryPanel({
+  loading,
+  summary,
+}: {
+  loading: boolean;
+  summary:
+    | {
+        byCategory: { _id: { entryType: EntryType; category: string }; total: number; count: number }[];
+        byProject: {
+          _id: { projectId: string; entryType: EntryType };
+          total: number;
+          count: number;
+          project: { _id: string; clientName: string; serviceType: string };
+        }[];
+        profitLoss: { totalIncome: number; totalExpense: number; netProfitLoss: number };
+      }
+    | undefined;
+}) {
+  const expenseCategories = useMemo(() => {
+    return (summary?.byCategory ?? [])
+      .filter((c) => c._id.entryType === "EXPENSE")
+      .map((c) => ({
+        name: c._id.category || "Uncategorised",
+        value: c.total,
+        count: c.count,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [summary?.byCategory]);
+
+  const incomeCategories = useMemo(() => {
+    return (summary?.byCategory ?? [])
+      .filter((c) => c._id.entryType === "INCOME")
+      .map((c) => ({
+        name: c._id.category || "Uncategorised",
+        value: c.total,
+        count: c.count,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [summary?.byCategory]);
+
+  const byProject = useMemo(() => {
+    const map = new Map<
+      string,
+      { name: string; income: number; expense: number }
+    >();
+    for (const p of summary?.byProject ?? []) {
+      const name = p.project?.clientName ?? "—";
+      const row = map.get(name) ?? { name, income: 0, expense: 0 };
+      if (p._id.entryType === "INCOME") row.income += p.total;
+      else if (p._id.entryType === "EXPENSE") row.expense += p.total;
+      map.set(name, row);
+    }
+    return Array.from(map.values())
+      .map((r) => ({ ...r, net: r.income - r.expense }))
+      .sort((a, b) => b.income + b.expense - (a.income + a.expense))
+      .slice(0, 8);
+  }, [summary?.byProject]);
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Skeleton className="h-[340px] rounded-xl" />
+        <Skeleton className="h-[340px] rounded-xl" />
+        <Skeleton className="h-[360px] rounded-xl lg:col-span-2" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <CategoryChartCard
+          title="Expense by Category"
+          subtitle="Where money is going"
+          categories={expenseCategories}
+          palette={EXPENSE_PALETTE}
+        />
+        <CategoryChartCard
+          title="Income by Category"
+          subtitle="Where money is coming from"
+          categories={incomeCategories}
+          palette={INCOME_PALETTE}
+        />
+      </div>
+
+      <section className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <header className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-slate-800">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+              Income vs Expense by Project
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Top {byProject.length} projects by activity
+            </p>
+          </div>
+        </header>
+        <div className="p-5">
+          {byProject.length === 0 ? (
+            <EmptyBlock label="No project activity in the current filter" />
+          ) : (
+            <ResponsiveContainer
+              width="100%"
+              height={Math.max(260, byProject.length * 44)}
+            >
+              <BarChart
+                layout="vertical"
+                data={byProject}
+                margin={{ top: 5, right: 20, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="currentColor"
+                  className="text-slate-200 dark:text-slate-800"
+                />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 12 }}
+                  stroke="currentColor"
+                  className="text-slate-500"
+                  tickFormatter={(v) => formatINRCompact(Number(v))}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  tick={{ fontSize: 12 }}
+                  stroke="currentColor"
+                  className="text-slate-500"
+                  width={140}
+                />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  formatter={(value) => formatINR(Number(value))}
+                />
+                <Bar
+                  dataKey="income"
+                  name="Income"
+                  fill="#10b981"
+                  radius={[0, 4, 4, 0]}
+                />
+                <Bar
+                  dataKey="expense"
+                  name="Expense"
+                  fill="#ef4444"
+                  radius={[0, 4, 4, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function CategoryChartCard({
+  title,
+  subtitle,
+  categories,
+  palette,
+}: {
+  title: string;
+  subtitle: string;
+  categories: { name: string; value: number; count: number }[];
+  palette: string[];
+}) {
+  const total = categories.reduce((s, c) => s + c.value, 0);
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+      <header className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-slate-800">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+            {title}
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {subtitle}
+          </p>
+        </div>
+      </header>
+      <div className="p-5">
+        {categories.length === 0 ? (
+          <EmptyBlock label="No data" />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-center">
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie
+                  data={categories}
+                  innerRadius={55}
+                  outerRadius={85}
+                  paddingAngle={2}
+                  dataKey="value"
+                  nameKey="name"
+                  stroke="none"
+                >
+                  {categories.map((_, i) => (
+                    <Cell key={i} fill={palette[i % palette.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  formatter={(value) => formatINR(Number(value))}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <ul className="space-y-2">
+              {categories.slice(0, 6).map((c, i) => {
+                const pct = total ? Math.round((c.value / total) * 100) : 0;
+                return (
+                  <li
+                    key={c.name}
+                    className="flex items-center justify-between gap-3 text-sm"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ background: palette[i % palette.length] }}
+                      />
+                      <span className="truncate text-slate-700 dark:text-slate-300">
+                        {c.name}
+                      </span>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="font-semibold text-slate-900 dark:text-slate-50">
+                        {formatINRCompact(c.value)}
+                      </span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        {pct}%
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function EmptyBlock({ label }: { label: string }) {
+  return (
+    <div className="flex h-[200px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 text-slate-400 dark:border-slate-800 dark:text-slate-500">
+      <Wallet className="mb-2 h-7 w-7 opacity-50" />
+      <p className="text-sm">{label}</p>
     </div>
   );
 }

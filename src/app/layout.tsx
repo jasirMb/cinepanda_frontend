@@ -5,7 +5,12 @@ import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "CinePanda Admin",
-  description: "Admin panel for CinePanda"
+  description: "Admin panel for CinePanda",
+  icons: {
+    icon: "/cinepanda-logo.png",
+    shortcut: "/cinepanda-logo.png",
+    apple: "/cinepanda-logo.png"
+  }
 };
 
 export default function RootLayout({
