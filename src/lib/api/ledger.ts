@@ -111,6 +111,22 @@ export interface MutationResponse {
   error?: string;
 }
 
+export interface LedgerCategory {
+  value: string;
+  label: string;
+  entryType: EntryType;
+  description?: string;
+  color?: string;
+  order?: number;
+  isActive?: boolean;
+}
+
+export interface LedgerCategoriesResponse {
+  success: boolean;
+  count: number;
+  data: LedgerCategory[];
+}
+
 export interface CategorySummary {
   _id: { entryType: EntryType; category: string };
   total: number;
@@ -200,6 +216,16 @@ export async function fetchLedgerSummary(
   const { data } = await api.get<LedgerSummaryResponse>("/ledger/summary", {
     params,
   });
+  return data;
+}
+
+export async function fetchLedgerCategories(
+  entryType?: EntryType
+): Promise<LedgerCategoriesResponse> {
+  const { data } = await api.get<LedgerCategoriesResponse>(
+    "/ledger/categories",
+    { params: entryType ? { entryType } : undefined }
+  );
   return data;
 }
 

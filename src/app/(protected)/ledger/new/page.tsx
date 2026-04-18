@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { ledgerKeys } from "@/hooks/useLedger";
+import { ledgerKeys, useLedgerCategories } from "@/hooks/useLedger";
 import { useProjects } from "@/hooks/useProjects";
 import { useCustomers } from "@/hooks/useCustomers";
 import {
@@ -135,7 +135,11 @@ export default function NewLedgerEntryPage() {
                       : "bg-red-600 text-white shadow-sm"
                     : "text-slate-600 hover:text-slate-900 dark:text-slate-400"
                 }`}
-                onClick={() => setForm((f) => ({ ...f, entryType: t }))}
+                onClick={() =>
+                  setForm((f) =>
+                    f.entryType === t ? f : { ...f, entryType: t, category: "" }
+                  )
+                }
               >
                 {t}
               </button>
@@ -145,13 +149,10 @@ export default function NewLedgerEntryPage() {
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Category *">
-            <Input
+            <CategorySelect
+              entryType={form.entryType}
               value={form.category}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, category: e.target.value }))
-              }
-              placeholder="e.g. Equipment Sale, Materials, Labor"
-              required
+              onChange={(v) => setForm((f) => ({ ...f, category: v }))}
             />
           </Field>
           <Field label="Amount (INR) *">
@@ -402,6 +403,63 @@ function Field({
         {label}
       </label>
       {children}
+    </div>
+  );
+}
+
+function CategorySelect({
+  entryType,
+  value,
+  onChange,
+}: {
+  entryType: EntryType;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const categoriesQuery = useLedgerCategories(entryType);
+  const categories = categoriesQuery.data?.data ?? [];
+  const known = categories.some((c) => c.value === value);
+  const isEmpty =
+    !categoriesQuery.isLoading &&
+    !categoriesQuery.isError &&
+    categories.length === 0;
+
+  return (
+    <div className="space-y-1">
+      <Select value={value || undefined} onValueChange={onChange}>
+        <SelectTrigger>
+          <SelectValue
+            placeholder={
+              categoriesQuery.isLoading
+                ? "Loading categories..."
+                : categoriesQuery.isError
+                  ? "Failed to load categories"
+                  : isEmpty
+                    ? "No categories available"
+                    : "Select category"
+            }
+          />
+        </SelectTrigger>
+        <SelectContent>
+          {value && !known && <SelectItem value={value}>{value}</SelectItem>}
+          {categories.map((c) => (
+            <SelectItem key={c.value} value={c.value}>
+              {c.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {categoriesQuery.isError && (
+        <p className="text-xs text-red-500">
+          Could not load categories from /api/ledger/categories.
+        </p>
+      )}
+      {isEmpty && (
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          No {entryType.toLowerCase()} categories returned. Seed them on the
+          backend: <code>npm run populate-ledger-categories</code>
+        </p>
+      )}
     </div>
   );
 }

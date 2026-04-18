@@ -2,9 +2,12 @@
 
 import { useQuery } from "@tanstack/react-query";
 import {
+  fetchLedgerCategories,
   fetchLedgerEntries,
   fetchLedgerEntry,
   fetchLedgerSummary,
+  type EntryType,
+  type LedgerCategoriesResponse,
   type LedgerListQuery,
   type LedgerListResponse,
   type LedgerEntryPopulated,
@@ -17,6 +20,8 @@ export const ledgerKeys = {
   detail: (id: string) => [...ledgerKeys.all, id] as const,
   summary: (params?: LedgerListQuery) =>
     [...ledgerKeys.all, "summary", params] as const,
+  categories: (entryType?: EntryType) =>
+    [...ledgerKeys.all, "categories", entryType ?? "all"] as const,
 };
 
 export function useLedger(params?: LedgerListQuery) {
@@ -41,5 +46,13 @@ export function useLedgerSummary(params?: LedgerListQuery) {
     queryKey: ledgerKeys.summary(params),
     queryFn: () => fetchLedgerSummary(params),
     staleTime: 60_000,
+  });
+}
+
+export function useLedgerCategories(entryType?: EntryType) {
+  return useQuery<LedgerCategoriesResponse>({
+    queryKey: ledgerKeys.categories(entryType),
+    queryFn: () => fetchLedgerCategories(entryType),
+    staleTime: 5 * 60_000,
   });
 }
