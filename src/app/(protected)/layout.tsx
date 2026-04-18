@@ -1,5 +1,6 @@
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { ThemeApplier } from "@/components/layout/ThemeApplier";
 import { Topbar } from "@/components/layout/Topbar";
 
 export default function ProtectedLayout({
@@ -9,7 +10,8 @@ export default function ProtectedLayout({
 }) {
   return (
     <AuthGuard>
-      <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-50">
+      <ThemeApplier />
+      <div className="flex h-screen overflow-hidden text-slate-900 dark:text-slate-50">
         <Sidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <Topbar />

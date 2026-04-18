@@ -13,11 +13,19 @@ import {
   LogOut,
   Package,
   Receipt,
+  Settings,
   UserPlus,
   Users,
   Wallet,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
+import { getSidebarPreset, useSettingsStore } from "@/store/settings-store";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { SettingsPanel } from "@/components/layout/SettingsPanel";
 
 const navItems: {
   href: string;
@@ -41,6 +49,8 @@ export function Sidebar() {
   const logout = useAuthStore((s) => s.logout);
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+  const sidebarId = useSettingsStore((s) => s.sidebarId);
+  const sidebarPreset = getSidebarPreset(sidebarId);
 
   useEffect(() => {
     const saved =
@@ -68,9 +78,14 @@ export function Sidebar() {
   return (
     <aside
       className={clsx(
-        "relative flex h-screen shrink-0 flex-col border-r border-slate-900/40 bg-slate-900 text-slate-200 transition-[width] duration-200 ease-out",
+        "relative flex h-screen shrink-0 flex-col border-r transition-[width] duration-200 ease-out",
         collapsed ? "w-16" : "w-64"
       )}
+      style={{
+        backgroundColor: sidebarPreset.bg,
+        color: sidebarPreset.fg,
+        borderColor: sidebarPreset.border,
+      }}
     >
       {/* Brand */}
       <div
@@ -139,6 +154,31 @@ export function Sidebar() {
 
       {/* Footer actions */}
       <div className="space-y-1 border-t border-white/10 p-2">
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              title="Settings"
+              aria-label="Settings"
+              className={clsx(
+                "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white",
+                collapsed && "justify-center px-2"
+              )}
+            >
+              <Settings className="h-4 w-4 shrink-0" />
+              {!collapsed && <span>Settings</span>}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            side="right"
+            align="end"
+            sideOffset={12}
+            className="w-80 max-h-[80vh] overflow-y-auto"
+          >
+            <SettingsPanel />
+          </PopoverContent>
+        </Popover>
+
         <button
           type="button"
           onClick={toggleCollapsed}
