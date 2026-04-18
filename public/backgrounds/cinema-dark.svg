@@ -46,8 +46,18 @@
       <path d="M -3 -13 L 10 -16 L 10 -2"/>
       <ellipse cx="7" cy="-2" rx="3.5" ry="2.6" fill="currentColor" stroke="none"/>
     </g>
-    <g id="cmark">
-      <path d="M 11 -11 a 14 14 0 1 0 0 22" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <g id="panda">
+      <circle cx="-9" cy="-10" r="4.5" fill="currentColor" stroke="none"/>
+      <circle cx="9" cy="-10" r="4.5" fill="currentColor" stroke="none"/>
+      <circle cx="-9" cy="-10" r="2" fill="#020617" stroke="none"/>
+      <circle cx="9" cy="-10" r="2" fill="#020617" stroke="none"/>
+      <circle cx="0" cy="1" r="12"/>
+      <ellipse cx="-4.8" cy="-1.5" rx="2.6" ry="3.6" fill="currentColor" stroke="none" transform="rotate(-15 -4.8 -1.5)"/>
+      <ellipse cx="4.8" cy="-1.5" rx="2.6" ry="3.6" fill="currentColor" stroke="none" transform="rotate(15 4.8 -1.5)"/>
+      <circle cx="-4.8" cy="-1" r="0.9" fill="#020617" stroke="none"/>
+      <circle cx="4.8" cy="-1" r="0.9" fill="#020617" stroke="none"/>
+      <ellipse cx="0" cy="4.5" rx="1.6" ry="1.1" fill="currentColor" stroke="none"/>
+      <path d="M 0 5.5 L 0 7.2 M -2 8 Q 0 9.4 2 8" fill="none"/>
     </g>
   </defs>
 
@@ -56,7 +66,7 @@
     <use href="#headphones" transform="translate(160, 50) rotate(8)"/>
     <use href="#tv" transform="translate(265, 60) rotate(-6)"/>
     <use href="#film" transform="translate(55, 160) rotate(14)"/>
-    <use href="#cmark" transform="translate(160, 160) rotate(0)"/>
+    <use href="#panda" transform="translate(160, 160) rotate(0)"/>
     <use href="#mic" transform="translate(265, 160) rotate(18)"/>
     <use href="#clap" transform="translate(55, 265) rotate(-9)"/>
     <use href="#music" transform="translate(160, 270) rotate(12)"/>
