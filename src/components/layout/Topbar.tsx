@@ -1,29 +1,128 @@
 "use client";
 
 import Image from "next/image";
+import { usePathname } from "next/navigation";
+
+interface PageMeta {
+  title: string;
+  subtitle?: string;
+}
+
+const ROUTE_META: { match: (p: string) => boolean; meta: PageMeta }[] = [
+  {
+    match: (p) => p === "/dashboard",
+    meta: { title: "Dashboard", subtitle: "Overview of your business" },
+  },
+
+  {
+    match: (p) => p === "/leads/new",
+    meta: { title: "New Lead", subtitle: "Capture a new business lead" },
+  },
+  {
+    match: (p) => p.startsWith("/leads"),
+    meta: { title: "Leads", subtitle: "Manage your leads pipeline" },
+  },
+
+  {
+    match: (p) => p === "/products/new",
+    meta: { title: "New Product", subtitle: "Add a product to your catalog" },
+  },
+  {
+    match: (p) => p.startsWith("/products"),
+    meta: { title: "Products", subtitle: "Catalog of available products" },
+  },
+
+  {
+    match: (p) => /^\/templates\/[^/]+$/.test(p),
+    meta: { title: "Template", subtitle: "Template details" },
+  },
+  {
+    match: (p) => p.startsWith("/templates"),
+    meta: { title: "Templates", subtitle: "Quotation templates" },
+  },
+
+  {
+    match: (p) => /^\/quotations\/[^/]+\/preview$/.test(p),
+    meta: { title: "Quotation Preview", subtitle: "Preview before sending" },
+  },
+  {
+    match: (p) => /^\/quotations\/[^/]+$/.test(p),
+    meta: { title: "Quotation Details", subtitle: "Quotation overview" },
+  },
+  {
+    match: (p) => p.startsWith("/quotations"),
+    meta: { title: "Quotations", subtitle: "All quotations" },
+  },
+
+  {
+    match: (p) => p === "/customers",
+    meta: { title: "Customers", subtitle: "Your customer directory" },
+  },
+
+  {
+    match: (p) => p === "/projects/new",
+    meta: { title: "New Project", subtitle: "Start a new project" },
+  },
+  {
+    match: (p) => /^\/projects\/[^/]+\/edit$/.test(p),
+    meta: { title: "Edit Project", subtitle: "Update project details" },
+  },
+  {
+    match: (p) => /^\/projects\/[^/]+$/.test(p),
+    meta: { title: "Project Details", subtitle: "Project overview" },
+  },
+  {
+    match: (p) => p.startsWith("/projects"),
+    meta: { title: "Projects", subtitle: "All active projects" },
+  },
+
+  {
+    match: (p) => p === "/ledger/new",
+    meta: { title: "New Ledger Entry", subtitle: "Record income or expense" },
+  },
+  {
+    match: (p) => /^\/ledger\/[^/]+\/edit$/.test(p),
+    meta: { title: "Edit Ledger Entry", subtitle: "Update entry details" },
+  },
+  {
+    match: (p) => p.startsWith("/ledger"),
+    meta: { title: "Ledger", subtitle: "Income and expense tracking" },
+  },
+];
+
+function resolveMeta(pathname: string): PageMeta {
+  for (const r of ROUTE_META) {
+    if (r.match(pathname)) return r.meta;
+  }
+  return { title: "CinePanda", subtitle: "Admin Console" };
+}
 
 export function Topbar() {
+  const pathname = usePathname();
+  const meta = resolveMeta(pathname);
+
   return (
-    <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white/80 px-6 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:border-slate-800 dark:bg-slate-950/80">
-      <div className="flex items-center gap-2.5">
+    <header className="flex h-14 items-center border-b border-slate-200 bg-white/80 px-6 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:border-slate-800 dark:bg-slate-950/80">
+      <div className="flex min-w-0 items-center gap-3">
         <Image
           src="/cinepanda-logo.png"
           alt="CinePanda logo"
-          width={28}
-          height={28}
+          width={32}
+          height={32}
           priority
           className="shrink-0 drop-shadow-sm"
         />
-        <div className="leading-tight">
-          <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-            CinePanda
+        <div className="min-w-0 leading-tight">
+          <p className="truncate text-base font-semibold text-slate-900 dark:text-slate-50">
+            {meta.title}
           </p>
-          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Admin Console
-          </p>
+          {meta.subtitle && (
+            <p className="truncate text-xs font-semibold text-slate-600 dark:text-slate-300">
+              {meta.subtitle}
+            </p>
+          )}
         </div>
       </div>
     </header>
   );
 }
-
