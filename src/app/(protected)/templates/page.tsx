@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { Check, Sparkles } from "lucide-react";
+
 import { templatesKeys, useTemplates } from "@/hooks/useTemplates";
 import { useCategories } from "@/hooks/useProducts";
 import {
@@ -325,41 +327,32 @@ export default function TemplatesPage() {
   // Step 1: Budget + template info
   if (step === "budget") {
     return (
-      <div className="mx-auto max-w-lg space-y-6">
+      <div className="space-y-4">
         <div>
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
-            Create New Template
+            New Template
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Step 1 of 3 — Enter template details and budget
+            Step 1 of 3 — Enter template details and budget.
           </p>
         </div>
 
-        <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Template Name *
-            </label>
+        <div className="max-w-2xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <WizardField label="Template Name *">
             <Input
               placeholder="e.g. Premium Home Cinema"
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
             />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Description
-            </label>
+          </WizardField>
+          <WizardField label="Description">
             <Input
               placeholder="e.g. Full 4K setup with Dolby Atmos"
               value={templateDescription}
               onChange={(e) => setTemplateDescription(e.target.value)}
             />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-              Budget (INR) *
-            </label>
+          </WizardField>
+          <WizardField label="Budget (INR) *">
             <Input
               type="number"
               placeholder="e.g. 500000"
@@ -372,19 +365,19 @@ export default function TemplatesPage() {
                 {INR(budgetNum)}
               </p>
             )}
-          </div>
-        </div>
+          </WizardField>
 
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={resetWizard}>
-            Cancel
-          </Button>
-          <Button
-            disabled={!templateName.trim() || budgetNum <= 0}
-            onClick={() => setStep("requirements")}
-          >
-            Next — Select Requirements
-          </Button>
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <Button variant="outline" onClick={resetWizard}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!templateName.trim() || budgetNum <= 0}
+              onClick={() => setStep("requirements")}
+            >
+              Next — Select Requirements
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -393,17 +386,17 @@ export default function TemplatesPage() {
   // Step 2: Select requirement categories
   if (step === "requirements") {
     return (
-      <div className="mx-auto max-w-lg space-y-6">
+      <div className="space-y-4">
         <div>
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
             Select Requirements
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Step 2 of 3 — Choose the product categories needed for this setup
+            Step 2 of 3 — Choose the product categories needed for this setup.
           </p>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="max-w-2xl rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
           {categoriesQuery.isLoading ? (
             <p className="text-sm text-slate-600 dark:text-slate-400">
               Loading categories...
@@ -438,20 +431,20 @@ export default function TemplatesPage() {
               })}
             </div>
           )}
-        </div>
 
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={() => setStep("budget")}>
-            Back
-          </Button>
-          <Button
-            disabled={selectedCategories.length === 0 || isFetchingProducts}
-            onClick={fetchRecommendations}
-          >
-            {isFetchingProducts
-              ? "Fetching products..."
-              : "Next — View Recommendations"}
-          </Button>
+          <div className="mt-4 flex items-center justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+            <Button variant="outline" onClick={() => setStep("budget")}>
+              Back
+            </Button>
+            <Button
+              disabled={selectedCategories.length === 0 || isFetchingProducts}
+              onClick={fetchRecommendations}
+            >
+              {isFetchingProducts
+                ? "Fetching products..."
+                : "Next — View Recommendations"}
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -459,8 +452,13 @@ export default function TemplatesPage() {
 
   // Step 3: Review recommended products
   if (step === "review") {
+    const overBudget = grandTotal > budgetNum;
+    const remaining = budgetNum - grandTotal;
+    const budgetUsed = budgetNum > 0 ? Math.min(100, (grandTotal / budgetNum) * 100) : 0;
+
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
+        {/* Header */}
         <div>
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
             Review Recommended Products
@@ -471,9 +469,64 @@ export default function TemplatesPage() {
           </p>
         </div>
 
-        {/* Products grouped by category — radio selection */}
+        {/* Budget banner */}
+        <div
+          className={`rounded-lg border px-5 py-4 shadow-sm ${
+            overBudget
+              ? "border-red-200 bg-gradient-to-r from-red-50 to-white dark:border-red-900/60 dark:from-red-950/30 dark:to-slate-900/60"
+              : "border-emerald-200 bg-gradient-to-r from-emerald-50 to-white dark:border-emerald-900/60 dark:from-emerald-950/30 dark:to-slate-900/60"
+          }`}
+        >
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Grand Total
+              </p>
+              <p
+                className={`text-2xl font-bold ${
+                  overBudget
+                    ? "text-red-600 dark:text-red-300"
+                    : "text-emerald-700 dark:text-emerald-300"
+                }`}
+              >
+                {INR(grandTotal)}
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Budget: {INR(budgetNum)} ·{" "}
+                {selectedProducts.length} product
+                {selectedProducts.length !== 1 ? "s" : ""} selected
+              </p>
+            </div>
+            <div className="text-right">
+              <p
+                className={`text-sm font-semibold ${
+                  overBudget
+                    ? "text-red-600 dark:text-red-300"
+                    : "text-emerald-700 dark:text-emerald-300"
+                }`}
+              >
+                {overBudget
+                  ? `Over by ${INR(Math.abs(remaining))}`
+                  : `${INR(remaining)} remaining`}
+              </p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                {Math.round(budgetUsed)}% of budget used
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+            <div
+              className={`h-full transition-all ${
+                overBudget ? "bg-red-500" : "bg-emerald-500"
+              }`}
+              style={{ width: `${budgetUsed}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Products grouped by category */}
         {productCategories.length === 0 ? (
-          <div className="rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
             <p className="text-sm text-slate-600 dark:text-slate-400">
               No products found for the selected categories.
             </p>
@@ -483,81 +536,100 @@ export default function TemplatesPage() {
             {productCategories.map((cat) => {
               const options = allCategoryProducts[cat] ?? [];
               const selectedId = categorySelection[cat];
+              const selected = options.find((o) => o._id === selectedId);
 
               return (
                 <div
                   key={cat}
-                  className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
+                  className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
                 >
                   {/* Category header */}
-                  <div className="border-b border-slate-200 px-6 py-3 dark:border-slate-800">
-                    <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                      {cat}
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Select one product — showing top {options.length}
-                    </p>
-                  </div>
-
-                  {/* Product options — top 3 highlighted, rest scrollable */}
-                  <div>
-                    {/* Top recommendations */}
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {options.slice(0, TOP_HIGHLIGHTED).map((product) => (
-                        <ProductRadioRow
-                          key={product._id}
-                          product={product}
-                          isSelected={selectedId === product._id}
-                          catKey={cat}
-                          onSelect={selectProduct}
-                          showBadge
-                        />
-                      ))}
+                  <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3 dark:border-slate-800">
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                        {cat}
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        {options.length} option{options.length !== 1 ? "s" : ""}
+                        {selected && (
+                          <>
+                            {" · Selected: "}
+                            <span className="font-medium text-cine-primary">
+                              {selected.name}
+                            </span>
+                          </>
+                        )}
+                      </p>
                     </div>
-
-                    {/* Scrollable area for remaining options */}
-                    {options.length > TOP_HIGHLIGHTED && (
-                      <>
-                        <div className="border-t border-dashed border-slate-200 px-6 py-1.5 dark:border-slate-700">
-                          <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                            More options — scroll to browse
-                          </p>
-                        </div>
-                        <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
-                          {options.slice(TOP_HIGHLIGHTED).map((product) => (
-                            <ProductRadioRow
-                              key={product._id}
-                              product={product}
-                              isSelected={selectedId === product._id}
-                              catKey={cat}
-                              onSelect={selectProduct}
-                              showBadge={false}
-                            />
-                          ))}
-                        </div>
-                      </>
+                    {selected && (
+                      <span className="shrink-0 rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                        {INR(selected.price)}
+                      </span>
                     )}
                   </div>
+
+                  {/* Top recommendations */}
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {options.slice(0, TOP_HIGHLIGHTED).map((product) => (
+                      <ProductRadioRow
+                        key={product._id}
+                        product={product}
+                        isSelected={selectedId === product._id}
+                        catKey={cat}
+                        onSelect={selectProduct}
+                        showBadge
+                      />
+                    ))}
+                  </div>
+
+                  {/* More options — scrollable */}
+                  {options.length > TOP_HIGHLIGHTED && (
+                    <>
+                      <div className="border-t border-dashed border-slate-200 bg-slate-50/50 px-5 py-1.5 dark:border-slate-700 dark:bg-slate-800/30">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                          More options ({options.length - TOP_HIGHLIGHTED}) — scroll to browse
+                        </p>
+                      </div>
+                      <div className="max-h-48 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
+                        {options.slice(TOP_HIGHLIGHTED).map((product) => (
+                          <ProductRadioRow
+                            key={product._id}
+                            product={product}
+                            isSelected={selectedId === product._id}
+                            catKey={cat}
+                            onSelect={selectProduct}
+                            showBadge={false}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               );
             })}
           </div>
         )}
 
-        {/* Discount & GST */}
-        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-          <h3 className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-50">
-            Adjustments
-          </h3>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {/* Discount */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-                Discount
-              </label>
+        {/* Adjustments */}
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+              Adjustments
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Apply discount and GST to the total.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <WizardField label="Discount">
               <div className="flex gap-2">
-                <Select value={discountType} onValueChange={(v) => setDiscountType(v as "flat" | "percent")}>
-                  <SelectTrigger className="w-20">
+                <Select
+                  value={discountType}
+                  onValueChange={(v) =>
+                    setDiscountType(v as "flat" | "percent")
+                  }
+                >
+                  <SelectTrigger className="w-24 shrink-0">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -574,17 +646,13 @@ export default function TemplatesPage() {
                 />
               </div>
               {discountAmount > 0 && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                  -{INR(discountAmount)}
+                <p className="mt-1 text-xs font-medium text-red-600 dark:text-red-400">
+                  −{INR(discountAmount)}
                 </p>
               )}
-            </div>
+            </WizardField>
 
-            {/* GST */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-                GST %
-              </label>
+            <WizardField label="GST %">
               <Input
                 type="number"
                 placeholder="18"
@@ -594,16 +662,16 @@ export default function TemplatesPage() {
                 onChange={(e) => setGstPercent(e.target.value)}
               />
               {gstAmount > 0 && (
-                <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
+                <p className="mt-1 text-xs font-medium text-amber-600 dark:text-amber-400">
                   +{INR(gstAmount)}
                 </p>
               )}
-            </div>
+            </WizardField>
           </div>
         </div>
 
-        {/* Totals */}
-        <div className="rounded-lg border border-slate-200 bg-white px-6 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        {/* Totals breakdown */}
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
           <div className="space-y-2 text-sm">
             <div className="flex justify-between text-slate-600 dark:text-slate-400">
               <span>
@@ -621,12 +689,12 @@ export default function TemplatesPage() {
                   Discount{" "}
                   {discountType === "percent" ? `(${discountNum}%)` : "(flat)"}
                 </span>
-                <span>-{INR(discountAmount)}</span>
+                <span>−{INR(discountAmount)}</span>
               </div>
             )}
 
             {gstAmount > 0 && (
-              <div className="flex justify-between text-slate-600 dark:text-slate-400">
+              <div className="flex justify-between text-amber-700 dark:text-amber-400">
                 <span>GST ({gstNum}%)</span>
                 <span>+{INR(gstAmount)}</span>
               </div>
@@ -638,7 +706,7 @@ export default function TemplatesPage() {
               </span>
               <span
                 className={`text-base font-bold ${
-                  grandTotal > budgetNum
+                  overBudget
                     ? "text-red-600 dark:text-red-400"
                     : "text-emerald-700 dark:text-emerald-400"
                 }`}
@@ -647,20 +715,16 @@ export default function TemplatesPage() {
               </span>
             </div>
 
-            {grandTotal > budgetNum && (
-              <p className="text-xs text-red-500 dark:text-red-400">
+            {overBudget && (
+              <p className="text-xs font-medium text-red-500 dark:text-red-400">
                 Exceeds budget by {INR(grandTotal - budgetNum)}
               </p>
             )}
-
-            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
-              <span>Budget</span>
-              <span>{INR(budgetNum)}</span>
-            </div>
           </div>
         </div>
 
-        <div className="flex gap-3">
+        {/* Footer actions */}
+        <div className="flex items-center justify-end gap-3 rounded-lg border border-slate-200 bg-white px-5 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
           <Button variant="outline" onClick={() => setStep("requirements")}>
             Back
           </Button>
@@ -668,6 +732,7 @@ export default function TemplatesPage() {
             disabled={selectedProducts.length === 0}
             onClick={handleConfirmCreate}
           >
+            <Check className="h-4 w-4" />
             Confirm & Create Template
           </Button>
         </div>
@@ -758,35 +823,52 @@ function ProductRadioRow({
 
   return (
     <label
-      className={`flex cursor-pointer items-center gap-4 px-6 py-3 transition ${
+      className={`relative flex cursor-pointer items-center gap-3 px-5 py-3 transition ${
         isSelected
           ? "bg-cine-primary/5 dark:bg-cine-primary/10"
           : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
       }`}
     >
+      {isSelected && (
+        <span
+          aria-hidden
+          className="absolute inset-y-0 left-0 w-1 bg-cine-primary"
+        />
+      )}
       <input
         type="radio"
         name={`cat-${catKey}`}
         checked={isSelected}
         onChange={() => onSelect(catKey, product._id)}
-        className="h-4 w-4 shrink-0 accent-cine-primary"
+        className="sr-only"
       />
+
+      <span
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${
+          isSelected
+            ? "border-cine-primary bg-cine-primary text-white"
+            : "border-slate-300 dark:border-slate-600"
+        }`}
+      >
+        {isSelected && <Check className="h-3 w-3" />}
+      </span>
 
       {showBadge ? (
         <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${priorityColor}`}
+          className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${priorityColor}`}
         >
-          #{product.rank} {priorityLabel}
+          {product.rank === 1 && <Sparkles className="h-3 w-3" />}#
+          {product.rank} {priorityLabel}
         </span>
       ) : (
-        <span className="shrink-0 w-6 text-center text-[10px] font-semibold text-slate-400 dark:text-slate-500">
+        <span className="w-6 shrink-0 text-center text-[10px] font-semibold text-slate-400 dark:text-slate-500">
           #{product.rank}
         </span>
       )}
 
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <p
-          className={`text-sm truncate ${
+          className={`truncate text-sm ${
             isSelected
               ? "font-semibold text-slate-900 dark:text-slate-50"
               : "font-medium text-slate-700 dark:text-slate-300"
@@ -800,10 +882,10 @@ function ProductRadioRow({
       </div>
 
       <p
-        className={`shrink-0 text-sm font-semibold ${
+        className={`shrink-0 text-sm font-bold ${
           isSelected
             ? "text-cine-primary"
-            : "text-slate-700 dark:text-slate-300"
+            : "text-slate-700 dark:text-slate-200"
         }`}
       >
         {INR(product.price)}
@@ -816,6 +898,23 @@ function ProductRadioRow({
    Template Card Component
    ──────────────────────────────────────────── */
 
+function WizardField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
 function TemplateCard({
   template,
   onDelete,
@@ -823,72 +922,79 @@ function TemplateCard({
   template: Template;
   onDelete: (id: string) => void;
 }) {
+  const totalProducts = template.groups.reduce(
+    (sum, g) => sum + g.productItems.length,
+    0
+  );
   return (
-    <div className="flex h-full flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800/70 dark:bg-slate-900/60">
-      <Link href={`/templates/${template._id}`} className="block">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+    <div className="group flex h-full flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
+      <Link href={`/templates/${template._id}`} className="space-y-3">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300">
+            <span className="text-base font-bold">T</span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate text-base font-semibold text-slate-900 dark:text-slate-50">
               {template.name}
             </h3>
             {template.description && (
-              <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">
+              <p className="line-clamp-1 text-xs text-slate-500 dark:text-slate-400">
                 {template.description}
               </p>
             )}
           </div>
-          <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
-            {template.grandTotal.toLocaleString("en-IN", {
-              style: "currency",
-              currency: "INR",
-              maximumFractionDigits: 0,
-            })}
-          </span>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {template.groups.map((group) => (
+        <div className="flex items-baseline justify-between">
+          <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
+            {INR(template.grandTotal)}
+          </p>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            {totalProducts} product{totalProducts !== 1 ? "s" : ""} ·{" "}
+            {template.groups.length} group
+            {template.groups.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-1">
+          {template.groups.slice(0, 5).map((group) => (
             <span
               key={group.name}
-              className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+              className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-300"
             >
               {group.name} ({group.productItems.length})
             </span>
           ))}
-        </div>
-
-        <div className="mt-3 space-y-1 text-xs text-slate-500 dark:text-slate-400">
-          <p>
-            {template.groups.reduce(
-              (sum, g) => sum + g.productItems.length,
-              0
-            )}{" "}
-            products across {template.groups.length} group
-            {template.groups.length !== 1 ? "s" : ""}
-          </p>
+          {template.groups.length > 5 && (
+            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+              +{template.groups.length - 5} more
+            </span>
+          )}
         </div>
       </Link>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-        <span className="rounded-full bg-slate-200/70 px-3 py-1 dark:bg-slate-800/70">
+      <div className="mt-auto flex items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+        <span className="text-[10px] text-slate-500 dark:text-slate-400">
           Created {new Date(template.createdAt).toLocaleDateString()}
         </span>
-        <Link
-          href={`/templates/${template._id}`}
-          className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-cine-primary"
-        >
-          View / Edit
-        </Link>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            onDelete(template._id);
-          }}
-          className="ml-auto inline-flex items-center gap-1 rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-semibold text-red-600 shadow-sm transition hover:bg-red-50 dark:border-red-800 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-900/30"
-        >
-          Delete
-        </button>
+        <div className="flex gap-1.5">
+          <Link
+            href={`/templates/${template._id}`}
+            className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+          >
+            View
+          </Link>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              onDelete(template._id);
+            }}
+            className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
+          >
+            Delete
+          </button>
+        </div>
       </div>
     </div>
   );

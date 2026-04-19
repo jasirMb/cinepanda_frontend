@@ -5,6 +5,14 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  CalendarDays,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import { templatesKeys, useTemplate } from "@/hooks/useTemplates";
 import {
@@ -16,13 +24,15 @@ import {
 } from "@/lib/api/templates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Spinner } from "@/components/ui/spinner";
-
-/* ────────────────────────────────────────────
-   Helpers
-   ──────────────────────────────────────────── */
 
 const INR = (n: number) =>
   n.toLocaleString("en-IN", {
@@ -30,10 +40,6 @@ const INR = (n: number) =>
     currency: "INR",
     maximumFractionDigits: 0,
   });
-
-/* ────────────────────────────────────────────
-   Editable product item (local state)
-   ──────────────────────────────────────────── */
 
 interface EditableProductItem {
   productId: string;
@@ -50,10 +56,6 @@ interface EditableGroup {
   manualItems: TemplateManualItem[];
 }
 
-/* ────────────────────────────────────────────
-   Page
-   ──────────────────────────────────────────── */
-
 export default function TemplateDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -66,13 +68,11 @@ export default function TemplateDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  // Editable form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [groups, setGroups] = useState<EditableGroup[]>([]);
   const [manualItems, setManualItems] = useState<TemplateManualItem[]>([]);
 
-  // Populate form when template loads
   useEffect(() => {
     if (template) {
       setName(template.name);
@@ -95,7 +95,6 @@ export default function TemplateDetailPage() {
     }
   }, [template]);
 
-  // Computed totals from editable state
   const groupSubtotals = useMemo(
     () =>
       groups.map((g) => {
@@ -132,7 +131,6 @@ export default function TemplateDetailPage() {
 
   const grandTotal = Math.max(0, groupsTotal + templateManualTotal);
 
-  // ── mutations ─────────────────────────────
   const updateMutation = useMutation({
     mutationFn: (payload: CreateTemplatePayload) =>
       updateTemplate(templateId, payload),
@@ -144,9 +142,7 @@ export default function TemplateDetailPage() {
       setIsEditing(false);
       toast.success("Template updated successfully");
     },
-    onError: () => {
-      toast.error("Failed to update template");
-    },
+    onError: () => toast.error("Failed to update template"),
   });
 
   const deleteMutation = useMutation({
@@ -155,12 +151,9 @@ export default function TemplateDetailPage() {
       queryClient.invalidateQueries({ queryKey: templatesKeys.all });
       router.push("/templates");
     },
-    onError: () => {
-      toast.error("Failed to delete template");
-    },
+    onError: () => toast.error("Failed to delete template"),
   });
 
-  // ── edit helpers ──────────────────────────
   function handleSave() {
     const payload: CreateTemplatePayload = {
       name: name.trim(),
@@ -205,10 +198,6 @@ export default function TemplateDetailPage() {
     setIsEditing(false);
   }
 
-  function handleDelete() {
-    setShowDeleteDialog(true);
-  }
-
   function updateProductField(
     gi: number,
     pi: number,
@@ -221,7 +210,12 @@ export default function TemplateDetailPage() {
           ? {
               ...g,
               productItems: g.productItems.map((p, j) =>
-                j === pi ? { ...p, [field]: Math.max(field === "quantity" ? 1 : 0, value) } : p
+                j === pi
+                  ? {
+                      ...p,
+                      [field]: Math.max(field === "quantity" ? 1 : 0, value),
+                    }
+                  : p
               ),
             }
           : g
@@ -294,7 +288,6 @@ export default function TemplateDetailPage() {
     setGroups((prev) => prev.filter((_, i) => i !== gi));
   }
 
-  // ── loading / error states ────────────────
   if (templateQuery.isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -309,84 +302,94 @@ export default function TemplateDetailPage() {
           Failed to load template. It may have been deleted.
         </p>
         <Button variant="outline" asChild>
-          <Link href="/templates">Back to templates</Link>
+          <Link href="/templates">
+            <ArrowLeft className="h-4 w-4" /> Back to templates
+          </Link>
         </Button>
       </div>
     );
   }
 
-  // ── RENDER ────────────────────────────────
+  const totalProducts = (isEditing ? groups : template.groups).reduce(
+    (s, g) => s + g.productItems.length,
+    0
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          {isEditing ? (
-            <div className="space-y-2">
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="text-lg font-semibold"
-                placeholder="Template name"
-              />
-              <Input
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Description (optional)"
-              />
-            </div>
-          ) : (
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
-                {template.name}
-              </h2>
-              {template.description && (
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  {template.description}
-                </p>
-              )}
-            </div>
-          )}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
+            {isEditing ? "Edit Template" : template.name}
+          </h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            {isEditing
+              ? "Update template details, groups, and adjustments."
+              : template.description || "Template details"}
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/templates">Back</Link>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/templates">
+              <ArrowLeft className="h-4 w-4" /> Back
+            </Link>
           </Button>
-          {isEditing ? (
+          {!isEditing && (
             <>
-              <Button variant="outline" onClick={handleCancel}>
-                Cancel
+              <Button size="sm" onClick={() => setIsEditing(true)}>
+                <Pencil className="h-4 w-4" /> Edit
               </Button>
               <Button
-                onClick={handleSave}
-                disabled={!name.trim() || updateMutation.isPending}
-              >
-                {updateMutation.isPending ? "Saving..." : "Save Changes"}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button onClick={() => setIsEditing(true)}>Edit</Button>
-              <Button
+                size="sm"
                 variant="outline"
-                onClick={handleDelete}
+                onClick={() => setShowDeleteDialog(true)}
                 className="text-red-600 hover:text-red-700 dark:text-red-400"
               >
-                Delete
+                <Trash2 className="h-4 w-4" /> Delete
               </Button>
             </>
           )}
         </div>
       </div>
 
+      {/* Edit-mode name/description card */}
+      {isEditing && (
+        <div className="max-w-2xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <Field label="Template Name *">
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Template name"
+            />
+          </Field>
+          <Field label="Description">
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Description (optional)"
+            />
+          </Field>
+        </div>
+      )}
+
       {/* Grand total banner */}
-      <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-6 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-        <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
-          Grand Total
-        </span>
-        <span className="text-xl font-bold text-emerald-700 dark:text-emerald-400">
-          {INR(isEditing ? grandTotal : template.grandTotal)}
-        </span>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-gradient-to-r from-emerald-50 to-white px-5 py-4 shadow-sm dark:border-slate-800 dark:from-emerald-950/30 dark:to-slate-900/60">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            Grand Total
+          </p>
+          <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
+            {INR(isEditing ? grandTotal : template.grandTotal)}
+          </p>
+        </div>
+        <div className="text-right text-xs text-slate-500 dark:text-slate-400">
+          <p>
+            {totalProducts} product{totalProducts !== 1 ? "s" : ""} ·{" "}
+            {(isEditing ? groups : template.groups).length} group
+            {(isEditing ? groups : template.groups).length !== 1 ? "s" : ""}
+          </p>
+        </div>
       </div>
 
       {/* Groups */}
@@ -401,53 +404,56 @@ export default function TemplateDetailPage() {
               key={gi}
               className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
             >
-              {/* Group header */}
-              <div className="flex items-center justify-between border-b border-slate-200 px-6 py-3 dark:border-slate-800">
+              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3 dark:border-slate-800">
                 <div>
                   <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
                     {group.name}
                   </h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     {group.productItems.length} product
-                    {group.productItems.length !== 1 ? "s" : ""} · Subtotal:{" "}
-                    {INR(subtotal)}
+                    {group.productItems.length !== 1 ? "s" : ""} · Subtotal{" "}
+                    <span className="font-semibold text-slate-700 dark:text-slate-200">
+                      {INR(subtotal)}
+                    </span>
                   </p>
                 </div>
                 {isEditing && (
                   <button
                     type="button"
                     onClick={() => removeGroup(gi)}
-                    className="text-xs text-red-500 hover:text-red-700 dark:text-red-400"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-700 dark:text-red-400"
                   >
-                    Remove Group
+                    <Trash2 className="h-3 w-3" /> Remove
                   </button>
                 )}
               </div>
 
-              {/* Product items */}
               <div className="divide-y divide-slate-100 dark:divide-slate-800">
                 {group.productItems.map((item, pi) => (
                   <div
                     key={pi}
-                    className="flex flex-wrap items-center gap-4 px-6 py-3"
+                    className="flex flex-wrap items-center gap-3 px-5 py-3"
                   >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 dark:text-slate-50 truncate">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-50">
                         {item.productName}
                       </p>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {item.category} / {item.subcategory}
+                        {item.category} · {item.subcategory}
                       </p>
                     </div>
 
                     {isEditing ? (
                       <>
-                        <div className="flex items-center gap-1">
-                          <label className="text-xs text-slate-500">Qty</label>
+                        <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                          Qty
                           <input
                             type="number"
                             min={1}
-                            value={(group as EditableGroup).productItems[pi].quantity}
+                            value={
+                              (group as EditableGroup).productItems[pi]
+                                .quantity
+                            }
                             onChange={(e) =>
                               updateProductField(
                                 gi,
@@ -458,13 +464,16 @@ export default function TemplateDetailPage() {
                             }
                             className="h-8 w-16 rounded-md border border-slate-200 bg-white px-2 text-center text-sm shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
                           />
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <label className="text-xs text-slate-500">Price</label>
+                        </label>
+                        <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                          Price
                           <input
                             type="number"
                             min={0}
-                            value={(group as EditableGroup).productItems[pi].unitPrice}
+                            value={
+                              (group as EditableGroup).productItems[pi]
+                                .unitPrice
+                            }
                             onChange={(e) =>
                               updateProductField(
                                 gi,
@@ -475,19 +484,19 @@ export default function TemplateDetailPage() {
                             }
                             className="h-8 w-28 rounded-md border border-slate-200 bg-white px-2 text-right text-sm shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
                           />
-                        </div>
+                        </label>
                         <button
                           type="button"
                           onClick={() => removeProduct(gi, pi)}
-                          className="text-xs text-red-500 hover:text-red-700 dark:text-red-400"
+                          className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 bg-white px-2 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400"
                         >
-                          Remove
+                          <X className="h-3 w-3" />
                         </button>
                       </>
                     ) : (
                       <>
                         <span className="text-xs text-slate-500 dark:text-slate-400">
-                          x{item.quantity}
+                          ×{item.quantity}
                         </span>
                         <span className="text-xs text-slate-500 dark:text-slate-400">
                           @ {INR(item.unitPrice)}
@@ -501,101 +510,25 @@ export default function TemplateDetailPage() {
                 ))}
               </div>
 
-              {/* Group manual items */}
               {group.manualItems.length > 0 && (
                 <div className="border-t border-dashed border-slate-200 dark:border-slate-700">
-                  <div className="px-6 py-2">
-                    <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
-                      Group adjustments
+                  <div className="px-5 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      Group Adjustments
                     </p>
                   </div>
-                  <div className="divide-y divide-slate-100 px-6 pb-3 dark:divide-slate-800">
+                  <div className="divide-y divide-slate-100 px-5 pb-3 dark:divide-slate-800">
                     {group.manualItems.map((m, mi) => (
-                      <div
+                      <ManualItemRow
                         key={mi}
-                        className="flex items-center gap-3 py-2"
-                      >
-                        {isEditing ? (
-                          <>
-                            <Input
-                              value={(group as EditableGroup).manualItems[mi].name}
-                              onChange={(e) =>
-                                updateManualItem(gi, mi, "name", e.target.value)
-                              }
-                              placeholder="Name"
-                              className="flex-1"
-                            />
-                            <Select value={(group as EditableGroup).manualItems[mi].type} onValueChange={(v) => updateManualItem(gi, mi, "type", v)}>
-                              <SelectTrigger className="h-9 w-28">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="service">Service</SelectItem>
-                                <SelectItem value="tax">Tax</SelectItem>
-                                <SelectItem value="discount">Discount</SelectItem>
-                                <SelectItem value="other">Other</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <input
-                              type="number"
-                              value={(group as EditableGroup).manualItems[mi].amount}
-                              onChange={(e) =>
-                                updateManualItem(
-                                  gi,
-                                  mi,
-                                  "amount",
-                                  parseFloat(e.target.value) || 0
-                                )
-                              }
-                              className="h-8 w-20 rounded-md border border-slate-200 bg-white px-2 text-right text-sm shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-                            />
-                            <label className="flex items-center gap-1 text-xs text-slate-500">
-                              <input
-                                type="checkbox"
-                                checked={
-                                  (group as EditableGroup).manualItems[mi]
-                                    .isPercentage
-                                }
-                                onChange={(e) =>
-                                  updateManualItem(
-                                    gi,
-                                    mi,
-                                    "isPercentage",
-                                    e.target.checked
-                                  )
-                                }
-                              />
-                              %
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => removeGroupManualItem(gi, mi)}
-                              className="text-xs text-red-500"
-                            >
-                              Remove
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <span className="flex-1 text-sm text-slate-700 dark:text-slate-300">
-                              {m.name}
-                            </span>
-                            <span className="text-xs rounded-full bg-slate-100 px-2 py-0.5 dark:bg-slate-800 dark:text-slate-300">
-                              {m.type}
-                            </span>
-                            <span
-                              className={`text-sm font-medium ${
-                                m.type === "discount"
-                                  ? "text-red-600 dark:text-red-400"
-                                  : "text-slate-700 dark:text-slate-300"
-                              }`}
-                            >
-                              {m.type === "discount" ? "-" : "+"}
-                              {m.isPercentage ? `${m.amount}%` : INR(m.amount)}
-                            </span>
-                          </>
-                        )}
-                      </div>
+                        item={m}
+                        editable={isEditing}
+                        editableValue={(group as EditableGroup).manualItems[mi]}
+                        onChange={(field, value) =>
+                          updateManualItem(gi, mi, field, value)
+                        }
+                        onRemove={() => removeGroupManualItem(gi, mi)}
+                      />
                     ))}
                   </div>
                 </div>
@@ -605,101 +538,41 @@ export default function TemplateDetailPage() {
         })}
       </div>
 
-      {/* Template-level manual items */}
-      {(isEditing ? manualItems : template.manualItems).length > 0 || isEditing ? (
+      {/* Template-level adjustments */}
+      {((isEditing ? manualItems : template.manualItems).length > 0 ||
+        isEditing) && (
         <div className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-          <div className="flex items-center justify-between border-b border-slate-200 px-6 py-3 dark:border-slate-800">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-              Template Adjustments (GST, Discounts, etc.)
-            </h3>
+          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3 dark:border-slate-800">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                Template Adjustments
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                GST, discounts, services applied across all groups.
+              </p>
+            </div>
             {isEditing && (
               <button
                 type="button"
                 onClick={addTemplateManualItem}
-                className="text-xs font-medium text-cine-primary hover:underline"
+                className="inline-flex items-center gap-1 rounded-md border border-cine-primary/40 bg-cine-primary/10 px-2.5 py-1 text-xs font-semibold text-cine-primary transition hover:bg-cine-primary/20"
               >
-                + Add Adjustment
+                <Plus className="h-3 w-3" /> Add Adjustment
               </button>
             )}
           </div>
-          <div className="divide-y divide-slate-100 px-6 dark:divide-slate-800">
+          <div className="divide-y divide-slate-100 px-5 dark:divide-slate-800">
             {(isEditing ? manualItems : template.manualItems).map((m, mi) => (
-              <div key={mi} className="flex items-center gap-3 py-3">
-                {isEditing ? (
-                  <>
-                    <Input
-                      value={manualItems[mi].name}
-                      onChange={(e) =>
-                        updateTemplateManualItem(mi, "name", e.target.value)
-                      }
-                      placeholder="e.g. GST 18%"
-                      className="flex-1"
-                    />
-                    <Select value={manualItems[mi].type} onValueChange={(v) => updateTemplateManualItem(mi, "type", v)}>
-                      <SelectTrigger className="h-9 w-28">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="service">Service</SelectItem>
-                        <SelectItem value="tax">Tax</SelectItem>
-                        <SelectItem value="discount">Discount</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <input
-                      type="number"
-                      value={manualItems[mi].amount}
-                      onChange={(e) =>
-                        updateTemplateManualItem(
-                          mi,
-                          "amount",
-                          parseFloat(e.target.value) || 0
-                        )
-                      }
-                      className="h-8 w-20 rounded-md border border-slate-200 bg-white px-2 text-right text-sm shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-                    />
-                    <label className="flex items-center gap-1 text-xs text-slate-500">
-                      <input
-                        type="checkbox"
-                        checked={manualItems[mi].isPercentage}
-                        onChange={(e) =>
-                          updateTemplateManualItem(
-                            mi,
-                            "isPercentage",
-                            e.target.checked
-                          )
-                        }
-                      />
-                      %
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => removeTemplateManualItem(mi)}
-                      className="text-xs text-red-500"
-                    >
-                      Remove
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span className="flex-1 text-sm text-slate-700 dark:text-slate-300">
-                      {m.name}
-                    </span>
-                    <span className="text-xs rounded-full bg-slate-100 px-2 py-0.5 dark:bg-slate-800 dark:text-slate-300">
-                      {m.type}
-                    </span>
-                    <span
-                      className={`text-sm font-medium ${
-                        m.type === "discount"
-                          ? "text-red-600 dark:text-red-400"
-                          : "text-slate-700 dark:text-slate-300"
-                      }`}
-                    >
-                      {m.type === "discount" ? "-" : "+"}
-                      {m.isPercentage ? `${m.amount}%` : INR(m.amount)}
-                    </span>
-                  </>
-                )}
+              <div key={mi} className="py-3">
+                <ManualItemRow
+                  item={m}
+                  editable={isEditing}
+                  editableValue={manualItems[mi]}
+                  onChange={(field, value) =>
+                    updateTemplateManualItem(mi, field, value)
+                  }
+                  onRemove={() => removeTemplateManualItem(mi)}
+                />
               </div>
             ))}
             {!isEditing && template.manualItems.length === 0 && (
@@ -709,18 +582,42 @@ export default function TemplateDetailPage() {
             )}
           </div>
         </div>
-      ) : null}
+      )}
 
-      {/* Meta info */}
-      <div className="flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
-        <span>Created: {new Date(template.createdAt).toLocaleString()}</span>
-        <span>Updated: {new Date(template.updatedAt).toLocaleString()}</span>
-        <span>ID: {template._id}</span>
-      </div>
+      {/* Edit footer */}
+      {isEditing && (
+        <div className="flex items-center justify-end gap-3 rounded-lg border border-slate-200 bg-white px-5 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <Button variant="outline" onClick={handleCancel}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={!name.trim() || updateMutation.isPending}
+          >
+            {updateMutation.isPending ? "Saving..." : "Save Changes"}
+          </Button>
+        </div>
+      )}
+
+      {/* Meta */}
+      {!isEditing && (
+        <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-500 dark:text-slate-400">
+          <span className="inline-flex items-center gap-1">
+            <CalendarDays className="h-3 w-3" />
+            Created {new Date(template.createdAt).toLocaleString()}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <CalendarDays className="h-3 w-3" />
+            Updated {new Date(template.updatedAt).toLocaleString()}
+          </span>
+        </div>
+      )}
 
       <ConfirmDialog
         open={showDeleteDialog}
-        onOpenChange={(open) => { if (!open) setShowDeleteDialog(false); }}
+        onOpenChange={(open) => {
+          if (!open) setShowDeleteDialog(false);
+        }}
         title="Delete template"
         description="Are you sure you want to delete this template? This action cannot be undone."
         confirmLabel="Delete"
@@ -729,6 +626,122 @@ export default function TemplateDetailPage() {
           setShowDeleteDialog(false);
         }}
       />
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function ManualItemRow({
+  item,
+  editable,
+  editableValue,
+  onChange,
+  onRemove,
+}: {
+  item: TemplateManualItem;
+  editable: boolean;
+  editableValue: TemplateManualItem;
+  onChange: (
+    field: keyof TemplateManualItem,
+    value: string | number | boolean
+  ) => void;
+  onRemove: () => void;
+}) {
+  if (editable) {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          value={editableValue.name}
+          onChange={(e) => onChange("name", e.target.value)}
+          placeholder="e.g. GST 18%"
+          className="h-9 min-w-[140px] flex-1"
+        />
+        <Select
+          value={editableValue.type}
+          onValueChange={(v) => onChange("type", v)}
+        >
+          <SelectTrigger className="h-9 w-28">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="service">Service</SelectItem>
+            <SelectItem value="tax">Tax</SelectItem>
+            <SelectItem value="discount">Discount</SelectItem>
+            <SelectItem value="other">Other</SelectItem>
+          </SelectContent>
+        </Select>
+        <input
+          type="number"
+          value={editableValue.amount}
+          onChange={(e) =>
+            onChange("amount", parseFloat(e.target.value) || 0)
+          }
+          className="h-9 w-24 rounded-md border border-slate-200 bg-white px-2 text-right text-sm shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+        />
+        <label className="flex items-center gap-1 text-xs text-slate-500">
+          <input
+            type="checkbox"
+            checked={editableValue.isPercentage}
+            onChange={(e) => onChange("isPercentage", e.target.checked)}
+          />
+          %
+        </label>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 bg-white px-2 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+    );
+  }
+
+  const typeBadge =
+    item.type === "discount"
+      ? "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300"
+      : item.type === "tax"
+        ? "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+        : item.type === "service"
+          ? "bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300"
+          : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <span className="flex-1 text-sm text-slate-700 dark:text-slate-300">
+        {item.name}
+      </span>
+      <span
+        className={`rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${typeBadge}`}
+      >
+        {item.type}
+      </span>
+      <span
+        className={`text-sm font-semibold ${
+          item.type === "discount"
+            ? "text-red-600 dark:text-red-400"
+            : "text-slate-700 dark:text-slate-200"
+        }`}
+      >
+        {item.type === "discount" ? "−" : "+"}
+        {item.isPercentage ? `${item.amount}%` : INR(item.amount)}
+      </span>
     </div>
   );
 }

@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { Pencil, Tag, Trash2 } from "lucide-react";
+
 import { productsKeys, useProducts, useCategories } from "@/hooks/useProducts";
 import { ProductsTable } from "@/components/tables/ProductsTable";
 import { Button } from "@/components/ui/button";
@@ -125,90 +127,102 @@ export default function ProductsPage() {
   }
 
   function ProductCard({ product }: { product: Product }) {
+    const specs = product.specifications
+      ? Object.entries(product.specifications)
+      : [];
     return (
-      <div className="flex h-full flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800/70 dark:bg-slate-900/60">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              {product.category}
+      <div className="group flex h-full flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
+        {/* Header */}
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cine-primary/10 text-cine-primary">
+            <Tag className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              {product.category} · {product.subcategory}
             </p>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+            <h3 className="truncate text-base font-semibold text-slate-900 dark:text-slate-50">
               {product.name}
             </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              {product.subcategory}
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-2 text-right">
-            <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
-              {product.price.toLocaleString("en-IN", {
-                style: "currency",
-                currency: "INR",
-                maximumFractionDigits: 0
-              })}
-            </span>
-            <span className="rounded-full bg-slate-900/10 px-3 py-1 text-xs font-semibold text-slate-800 dark:bg-slate-50/10 dark:text-slate-100">
-              {product.unit}
-            </span>
           </div>
         </div>
 
-        {product.description && (
-          <p className="mt-3 text-sm text-slate-600 line-clamp-2 dark:text-slate-300">
-            {product.description}
+        {/* Price */}
+        <div className="flex items-baseline justify-between">
+          <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
+            {product.price.toLocaleString("en-IN", {
+              style: "currency",
+              currency: "INR",
+              maximumFractionDigits: 0,
+            })}
           </p>
-        )}
-
-        <div className="mt-4 space-y-1 text-sm text-slate-700 dark:text-slate-200">
-          {product.brand && (
-            <p>
-              <span className="font-semibold">Brand:</span> {product.brand}
-            </p>
-          )}
-          {product.productModel && (
-            <p>
-              <span className="font-semibold">Model:</span> {product.productModel}
-            </p>
-          )}
+          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            {product.unit}
+          </span>
         </div>
 
-        {product.specifications && Object.keys(product.specifications).length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {Object.entries(product.specifications)
-              .slice(0, 4)
-              .map(([key, value]) => (
-                <span
-                  key={key}
-                  className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                >
-                  {key}: {String(value)}
-                </span>
-              ))}
-            {Object.keys(product.specifications).length > 4 && (
-              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                +{Object.keys(product.specifications).length - 4} more
+        {/* Brand / Model badges */}
+        {(product.brand || product.productModel) && (
+          <div className="flex flex-wrap gap-1.5">
+            {product.brand && (
+              <span className="rounded-md bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">
+                {product.brand}
+              </span>
+            )}
+            {product.productModel && (
+              <span className="rounded-md bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                {product.productModel}
               </span>
             )}
           </div>
         )}
 
-        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-          <span className="rounded-full bg-slate-200/70 px-3 py-1 dark:bg-slate-800/70">
+        {product.description && (
+          <p className="line-clamp-2 text-xs text-slate-600 dark:text-slate-400">
+            {product.description}
+          </p>
+        )}
+
+        {specs.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {specs.slice(0, 4).map(([key, value]) => (
+              <span
+                key={key}
+                className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+              >
+                {key}: {String(value)}
+              </span>
+            ))}
+            {specs.length > 4 && (
+              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                +{specs.length - 4} more
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="mt-auto flex items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+          <span className="text-[10px] text-slate-500 dark:text-slate-400">
             Added {new Date(product.createdAt).toLocaleDateString()}
           </span>
-          <Link
-            href={`/products/new?edit=${product._id}`}
-            className="ml-auto inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-cine-primary"
-          >
-            Edit
-          </Link>
-          <button
-            type="button"
-            onClick={() => handleDelete(product._id)}
-            className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-semibold text-red-600 shadow-sm transition hover:bg-red-50 dark:border-red-800 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-900/30"
-          >
-            Delete
-          </button>
+          <div className="flex gap-1.5">
+            <Link
+              href={`/products/new?edit=${product._id}`}
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            >
+              <Pencil className="h-3 w-3" />
+              Edit
+            </Link>
+            <button
+              type="button"
+              onClick={() => handleDelete(product._id)}
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
+            >
+              <Trash2 className="h-3 w-3" />
+              Delete
+            </button>
+          </div>
         </div>
       </div>
     );
