@@ -1,13 +1,30 @@
 "use client";
 
-import { use, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  CalendarDays,
+  Clock,
+  FileText,
+  IndianRupee,
+  MapPin,
+  Pencil,
+  Phone,
+  Plus,
+  TrendingDown,
+  TrendingUp,
+  Trash2,
+  User,
+  UserPlus,
+  Wallet,
+} from "lucide-react";
 
 import { projectsKeys, useProject } from "@/hooks/useProjects";
-import { ledgerKeys, useLedger } from "@/hooks/useLedger";
+import { useLedger } from "@/hooks/useLedger";
 import {
   updateProject,
   deleteProject,
@@ -19,16 +36,24 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { LedgerEntryPopulated } from "@/lib/api/ledger";
 
-/* ────────────────────────────────────────────
-   Helpers
-   ──────────────────────────────────────────── */
-
 const STATUS_BADGE: Record<ProjectStatus, string> = {
-  PLANNING: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
-  ONGOING: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
-  ON_HOLD: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300",
-  COMPLETED: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
-  CANCELLED: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
+  PLANNING: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
+  ONGOING:
+    "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
+  ON_HOLD:
+    "bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-300",
+  COMPLETED:
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
+  CANCELLED:
+    "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300",
+};
+
+const STATUS_STRIPE: Record<ProjectStatus, string> = {
+  PLANNING: "bg-blue-500",
+  ONGOING: "bg-amber-500",
+  ON_HOLD: "bg-orange-500",
+  COMPLETED: "bg-emerald-500",
+  CANCELLED: "bg-red-500",
 };
 
 const STATUS_ACTION_LABELS: Partial<Record<ProjectStatus, string>> = {
@@ -37,6 +62,32 @@ const STATUS_ACTION_LABELS: Partial<Record<ProjectStatus, string>> = {
   COMPLETED: "Mark Complete",
   CANCELLED: "Cancel",
 };
+
+const AVATAR_PALETTE = [
+  "bg-cine-primary/15 text-cine-primary",
+  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  "bg-violet-500/15 text-violet-700 dark:text-violet-300",
+  "bg-amber-500/15 text-amber-800 dark:text-amber-300",
+  "bg-rose-500/15 text-rose-700 dark:text-rose-300",
+  "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+];
+
+function getInitials(name: string) {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  );
+}
+
+function avatarColor(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length];
+}
 
 function formatINR(amount: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -54,16 +105,12 @@ function formatDate(iso: string) {
   });
 }
 
-/* ────────────────────────────────────────────
-   Component
-   ──────────────────────────────────────────── */
-
 export default function ProjectDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }) {
-  const { id } = use(params);
+  const { id } = params;
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -100,7 +147,6 @@ export default function ProjectDetailPage({
     onError: () => toast.error("Failed to delete project"),
   });
 
-  /* ── Financials ── */
   const totalIncome = ledgerEntries
     .filter((e) => e.entryType === "INCOME")
     .reduce((s, e) => s + e.amount, 0);
@@ -108,10 +154,14 @@ export default function ProjectDetailPage({
     .filter((e) => e.entryType === "EXPENSE")
     .reduce((s, e) => s + e.amount, 0);
   const pendingAmount = project ? project.projectValue - totalIncome : 0;
+  const collectedPct =
+    project && project.projectValue > 0
+      ? Math.min(100, (totalIncome / project.projectValue) * 100)
+      : 0;
 
   if (projectQuery.isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="max-w-5xl space-y-4">
         <Skeleton className="h-8 w-64" />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -125,54 +175,74 @@ export default function ProjectDetailPage({
 
   if (projectQuery.isError || !project) {
     return (
-      <p className="text-red-400">
-        Failed to load project. Please try again.
-      </p>
+      <div className="space-y-4">
+        <p className="text-red-400">Failed to load project. Please try again.</p>
+        <Button variant="outline" asChild>
+          <Link href="/projects">
+            <ArrowLeft className="h-4 w-4" /> Back to projects
+          </Link>
+        </Button>
+      </div>
     );
   }
 
   const validTransitions = VALID_STATUS_TRANSITIONS[project.status];
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-5xl space-y-4">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
-              {project.clientName}
-            </h2>
-            <span
-              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[project.status]}`}
-            >
-              {project.status.replace("_", " ")}
-            </span>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <div
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-base font-semibold ${avatarColor(project.clientName)}`}
+          >
+            {getInitials(project.clientName)}
           </div>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            {project.serviceType}
-            {project.description ? ` — ${project.description}` : ""}
-          </p>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="truncate text-xl font-semibold text-slate-900 dark:text-slate-50">
+                {project.clientName}
+              </h2>
+              <span
+                className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-semibold ${STATUS_BADGE[project.status]}`}
+              >
+                {project.status.replace("_", " ")}
+              </span>
+            </div>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              {project.serviceType}
+              {project.description ? ` — ${project.description}` : ""}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          <Link href={`/projects/${id}/edit`}>
-            <Button variant="outline" size="sm">
-              Edit
-            </Button>
-          </Link>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/projects">
+              <ArrowLeft className="h-4 w-4" /> Back
+            </Link>
+          </Button>
+          <Button size="sm" asChild>
+            <Link href={`/projects/${id}/edit`}>
+              <Pencil className="h-4 w-4" /> Edit
+            </Link>
+          </Button>
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             className="text-red-600 hover:text-red-700 dark:text-red-400"
             onClick={() => setShowDeleteDialog(true)}
           >
-            Delete
+            <Trash2 className="h-4 w-4" /> Delete
           </Button>
         </div>
       </div>
 
-      {/* Status transition buttons */}
+      {/* Status transitions */}
       {validTransitions.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            Move to:
+          </span>
           {validTransitions.map((nextStatus) => (
             <Button
               key={nextStatus}
@@ -187,132 +257,180 @@ export default function ProjectDetailPage({
         </div>
       )}
 
-      {/* Info cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <InfoCard label="Project Value" value={formatINR(project.projectValue)} />
-        <InfoCard
+      {/* Financial banner with progress */}
+      <div
+        className={`relative overflow-hidden rounded-lg border border-slate-200 bg-gradient-to-r from-emerald-50 to-white px-5 py-4 shadow-sm dark:border-slate-800 dark:from-emerald-950/30 dark:to-slate-900/60`}
+      >
+        <div
+          aria-hidden
+          className={`absolute left-0 top-0 h-full w-1 ${STATUS_STRIPE[project.status]}`}
+        />
+        <div className="flex flex-wrap items-end justify-between gap-3 pl-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Project Value
+            </p>
+            <p className="text-2xl font-bold text-slate-900 dark:text-slate-50">
+              {formatINR(project.projectValue)}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+              {formatINR(totalIncome)} received
+            </p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400">
+              {Math.round(collectedPct)}% collected ·{" "}
+              {pendingAmount > 0
+                ? `${formatINR(pendingAmount)} pending`
+                : "Fully collected"}
+            </p>
+          </div>
+        </div>
+        <div className="ml-3 mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+          <div
+            className="h-full bg-emerald-500 transition-all"
+            style={{ width: `${collectedPct}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard
+          icon={IndianRupee}
+          label="Project Value"
+          value={formatINR(project.projectValue)}
+          tone="slate"
+        />
+        <StatCard
+          icon={TrendingUp}
           label="Total Received"
           value={formatINR(totalIncome)}
-          accent="text-emerald-600 dark:text-emerald-400"
+          tone="emerald"
         />
-        <InfoCard
+        <StatCard
+          icon={TrendingDown}
           label="Total Expenses"
           value={formatINR(totalExpense)}
-          accent="text-red-600 dark:text-red-400"
+          tone="red"
         />
-        <InfoCard
-          label="Pending Amount"
+        <StatCard
+          icon={Clock}
+          label="Pending"
           value={formatINR(pendingAmount > 0 ? pendingAmount : 0)}
-          accent="text-amber-600 dark:text-amber-400"
+          tone="amber"
         />
       </div>
 
-      {/* Project details */}
-      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-        <h3 className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-50">
-          Project Details
-        </h3>
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <Detail label="Start Date" value={formatDate(project.startDate)} />
-          <Detail
+      {/* Project + Customer details */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <DetailsCard title="Project Details" icon={CalendarDays}>
+          <DetailRow
+            icon={CalendarDays}
+            label="Start Date"
+            value={formatDate(project.startDate)}
+          />
+          <DetailRow
+            icon={CalendarDays}
             label="Expected Completion"
             value={formatDate(project.expectedCompletionDate)}
           />
           {project.actualCompletionDate && (
-            <Detail
+            <DetailRow
+              icon={CalendarDays}
               label="Actual Completion"
               value={formatDate(project.actualCompletionDate)}
             />
           )}
-          {project.customerId && typeof project.customerId === "object" && (
-            <>
-              <Detail label="Customer" value={project.customerId.name} />
-              <Detail label="Phone" value={project.customerId.phone} />
-              <Detail label="Place" value={project.customerId.place} />
-            </>
+          {project.notes && (
+            <DetailRow icon={FileText} label="Notes" value={project.notes} />
           )}
-          {project.notes && <Detail label="Notes" value={project.notes} />}
-        </dl>
+        </DetailsCard>
+
+        {project.customerId && typeof project.customerId === "object" && (
+          <DetailsCard title="Customer" icon={User}>
+            <DetailRow
+              icon={User}
+              label="Name"
+              value={project.customerId.name}
+            />
+            <DetailRow
+              icon={Phone}
+              label="Phone"
+              value={project.customerId.phone}
+              link={`tel:${project.customerId.phone}`}
+            />
+            <DetailRow
+              icon={MapPin}
+              label="Place"
+              value={project.customerId.place}
+            />
+          </DetailsCard>
+        )}
       </div>
 
-      {/* Linked quotation */}
-      {project.quotationId && typeof project.quotationId === "object" && (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-          <h3 className="mb-2 text-sm font-semibold text-slate-900 dark:text-slate-50">
-            Linked Quotation
-          </h3>
-          <p className="text-sm text-slate-700 dark:text-slate-300">
-            Status:{" "}
-            <span className="font-medium">{project.quotationId.status}</span> |
-            Date: {formatDate(project.quotationId.quotationDate)}
-          </p>
-          <Link href={`/quotations/${project.quotationId._id}`}>
-            <Button variant="link" size="sm" className="mt-1 px-0">
-              View Quotation
-            </Button>
-          </Link>
-        </div>
-      )}
-
-      {/* Linked lead */}
-      {project.leadId && typeof project.leadId === "object" && (
-        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-          <h3 className="mb-2 text-sm font-semibold text-slate-900 dark:text-slate-50">
-            Linked Lead
-          </h3>
-          <p className="text-sm text-slate-700 dark:text-slate-300">
-            {project.leadId.customerName} — {project.leadId.contactNumber}
-            {project.leadId.requirement
-              ? ` — ${project.leadId.requirement}`
-              : ""}
-          </p>
-        </div>
-      )}
+      {/* Linked records */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {project.quotationId && typeof project.quotationId === "object" && (
+          <LinkedRecordCard
+            icon={FileText}
+            title="Linked Quotation"
+            badge={project.quotationId.status}
+            line={`Date: ${formatDate(project.quotationId.quotationDate)}`}
+            href={`/quotations/${project.quotationId._id}`}
+            actionLabel="View Quotation"
+          />
+        )}
+        {project.leadId && typeof project.leadId === "object" && (
+          <LinkedRecordCard
+            icon={UserPlus}
+            title="Linked Lead"
+            line={`${project.leadId.customerName} · ${project.leadId.contactNumber}`}
+            sub={project.leadId.requirement}
+          />
+        )}
+      </div>
 
       {/* Ledger entries */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-            Ledger Entries
-          </h3>
-          <Link
-            href={`/ledger/new?projectId=${id}&customerId=${
-              typeof project.customerId === "object"
-                ? project.customerId?._id
-                : ""
-            }`}
-          >
-            <Button size="sm">Add Entry</Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Wallet className="h-4 w-4 text-slate-400" />
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+              Ledger Entries
+            </h3>
+            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              {ledgerEntries.length}
+            </span>
+          </div>
+          <Button size="sm" asChild>
+            <Link
+              href={`/ledger/new?projectId=${id}&customerId=${
+                typeof project.customerId === "object"
+                  ? project.customerId?._id
+                  : ""
+              }`}
+            >
+              <Plus className="h-4 w-4" /> Add Entry
+            </Link>
+          </Button>
         </div>
 
         {ledgerEntries.length === 0 ? (
-          <p className="text-sm text-slate-600 dark:text-slate-400">
+          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
             No ledger entries linked to this project yet.
-          </p>
+          </div>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/80">
-                  <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300">
-                    Date
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300">
-                    Type
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300">
-                    Category
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300">
-                    Description
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-slate-700 dark:text-slate-300">
-                    Amount
-                  </th>
-                  <th className="px-4 py-3 text-center font-medium text-slate-700 dark:text-slate-300">
-                    Status
-                  </th>
+                <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+                  <th className="px-4 py-2.5">Date</th>
+                  <th className="px-4 py-2.5">Type</th>
+                  <th className="px-4 py-2.5">Category</th>
+                  <th className="px-4 py-2.5">Description</th>
+                  <th className="px-4 py-2.5 text-right">Amount</th>
+                  <th className="px-4 py-2.5 text-center">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -326,26 +444,46 @@ export default function ProjectDetailPage({
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className={`text-xs font-semibold ${
+                        className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold ${
                           entry.entryType === "INCOME"
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-red-600 dark:text-red-400"
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                            : "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300"
                         }`}
                       >
+                        {entry.entryType === "INCOME" ? (
+                          <TrendingUp className="h-3 w-3" />
+                        ) : (
+                          <TrendingDown className="h-3 w-3" />
+                        )}
                         {entry.entryType}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
-                      {entry.category}
+                      {entry.category.replace(/_/g, " ")}
                     </td>
-                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                    <td className="max-w-[280px] truncate px-4 py-3 text-slate-700 dark:text-slate-300">
                       {entry.description}
                     </td>
-                    <td className="px-4 py-3 text-right text-slate-700 dark:text-slate-300">
+                    <td
+                      className={`px-4 py-3 text-right font-semibold ${
+                        entry.entryType === "INCOME"
+                          ? "text-emerald-700 dark:text-emerald-300"
+                          : "text-red-600 dark:text-red-400"
+                      }`}
+                    >
+                      {entry.entryType === "INCOME" ? "+" : "−"}
                       {formatINR(entry.amount)}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                      <span
+                        className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${
+                          entry.paymentStatus === "PAID"
+                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                            : entry.paymentStatus === "PENDING"
+                              ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                              : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                        }`}
+                      >
                         {entry.paymentStatus}
                       </span>
                     </td>
@@ -357,7 +495,6 @@ export default function ProjectDetailPage({
         )}
       </div>
 
-      {/* Delete dialog */}
       <ConfirmDialog
         open={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
@@ -372,38 +509,156 @@ export default function ProjectDetailPage({
 
 /* ── Sub-components ── */
 
-function InfoCard({
+type StatTone = "slate" | "emerald" | "red" | "amber";
+
+const STAT_TONES: Record<StatTone, string> = {
+  slate: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+  emerald:
+    "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300",
+  red: "bg-red-100 text-red-600 dark:bg-red-950/50 dark:text-red-300",
+  amber:
+    "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
+};
+
+function StatCard({
+  icon: Icon,
   label,
   value,
-  accent,
+  tone = "slate",
 }: {
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
-  accent?: string;
+  tone?: StatTone;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-        {label}
-      </p>
-      <p
-        className={`mt-1 text-lg font-semibold ${
-          accent ?? "text-slate-900 dark:text-slate-50"
-        }`}
+    <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+      <div
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${STAT_TONES[tone]}`}
       >
-        {value}
-      </p>
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          {label}
+        </p>
+        <p className="truncate text-base font-bold text-slate-900 dark:text-slate-50">
+          {value}
+        </p>
+      </div>
     </div>
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
+function DetailsCard({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  children: React.ReactNode;
+}) {
   return (
-    <div>
-      <dt className="text-xs font-medium text-slate-500 dark:text-slate-400">
-        {label}
-      </dt>
-      <dd className="text-slate-900 dark:text-slate-50">{value}</dd>
+    <div className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+      <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-3 dark:border-slate-800">
+        <Icon className="h-4 w-4 text-slate-400" />
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+          {title}
+        </h3>
+      </div>
+      <div className="space-y-2.5 p-5">{children}</div>
+    </div>
+  );
+}
+
+function DetailRow({
+  icon: Icon,
+  label,
+  value,
+  link,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  link?: string;
+}) {
+  return (
+    <div className="flex items-start gap-3 text-sm">
+      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          {label}
+        </p>
+        {link ? (
+          <a
+            href={link}
+            className="block truncate text-slate-900 hover:text-cine-primary dark:text-slate-100"
+          >
+            {value}
+          </a>
+        ) : (
+          <p className="truncate text-slate-900 dark:text-slate-100">
+            {value}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LinkedRecordCard({
+  icon: Icon,
+  title,
+  badge,
+  line,
+  sub,
+  href,
+  actionLabel,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  badge?: string;
+  line: string;
+  sub?: string;
+  href?: string;
+  actionLabel?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+      <div className="flex items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cine-primary/10 text-cine-primary">
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+              {title}
+            </h3>
+            {badge && (
+              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                {badge}
+              </span>
+            )}
+          </div>
+          <p className="mt-1 truncate text-sm text-slate-700 dark:text-slate-300">
+            {line}
+          </p>
+          {sub && (
+            <p className="line-clamp-2 text-xs text-slate-500 dark:text-slate-400">
+              {sub}
+            </p>
+          )}
+          {href && actionLabel && (
+            <Link
+              href={href}
+              className="mt-2 inline-flex items-center text-xs font-semibold text-cine-primary hover:underline"
+            >
+              {actionLabel} →
+            </Link>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

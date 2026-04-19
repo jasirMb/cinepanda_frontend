@@ -316,7 +316,7 @@ export default function TemplateDetailPage() {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="max-w-4xl space-y-4">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">

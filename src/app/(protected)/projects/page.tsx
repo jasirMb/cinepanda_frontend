@@ -4,6 +4,13 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  CalendarDays,
+  Eye,
+  IndianRupee,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 
 import { projectsKeys, useProjects } from "@/hooks/useProjects";
 import {
@@ -24,22 +31,51 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-/* ────────────────────────────────────────────
-   Helpers
-   ──────────────────────────────────────────── */
-
 const STATUS_BADGE: Record<ProjectStatus, string> = {
-  PLANNING:
-    "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
+  PLANNING: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
   ONGOING:
-    "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+    "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
   ON_HOLD:
-    "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300",
+    "bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-300",
   COMPLETED:
-    "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
   CANCELLED:
-    "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
+    "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300",
 };
+
+const STATUS_STRIPE: Record<ProjectStatus, string> = {
+  PLANNING: "bg-blue-500",
+  ONGOING: "bg-amber-500",
+  ON_HOLD: "bg-orange-500",
+  COMPLETED: "bg-emerald-500",
+  CANCELLED: "bg-red-500",
+};
+
+const AVATAR_PALETTE = [
+  "bg-cine-primary/15 text-cine-primary",
+  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  "bg-violet-500/15 text-violet-700 dark:text-violet-300",
+  "bg-amber-500/15 text-amber-800 dark:text-amber-300",
+  "bg-rose-500/15 text-rose-700 dark:text-rose-300",
+  "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+];
+
+function getInitials(name: string) {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  );
+}
+
+function avatarColor(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length];
+}
 
 function formatINR(amount: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -57,15 +93,12 @@ function formatDate(iso: string) {
   });
 }
 
-/* ────────────────────────────────────────────
-   Component
-   ──────────────────────────────────────────── */
-
 export default function ProjectsPage() {
   const queryClient = useQueryClient();
 
   const [filters, setFilters] = useState<ProjectsListQuery>({});
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
 
   const params = useMemo(() => {
     const p: ProjectsListQuery = {};
@@ -87,7 +120,6 @@ export default function ProjectsPage() {
     onError: () => toast.error("Failed to delete project"),
   });
 
-  /* ── Loading ── */
   if (projectsQuery.isLoading) {
     return (
       <div className="space-y-4">
@@ -98,9 +130,9 @@ export default function ProjectsPage() {
           </div>
           <Skeleton className="h-9 w-32" />
         </div>
-        <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full rounded-lg" />
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-40 w-full rounded-xl" />
           ))}
         </div>
       </div>
@@ -125,9 +157,25 @@ export default function ProjectsPage() {
             Track CinePanda installation projects and their lifecycle.
           </p>
         </div>
-        <Link href="/projects/new">
-          <Button>New Project</Button>
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant={viewMode === "cards" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("cards")}
+          >
+            Cards
+          </Button>
+          <Button
+            variant={viewMode === "table" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("table")}
+          >
+            Table
+          </Button>
+          <Button asChild>
+            <Link href="/projects/new">New Project</Link>
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -164,7 +212,9 @@ export default function ProjectsPage() {
           </label>
           <DatePicker
             value={filters.startDate ?? ""}
-            onChange={(v) => setFilters((f) => ({ ...f, startDate: v || undefined }))}
+            onChange={(v) =>
+              setFilters((f) => ({ ...f, startDate: v || undefined }))
+            }
             placeholder="From date"
           />
         </div>
@@ -174,26 +224,34 @@ export default function ProjectsPage() {
           </label>
           <DatePicker
             value={filters.endDate ?? ""}
-            onChange={(v) => setFilters((f) => ({ ...f, endDate: v || undefined }))}
+            onChange={(v) =>
+              setFilters((f) => ({ ...f, endDate: v || undefined }))
+            }
             placeholder="To date"
           />
         </div>
         {(filters.status || filters.startDate || filters.endDate) && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setFilters({})}
-          >
+          <Button variant="ghost" size="sm" onClick={() => setFilters({})}>
             Clear filters
           </Button>
         )}
       </div>
 
-      {/* Table */}
+      {/* Content */}
       {projects.length === 0 ? (
-        <p className="text-sm text-slate-600 dark:text-slate-400">
-          No projects found. Create your first project above.
-        </p>
+        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
+          No projects found. Create your first project to get started.
+        </div>
+      ) : viewMode === "cards" ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {projects.map((p: ProjectPopulated) => (
+            <ProjectCard
+              key={p._id}
+              project={p}
+              onDelete={(id) => setDeleteTarget(id)}
+            />
+          ))}
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
           <table className="w-full text-sm">
@@ -279,7 +337,6 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* Delete dialog */}
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => {
@@ -293,6 +350,98 @@ export default function ProjectsPage() {
           setDeleteTarget(null);
         }}
       />
+    </div>
+  );
+}
+
+function ProjectCard({
+  project,
+  onDelete,
+}: {
+  project: ProjectPopulated;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <div className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
+      <div
+        aria-hidden
+        className={`absolute left-0 top-0 h-full w-1 ${STATUS_STRIPE[project.status]}`}
+      />
+      <div className="flex flex-1 flex-col gap-3 p-4 pl-5">
+        {/* Header */}
+        <div className="flex items-start gap-3">
+          <div
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${avatarColor(project.clientName)}`}
+          >
+            {getInitials(project.clientName)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate text-base font-semibold text-slate-900 dark:text-slate-50">
+              {project.clientName}
+            </h3>
+            <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+              {project.serviceType}
+            </p>
+          </div>
+          <span
+            className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-semibold ${STATUS_BADGE[project.status]}`}
+          >
+            {project.status.replace("_", " ")}
+          </span>
+        </div>
+
+        {/* Value */}
+        <div className="flex items-baseline justify-between">
+          <p className="inline-flex items-center gap-1 text-xl font-bold text-emerald-700 dark:text-emerald-300">
+            <IndianRupee className="h-4 w-4" />
+            {project.projectValue.toLocaleString("en-IN", {
+              maximumFractionDigits: 0,
+            })}
+          </p>
+        </div>
+
+        {/* Dates */}
+        <div className="space-y-1.5 text-sm text-slate-700 dark:text-slate-300">
+          <p className="flex items-center gap-2">
+            <CalendarDays className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Start:
+            </span>
+            <span>{formatDate(project.startDate)}</span>
+          </p>
+          <p className="flex items-center gap-2">
+            <CalendarDays className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Expected:
+            </span>
+            <span>{formatDate(project.expectedCompletionDate)}</span>
+          </p>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-auto flex items-center justify-end gap-1.5 border-t border-slate-100 pt-3 dark:border-slate-800">
+          <Link
+            href={`/projects/${project._id}`}
+            className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+          >
+            <Eye className="h-3 w-3" /> View
+          </Link>
+          <Link
+            href={`/projects/${project._id}/edit`}
+            className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+          >
+            <Pencil className="h-3 w-3" /> Edit
+          </Link>
+          <button
+            type="button"
+            onClick={() => onDelete(project._id)}
+            className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
+          >
+            <Trash2 className="h-3 w-3" />
+            Delete
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

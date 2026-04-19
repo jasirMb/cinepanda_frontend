@@ -19,16 +19,11 @@ import {
   X,
 } from "lucide-react";
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
   Cell,
   Pie,
   PieChart,
   ResponsiveContainer,
   Tooltip,
-  XAxis,
-  YAxis,
 } from "recharts";
 
 import { ledgerKeys, useLedger, useLedgerSummary } from "@/hooks/useLedger";
@@ -938,72 +933,155 @@ function SummaryPanel({
         />
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-        <header className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-slate-800">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-              Income vs Expense by Project
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Top {byProject.length} projects by activity
-            </p>
-          </div>
-        </header>
-        <div className="p-5">
-          {byProject.length === 0 ? (
-            <EmptyBlock label="No project activity in the current filter" />
-          ) : (
-            <ResponsiveContainer
-              width="100%"
-              height={Math.max(260, byProject.length * 44)}
-            >
-              <BarChart
-                layout="vertical"
-                data={byProject}
-                margin={{ top: 5, right: 20, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="currentColor"
-                  className="text-slate-200 dark:text-slate-800"
-                />
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 12 }}
-                  stroke="currentColor"
-                  className="text-slate-500"
-                  tickFormatter={(v) => formatINRCompact(Number(v))}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  tick={{ fontSize: 12 }}
-                  stroke="currentColor"
-                  className="text-slate-500"
-                  width={140}
-                />
-                <Tooltip
-                  contentStyle={tooltipStyle}
-                  formatter={(value) => formatINR(Number(value))}
-                />
-                <Bar
-                  dataKey="income"
-                  name="Income"
-                  fill="#10b981"
-                  radius={[0, 4, 4, 0]}
-                />
-                <Bar
-                  dataKey="expense"
-                  name="Expense"
-                  fill="#ef4444"
-                  radius={[0, 4, 4, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </section>
+      <ProjectActivityList projects={byProject} />
     </div>
+  );
+}
+
+function ProjectActivityList({
+  projects,
+}: {
+  projects: { name: string; income: number; expense: number; net: number }[];
+}) {
+  const globalMax = Math.max(
+    1,
+    ...projects.flatMap((p) => [p.income, p.expense])
+  );
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+      <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3.5 dark:border-slate-800">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+            Income vs Expense by Project
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Top {projects.length} project{projects.length !== 1 ? "s" : ""} by
+            activity
+          </p>
+        </div>
+        <div className="hidden items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400 sm:flex">
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2 w-2 rounded-sm bg-red-500" /> Expense
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2 w-2 rounded-sm bg-emerald-500" /> Income
+          </span>
+        </div>
+      </header>
+
+      {projects.length === 0 ? (
+        <div className="p-5">
+          <EmptyBlock label="No project activity in the current filter" />
+        </div>
+      ) : (
+        <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+          {projects.map((p, i) => {
+            const incomePct = Math.round((p.income / globalMax) * 100);
+            const expensePct = Math.round((p.expense / globalMax) * 100);
+            const isPositive = p.net >= 0;
+            return (
+              <li
+                key={p.name}
+                className="grid grid-cols-[140px_1fr_1fr_104px] items-center gap-3 px-5 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40"
+              >
+                {/* Name */}
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                    {i + 1}
+                  </span>
+                  <span
+                    className="truncate text-sm font-medium text-slate-900 dark:text-slate-50"
+                    title={p.name}
+                  >
+                    {p.name}
+                  </span>
+                </div>
+
+                {/* Expense bar — grows from center to LEFT */}
+                <div className="relative flex h-7 items-center justify-end">
+                  <div
+                    className="h-5 rounded-l-md bg-red-500 transition-all"
+                    style={{
+                      width: `${
+                        p.expense > 0 ? Math.max(2, expensePct) : 0
+                      }%`,
+                    }}
+                  />
+                  {p.expense > 0 && (
+                    <span
+                      className={`absolute right-1.5 text-[10px] font-bold text-white ${
+                        expensePct < 25 ? "right-auto" : ""
+                      }`}
+                      style={
+                        expensePct < 25
+                          ? { right: `calc(${expensePct}% + 4px)` }
+                          : undefined
+                      }
+                    >
+                      {expensePct < 25 ? (
+                        <span className="text-red-600 dark:text-red-400">
+                          {formatINRCompact(p.expense)}
+                        </span>
+                      ) : (
+                        formatINRCompact(p.expense)
+                      )}
+                    </span>
+                  )}
+                </div>
+
+                {/* Income bar — grows from center to RIGHT */}
+                <div className="relative flex h-7 items-center border-l-2 border-slate-200 pl-px dark:border-slate-700">
+                  <div
+                    className="h-5 rounded-r-md bg-emerald-500 transition-all"
+                    style={{
+                      width: `${
+                        p.income > 0 ? Math.max(2, incomePct) : 0
+                      }%`,
+                    }}
+                  />
+                  {p.income > 0 && (
+                    <span
+                      className={`absolute text-[10px] font-bold text-white ${
+                        incomePct < 25
+                          ? "text-emerald-700 dark:text-emerald-400"
+                          : ""
+                      }`}
+                      style={
+                        incomePct < 25
+                          ? { left: `calc(${incomePct}% + 4px)` }
+                          : { left: `${Math.max(8, incomePct - 16)}%` }
+                      }
+                    >
+                      {formatINRCompact(p.income)}
+                    </span>
+                  )}
+                </div>
+
+                {/* Net */}
+                <div className="text-right">
+                  <span
+                    className={`inline-flex items-center gap-0.5 rounded-md px-2 py-0.5 text-[11px] font-semibold ${
+                      isPositive
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                        : "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300"
+                    }`}
+                  >
+                    {isPositive ? (
+                      <ArrowUpRight className="h-3 w-3" />
+                    ) : (
+                      <ArrowDownRight className="h-3 w-3" />
+                    )}
+                    {isPositive ? "+" : "−"}
+                    {formatINRCompact(Math.abs(p.net))}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
 
