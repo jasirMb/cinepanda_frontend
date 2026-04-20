@@ -10,9 +10,12 @@ import {
   IndianRupee,
   Pencil,
   Trash2,
+  TrendingDown,
+  TrendingUp,
 } from "lucide-react";
 
 import { projectsKeys, useProjects } from "@/hooks/useProjects";
+import { useLedgerSummary } from "@/hooks/useLedger";
 import {
   deleteProject,
   type ProjectPopulated,
@@ -110,6 +113,20 @@ export default function ProjectsPage() {
 
   const projectsQuery = useProjects(params);
   const projects = projectsQuery.data?.data ?? [];
+
+  const ledgerSummaryQuery = useLedgerSummary();
+  const financialsByProject = useMemo(() => {
+    const map = new Map<string, { income: number; expense: number; net: number }>();
+    for (const row of ledgerSummaryQuery.data?.data?.byProject ?? []) {
+      const id = row._id.projectId;
+      const entry = map.get(id) ?? { income: 0, expense: 0, net: 0 };
+      if (row._id.entryType === "INCOME") entry.income += row.total;
+      else if (row._id.entryType === "EXPENSE") entry.expense += row.total;
+      entry.net = entry.income - entry.expense;
+      map.set(id, entry);
+    }
+    return map;
+  }, [ledgerSummaryQuery.data]);
 
   const deleteMutation = useMutation({
     mutationFn: deleteProject,
@@ -248,6 +265,7 @@ export default function ProjectsPage() {
             <ProjectCard
               key={p._id}
               project={p}
+              financials={financialsByProject.get(p._id)}
               onDelete={(id) => setDeleteTarget(id)}
             />
           ))}
@@ -265,6 +283,9 @@ export default function ProjectsPage() {
                 </th>
                 <th className="px-4 py-3 text-right font-medium text-slate-700 dark:text-slate-300">
                   Value
+                </th>
+                <th className="px-4 py-3 text-right font-medium text-slate-700 dark:text-slate-300">
+                  Net P/L
                 </th>
                 <th className="px-4 py-3 text-center font-medium text-slate-700 dark:text-slate-300">
                   Status
@@ -294,6 +315,32 @@ export default function ProjectsPage() {
                   </td>
                   <td className="px-4 py-3 text-right text-slate-700 dark:text-slate-300">
                     {formatINR(p.projectValue)}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {(() => {
+                      const fin = financialsByProject.get(p._id);
+                      if (!fin || (fin.income === 0 && fin.expense === 0)) {
+                        return <span className="text-slate-400">—</span>;
+                      }
+                      const positive = fin.net >= 0;
+                      return (
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold ${
+                            positive
+                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                              : "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300"
+                          }`}
+                        >
+                          {positive ? (
+                            <TrendingUp className="h-3 w-3" />
+                          ) : (
+                            <TrendingDown className="h-3 w-3" />
+                          )}
+                          {positive ? "+" : "−"}
+                          {formatINR(Math.abs(fin.net))}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span
@@ -356,11 +403,17 @@ export default function ProjectsPage() {
 
 function ProjectCard({
   project,
+  financials,
   onDelete,
 }: {
   project: ProjectPopulated;
+  financials?: { income: number; expense: number; net: number };
   onDelete: (id: string) => void;
 }) {
+  const hasActivity =
+    financials && (financials.income > 0 || financials.expense > 0);
+  const isProfit = (financials?.net ?? 0) >= 0;
+
   return (
     <div className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
       <div
@@ -390,14 +443,36 @@ function ProjectCard({
           </span>
         </div>
 
-        {/* Value */}
-        <div className="flex items-baseline justify-between">
-          <p className="inline-flex items-center gap-1 text-xl font-bold text-emerald-700 dark:text-emerald-300">
+        {/* Value + Profit/Loss */}
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="inline-flex items-center gap-1 text-xl font-bold text-slate-900 dark:text-slate-50">
             <IndianRupee className="h-4 w-4" />
             {project.projectValue.toLocaleString("en-IN", {
               maximumFractionDigits: 0,
             })}
           </p>
+          {hasActivity ? (
+            <span
+              className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold ${
+                isProfit
+                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                  : "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300"
+              }`}
+              title={`Income ${formatINR(financials!.income)} − Expense ${formatINR(financials!.expense)}`}
+            >
+              {isProfit ? (
+                <TrendingUp className="h-3 w-3" />
+              ) : (
+                <TrendingDown className="h-3 w-3" />
+              )}
+              {isProfit ? "Profit" : "Loss"} {isProfit ? "+" : "−"}
+              {formatINR(Math.abs(financials!.net))}
+            </span>
+          ) : (
+            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+              No activity
+            </span>
+          )}
         </div>
 
         {/* Dates */}

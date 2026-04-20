@@ -158,6 +158,11 @@ export default function ProjectDetailPage({
     project && project.projectValue > 0
       ? Math.min(100, (totalIncome / project.projectValue) * 100)
       : 0;
+  const netProfit = totalIncome - totalExpense;
+  const hasActivity = totalIncome > 0 || totalExpense > 0;
+  const isProfit = netProfit >= 0;
+  const marginPct =
+    totalIncome > 0 ? Math.round((netProfit / totalIncome) * 100) : 0;
 
   if (projectQuery.isLoading) {
     return (
@@ -291,6 +296,80 @@ export default function ProjectDetailPage({
             className="h-full bg-emerald-500 transition-all"
             style={{ width: `${collectedPct}%` }}
           />
+        </div>
+      </div>
+
+      {/* Profit / Loss banner */}
+      <div
+        className={`relative overflow-hidden rounded-lg border px-5 py-4 shadow-sm ${
+          !hasActivity
+            ? "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60"
+            : isProfit
+              ? "border-emerald-200 bg-gradient-to-r from-emerald-50 to-white dark:border-emerald-900/60 dark:from-emerald-950/30 dark:to-slate-900/60"
+              : "border-red-200 bg-gradient-to-r from-red-50 to-white dark:border-red-900/60 dark:from-red-950/30 dark:to-slate-900/60"
+        }`}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
+                !hasActivity
+                  ? "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                  : isProfit
+                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                    : "bg-red-500/15 text-red-700 dark:text-red-300"
+              }`}
+            >
+              {hasActivity && isProfit ? (
+                <TrendingUp className="h-5 w-5" />
+              ) : hasActivity ? (
+                <TrendingDown className="h-5 w-5" />
+              ) : (
+                <Clock className="h-5 w-5" />
+              )}
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                {hasActivity
+                  ? isProfit
+                    ? "In Profit"
+                    : "In Loss"
+                  : "No Activity Yet"}
+              </p>
+              <p
+                className={`text-2xl font-bold ${
+                  !hasActivity
+                    ? "text-slate-700 dark:text-slate-200"
+                    : isProfit
+                      ? "text-emerald-700 dark:text-emerald-300"
+                      : "text-red-600 dark:text-red-400"
+                }`}
+              >
+                {hasActivity
+                  ? `${isProfit ? "+" : "−"}${formatINR(Math.abs(netProfit))}`
+                  : "—"}
+              </p>
+            </div>
+          </div>
+          {hasActivity && (
+            <div className="text-right text-xs text-slate-500 dark:text-slate-400">
+              <p>
+                Income {formatINR(totalIncome)}{" "}
+                <span className="text-slate-300 dark:text-slate-600">·</span>{" "}
+                Expense {formatINR(totalExpense)}
+              </p>
+              <p
+                className={`text-sm font-semibold ${
+                  isProfit
+                    ? "text-emerald-700 dark:text-emerald-300"
+                    : "text-red-600 dark:text-red-400"
+                }`}
+              >
+                Margin {isProfit ? "+" : ""}
+                {marginPct}%
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
