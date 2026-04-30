@@ -4,6 +4,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { useShellStore } from "@/store/shell-store";
+import { InstallButton } from "@/components/layout/InstallButton";
 
 interface PageMeta {
   title: string;
@@ -133,6 +134,9 @@ export function Topbar() {
             </p>
           )}
         </div>
+      </div>
+      <div className="ml-auto flex items-center gap-2">
+        <InstallButton />
       </div>
     </header>
   );
