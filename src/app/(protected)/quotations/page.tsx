@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -18,6 +18,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -62,6 +69,90 @@ export default function QuotationsPage() {
   const customers = customersQuery.data?.data ?? [];
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [whatsappTarget, setWhatsappTarget] = useState<
+    { phone: string; name: string } | null
+  > (null);
+
+  // ── list filters / pagination ─────────────
+  type StatusFilter = "ALL" | Quotation["status"];
+  type SortOption =
+    | "createdAt_desc"
+    | "createdAt_asc"
+    | "quotationDate_desc"
+    | "quotationDate_asc"
+    | "amount_desc"
+    | "amount_asc";
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [sortBy, setSortBy] = useState<SortOption>("createdAt_desc");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 12;
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, sortBy]);
+
+  const filteredQuotations = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const grandTotal = (qt: Quotation) =>
+      qt.sections.reduce((s, sec) => s + sec.grandTotal, 0);
+
+    let list = quotations;
+    if (statusFilter !== "ALL") {
+      list = list.filter((x) => x.status === statusFilter);
+    }
+    if (q) {
+      list = list.filter((x) => {
+        const c = x.customerId;
+        return (
+          (c?.name ?? "").toLowerCase().includes(q) ||
+          (c?.place ?? "").toLowerCase().includes(q) ||
+          (c?.phone ?? "").toLowerCase().includes(q)
+        );
+      });
+    }
+
+    const sorted = [...list].sort((a, b) => {
+      switch (sortBy) {
+        case "createdAt_asc":
+          return (
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
+        case "createdAt_desc":
+          return (
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+        case "quotationDate_asc":
+          return (
+            new Date(a.quotationDate).getTime() -
+            new Date(b.quotationDate).getTime()
+          );
+        case "quotationDate_desc":
+          return (
+            new Date(b.quotationDate).getTime() -
+            new Date(a.quotationDate).getTime()
+          );
+        case "amount_asc":
+          return grandTotal(a) - grandTotal(b);
+        case "amount_desc":
+          return grandTotal(b) - grandTotal(a);
+        default:
+          return 0;
+      }
+    });
+    return sorted;
+  }, [quotations, search, statusFilter, sortBy]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredQuotations.length / PAGE_SIZE)
+  );
+  const currentPage = Math.min(page, totalPages);
+  const pagedQuotations = filteredQuotations.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
 
   // ── wizard state ──────────────────────────
   const [step, setStep] = useState<Step>("list");
@@ -629,8 +720,8 @@ export default function QuotationsPage() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
             Quotations
           </h2>
@@ -643,6 +734,79 @@ export default function QuotationsPage() {
         </Button>
       </div>
 
+      {/* Filter bar */}
+      {quotations.length > 0 && (
+        <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 sm:grid-cols-2 md:grid-cols-4">
+          <Input
+            placeholder="Search customer, place, phone"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="md:col-span-2"
+          />
+          <Select
+            value={statusFilter}
+            onValueChange={(v) => setStatusFilter(v as StatusFilter)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All statuses</SelectItem>
+              <SelectItem value="DRAFT">Draft</SelectItem>
+              <SelectItem value="SENT">Sent</SelectItem>
+              <SelectItem value="APPROVED">Approved</SelectItem>
+              <SelectItem value="REJECTED">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={sortBy}
+            onValueChange={(v) => setSortBy(v as SortOption)}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="createdAt_desc">Created (newest)</SelectItem>
+              <SelectItem value="createdAt_asc">Created (oldest)</SelectItem>
+              <SelectItem value="quotationDate_desc">
+                Quotation date (newest)
+              </SelectItem>
+              <SelectItem value="quotationDate_asc">
+                Quotation date (oldest)
+              </SelectItem>
+              <SelectItem value="amount_desc">Amount (highest)</SelectItem>
+              <SelectItem value="amount_asc">Amount (lowest)</SelectItem>
+            </SelectContent>
+          </Select>
+          {(search || statusFilter !== "ALL" || sortBy !== "createdAt_desc") && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="md:col-span-4 md:justify-self-end"
+              onClick={() => {
+                setSearch("");
+                setStatusFilter("ALL");
+                setSortBy("createdAt_desc");
+              }}
+            >
+              Reset filters
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Results info */}
+      {quotations.length > 0 && (
+        <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
+          <p>
+            Showing {pagedQuotations.length} of {filteredQuotations.length}
+            {filteredQuotations.length !== quotations.length &&
+              ` (filtered from ${quotations.length})`}
+            {totalPages > 1 && ` · page ${currentPage} of ${totalPages}`}
+          </p>
+        </div>
+      )}
+
       {/* Quotation cards */}
       {quotations.length === 0 ? (
         <div className="rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
@@ -650,9 +814,15 @@ export default function QuotationsPage() {
             No quotations yet. Create one from your templates.
           </p>
         </div>
+      ) : pagedQuotations.length === 0 ? (
+        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            No quotations match your filters.
+          </p>
+        </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {quotations.map((q) => (
+          {pagedQuotations.map((q) => (
             <QuotationCard
               key={q._id}
               quotation={q}
@@ -660,8 +830,36 @@ export default function QuotationsPage() {
               onStatusChange={(id, status) =>
                 statusMutation.mutate({ id, status })
               }
+              onWhatsapp={(phone, name) =>
+                setWhatsappTarget({ phone, name })
+              }
             />
           ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={currentPage === 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-slate-700 dark:text-slate-300">
+            Page {currentPage} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={currentPage === totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            Next
+          </Button>
         </div>
       )}
 
@@ -676,7 +874,64 @@ export default function QuotationsPage() {
           setDeleteTarget(null);
         }}
       />
+
+      <ConfirmDialog
+        open={whatsappTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setWhatsappTarget(null);
+        }}
+        title="Open WhatsApp?"
+        description={
+          whatsappTarget
+            ? `Send a WhatsApp message to ${whatsappTarget.name} (${whatsappTarget.phone})? WhatsApp will open with a pre-filled message that you can edit before sending.`
+            : ""
+        }
+        confirmLabel="Open WhatsApp"
+        variant="default"
+        onConfirm={() => {
+          if (whatsappTarget) {
+            const url = buildWhatsappUrl(
+              whatsappTarget.phone,
+              defaultWhatsappMessage(whatsappTarget.name)
+            );
+            window.open(url, "_blank", "noopener,noreferrer");
+          }
+          setWhatsappTarget(null);
+        }}
+      />
     </div>
+  );
+}
+
+/* ────────────────────────────────────────────
+   WhatsApp helpers
+   ──────────────────────────────────────────── */
+
+function buildWhatsappUrl(phone: string, message: string): string {
+  // wa.me works across WhatsApp Web (macOS/Windows browser), desktop apps,
+  // Android and iOS — it picks the right target based on the platform.
+  const digits = phone.replace(/\D/g, "");
+  // Fall back to India country code for 10-digit local numbers (project default).
+  const normalized = digits.length === 10 ? `91${digits}` : digits;
+  return `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
+}
+
+function defaultWhatsappMessage(customerName: string): string {
+  const firstName = customerName.trim().split(/\s+/)[0] || "there";
+  return `Hi ${firstName}, this is regarding your quotation from CinePanda. Please let me know if you have any questions.`;
+}
+
+function WhatsappIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-hidden
+    >
+      <path d="M19.11 4.91A9.816 9.816 0 0 0 12.04 2c-5.46 0-9.91 4.44-9.91 9.9 0 1.74.46 3.44 1.33 4.95L2 22l5.29-1.39a9.93 9.93 0 0 0 4.75 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.85-6.99ZM12.04 20.13h-.01a8.23 8.23 0 0 1-4.2-1.15l-.3-.18-3.14.82.84-3.06-.2-.31a8.23 8.23 0 0 1-1.26-4.35c0-4.54 3.7-8.24 8.27-8.24 2.2 0 4.28.86 5.84 2.42a8.19 8.19 0 0 1 2.42 5.83c-.01 4.55-3.7 8.22-8.26 8.22Zm4.53-6.16c-.25-.12-1.47-.72-1.69-.8-.23-.08-.39-.12-.56.12-.17.25-.64.8-.79.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.24-1.47-1.38-1.72-.14-.25-.02-.39.11-.51.11-.11.25-.29.37-.43.12-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.55-1.33-.76-1.83-.2-.48-.4-.41-.56-.42-.14-.01-.31-.01-.48-.01a.92.92 0 0 0-.66.31c-.23.25-.87.85-.87 2.07 0 1.22.89 2.4 1.02 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.53.59.19 1.13.16 1.55.1.47-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.14-1.18-.06-.1-.22-.17-.47-.29Z" />
+    </svg>
   );
 }
 
@@ -688,10 +943,12 @@ function QuotationCard({
   quotation,
   onDelete,
   onStatusChange,
+  onWhatsapp,
 }: {
   quotation: Quotation;
   onDelete: (id: string) => void;
   onStatusChange: (id: string, status: Quotation["status"]) => void;
+  onWhatsapp: (phone: string, name: string) => void;
 }) {
   const statusColor = STATUS_COLORS[quotation.status] ?? STATUS_COLORS.DRAFT;
   const statusMap: Record<Quotation["status"], Quotation["status"][]> = {
@@ -704,24 +961,46 @@ function QuotationCard({
 
   return (
     <div className="flex h-full flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800/70 dark:bg-slate-900/60">
-      <Link href={`/quotations/${quotation._id}`} className="block">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-              {quotation.customerId.name}
-            </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {quotation.customerId.place} · {quotation.customerId.phone}
-            </p>
-          </div>
-          <span
-            className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusColor}`}
+      {/* Header — kept out of <Link> so the WhatsApp <button> is valid HTML */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <Link
+            href={`/quotations/${quotation._id}`}
+            className="block truncate text-sm font-semibold text-slate-900 hover:text-cine-primary dark:text-slate-50"
           >
-            {quotation.status}
-          </span>
+            {quotation.customerId.name}
+          </Link>
+          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+            <span className="truncate">
+              {quotation.customerId.place} · {quotation.customerId.phone}
+            </span>
+            {quotation.customerId.phone && (
+              <button
+                type="button"
+                onClick={() =>
+                  onWhatsapp(
+                    quotation.customerId.phone,
+                    quotation.customerId.name
+                  )
+                }
+                aria-label={`Send WhatsApp message to ${quotation.customerId.name}`}
+                title="Send WhatsApp message"
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950/50 dark:hover:text-emerald-300"
+              >
+                <WhatsappIcon className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
+        <span
+          className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusColor}`}
+        >
+          {quotation.status}
+        </span>
+      </div>
 
-        <div className="mt-3 flex flex-wrap gap-1.5">
+      <Link href={`/quotations/${quotation._id}`} className="mt-3 block">
+        <div className="flex flex-wrap gap-1.5">
           {quotation.sections.map((sec, i) => (
             <span
               key={i}

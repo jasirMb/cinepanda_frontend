@@ -361,39 +361,43 @@ export default function QuotationDetailPage() {
                   </div>
 
                   {/* Products table */}
-                  <table className="mt-2 w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-[10px] uppercase tracking-wider text-slate-400">
-                        <th className="py-1 font-medium">#</th>
-                        <th className="py-1 font-medium">Product</th>
-                        <th className="py-1 font-medium text-center">Qty</th>
-                        <th className="py-1 font-medium text-right">
-                          Unit Price
-                        </th>
-                        <th className="py-1 font-medium text-right">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-slate-700 dark:text-slate-300">
-                      {group.productItems.map((item, ii) => (
-                        <tr key={ii}>
-                          <td className="py-1 text-slate-400">{ii + 1}</td>
-                          <td className="py-1">
-                            <p>{item.productName}</p>
-                            <p className="text-[10px] text-slate-400">
-                              {item.category} / {item.subcategory}
-                            </p>
-                          </td>
-                          <td className="py-1 text-center">{item.quantity}</td>
-                          <td className="py-1 text-right">
-                            {INR(item.unitPrice)}
-                          </td>
-                          <td className="py-1 text-right font-medium">
-                            {INR(item.lineTotal)}
-                          </td>
+                  <div className="-mx-6 mt-2 overflow-x-auto px-6">
+                    <table className="w-full min-w-[480px] text-sm">
+                      <thead>
+                        <tr className="text-left text-[10px] uppercase tracking-wider text-slate-400">
+                          <th className="py-1 font-medium">#</th>
+                          <th className="py-1 font-medium">Product</th>
+                          <th className="py-1 font-medium text-center">Qty</th>
+                          <th className="py-1 font-medium text-right">
+                            Unit Price
+                          </th>
+                          <th className="py-1 font-medium text-right">Total</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="text-slate-700 dark:text-slate-300">
+                        {group.productItems.map((item, ii) => (
+                          <tr key={ii}>
+                            <td className="py-1 text-slate-400">{ii + 1}</td>
+                            <td className="py-1">
+                              <p>{item.productName}</p>
+                              <p className="text-[10px] text-slate-400">
+                                {item.category} / {item.subcategory}
+                              </p>
+                            </td>
+                            <td className="py-1 text-center">
+                              {item.quantity}
+                            </td>
+                            <td className="py-1 text-right">
+                              {INR(item.unitPrice)}
+                            </td>
+                            <td className="py-1 text-right font-medium">
+                              {INR(item.lineTotal)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
 
                   {/* Group-level manual items */}
                   {group.manualItems.length > 0 && (

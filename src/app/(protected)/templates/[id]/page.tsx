@@ -355,7 +355,7 @@ export default function TemplateDetailPage() {
 
       {/* Edit-mode name/description card */}
       {isEditing && (
-        <div className="max-w-2xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="max-w-4xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
           <Field label="Template Name *">
             <Input
               value={name}

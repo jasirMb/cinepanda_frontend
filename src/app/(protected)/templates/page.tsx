@@ -337,7 +337,7 @@ export default function TemplatesPage() {
           </p>
         </div>
 
-        <div className="max-w-2xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="max-w-4xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
           <WizardField label="Template Name *">
             <Input
               placeholder="e.g. Premium Home Cinema"
@@ -396,7 +396,7 @@ export default function TemplatesPage() {
           </p>
         </div>
 
-        <div className="max-w-2xl rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="max-w-4xl rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
           {categoriesQuery.isLoading ? (
             <p className="text-sm text-slate-600 dark:text-slate-400">
               Loading categories...
@@ -755,8 +755,8 @@ export default function TemplatesPage() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
             Templates
           </h2>

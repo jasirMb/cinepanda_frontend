@@ -107,8 +107,8 @@ export default function CustomersPage() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
             Customers
           </h2>
@@ -133,7 +133,7 @@ export default function CustomersPage() {
       {showForm && (
         <form
           onSubmit={handleSubmit}
-          className="max-w-2xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
+          className="max-w-4xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
         >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Name *">

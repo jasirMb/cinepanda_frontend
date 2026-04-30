@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { leadsKeys } from "@/hooks/useLeads";
 import {
   createLead,
@@ -51,6 +52,7 @@ const initialFormValues: CreateLeadPayload = {
   customerName: "",
   place: "",
   contactNumber: "",
+  alternativeNumber: "",
   leadSource: "",
   leadDate: "",
   lastUpdate: "",
@@ -125,6 +127,7 @@ export default function NewLeadPage() {
         customerName: lead.customerName ?? "",
         place: lead.place ?? "",
         contactNumber: lead.contactNumber ?? "",
+        alternativeNumber: lead.alternativeNumber ?? "",
         leadSource: lead.leadSource ?? "",
         leadDate: lead.leadDate ? lead.leadDate.slice(0, 10) : "",
         lastUpdate: lead.lastUpdate ? lead.lastUpdate.slice(0, 10) : "",
@@ -149,6 +152,13 @@ export default function NewLeadPage() {
       errors.contactNumber = "Contact number is required.";
     } else if (!/^[0-9+\-\s()]{6,}$/.test(values.contactNumber.trim())) {
       errors.contactNumber = "Enter a valid phone number.";
+    }
+    if (
+      values.alternativeNumber &&
+      values.alternativeNumber.trim() !== "" &&
+      !/^[0-9+\-\s()]{6,}$/.test(values.alternativeNumber.trim())
+    ) {
+      errors.alternativeNumber = "Enter a valid phone number.";
     }
     if (!values.leadSource.trim())
       errors.leadSource = "Lead source is required.";
@@ -185,6 +195,11 @@ export default function NewLeadPage() {
         formValues.nextCallTime.trim() === ""
           ? null
           : formValues.nextCallTime,
+      alternativeNumber:
+        typeof formValues.alternativeNumber === "string" &&
+        formValues.alternativeNumber.trim() === ""
+          ? null
+          : formValues.alternativeNumber?.trim(),
     };
 
     const nextErrors = validate(normalized);
@@ -214,7 +229,7 @@ export default function NewLeadPage() {
       </div>
 
       {isEditMode && leadQuery.isLoading ? (
-        <div className="max-w-2xl rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="max-w-4xl rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
           <p className="text-sm text-slate-600 dark:text-slate-300">
             Loading lead details...
           </p>
@@ -223,7 +238,7 @@ export default function NewLeadPage() {
         <form
           onSubmit={handleSubmit}
           noValidate
-          className="max-w-2xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
+          className="max-w-4xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
         >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Customer Name *" error={formErrors.customerName}>
@@ -250,6 +265,21 @@ export default function NewLeadPage() {
                 placeholder="+91 9XXXX XXXXX"
               />
             </Field>
+            <Field
+              label="Alternative Number"
+              error={formErrors.alternativeNumber}
+            >
+              <Input
+                value={formValues.alternativeNumber ?? ""}
+                onChange={(e) =>
+                  handleChange("alternativeNumber", e.target.value)
+                }
+                placeholder="Optional backup number"
+              />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Lead Source *" error={formErrors.leadSource}>
               <Select
                 value={formValues.leadSource || undefined}
@@ -266,6 +296,13 @@ export default function NewLeadPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </Field>
+            <Field label="Next Call Time">
+              <DateTimePicker
+                value={formValues.nextCallTime ?? ""}
+                onChange={(v) => handleChange("nextCallTime", v)}
+                placeholder="Pick next call date & time"
+              />
             </Field>
           </div>
 
@@ -322,14 +359,6 @@ export default function NewLeadPage() {
               </Select>
             </Field>
           </div>
-
-          <Field label="Next Call Time">
-            <Input
-              type="datetime-local"
-              value={formValues.nextCallTime ?? ""}
-              onChange={(e) => handleChange("nextCallTime", e.target.value)}
-            />
-          </Field>
 
           <Field label="Requirement *" error={formErrors.requirement}>
             <textarea

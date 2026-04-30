@@ -5,6 +5,7 @@ export interface Lead {
   customerName: string;
   place: string;
   contactNumber: string;
+  alternativeNumber?: string;
   leadSource: string;
   leadDate: string;
   lastUpdate: string;
@@ -82,6 +83,7 @@ export interface CreateLeadPayload {
   customerName: string;
   place: string;
   contactNumber: string;
+  alternativeNumber?: string | null;
   leadSource: string;
   leadDate: string;
   lastUpdate: string;

@@ -501,8 +501,8 @@ export default function LeadsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
             Leads
           </h2>
@@ -531,7 +531,7 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6">
         <StatCard
           icon={Users}
           label="Total Leads"

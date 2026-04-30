@@ -18,8 +18,8 @@ interface ProductsTableProps {
 
 export function ProductsTable({ products, onDelete }: ProductsTableProps) {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-      <Table>
+    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+      <Table className="min-w-[960px]">
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>

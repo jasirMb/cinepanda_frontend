@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   Area,
@@ -20,6 +20,7 @@ import {
   ArrowUpRight,
   Briefcase,
   CalendarDays,
+  ChevronLeft,
   ChevronRight,
   Clock,
   Phone,
@@ -35,6 +36,7 @@ import { useLedger, useLedgerSummary } from "@/hooks/useLedger";
 import { useFollowupLeads } from "@/hooks/useLeads";
 import { useProjects } from "@/hooks/useProjects";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSettingsStore } from "@/store/settings-store";
 import type { Lead } from "@/lib/api/leads";
 import type {
   CategorySummary,
@@ -137,6 +139,7 @@ const tooltipStyle: React.CSSProperties = {
 export default function DashboardPage() {
   const overviewQuery = useProjectsOverview();
   const summaryQuery = useLedgerSummary();
+  const profileName = useSettingsStore((s) => s.profile.name);
 
   const sixMonthsAgo = useMemo(() => startOfSixMonthsAgo(), []);
   const today = useMemo(() => new Date(), []);
@@ -261,8 +264,8 @@ export default function DashboardPage() {
       {/* Greeting */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-            {greeting()}, Admin
+          <h2 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-2xl">
+            {greeting()}, {profileName.trim() || "Admin"}
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {today.toLocaleDateString("en-IN", {
@@ -582,8 +585,8 @@ export default function DashboardPage() {
         ) : pipelineProjects.length === 0 ? (
           <EmptyBlock label="No active or upcoming projects" />
         ) : (
-          <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+            <table className="w-full min-w-[560px] text-sm">
               <thead className="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-400">
                 <tr>
                   <th className="px-4 py-2.5">Client</th>
@@ -678,20 +681,20 @@ function SectionCard({
         className ?? ""
       }`}
     >
-      <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3.5 dark:border-slate-800">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+      <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3.5 dark:border-slate-800 sm:px-5">
+        <div className="min-w-0">
+          <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
             {title}
           </h3>
           {subtitle ? (
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="truncate text-xs text-slate-500 dark:text-slate-400">
               {subtitle}
             </p>
           ) : null}
         </div>
         {action}
       </header>
-      <div className="p-5">{children}</div>
+      <div className="p-4 sm:p-5">{children}</div>
     </section>
   );
 }
@@ -779,8 +782,8 @@ function ReceivablesCard({
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-      <header className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-slate-800">
-        <div>
+      <header className="flex items-center justify-between border-b border-slate-100 px-4 py-3.5 dark:border-slate-800 sm:px-5">
+        <div className="min-w-0">
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
             Total Receivables
           </h3>
@@ -788,10 +791,10 @@ function ReceivablesCard({
             Amount yet to be collected
           </p>
         </div>
-        <Wallet className="h-4 w-4 text-slate-400" />
+        <Wallet className="h-4 w-4 shrink-0 text-slate-400" />
       </header>
-      <div className="p-5">
-        <p className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
+      <div className="p-4 sm:p-5">
+        <p className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-3xl">
           {formatINR(totalPending)}
         </p>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -855,8 +858,8 @@ function SalesSummaryCard({
 }) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-      <header className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 dark:border-slate-800">
-        <div>
+      <header className="flex items-center justify-between border-b border-slate-100 px-4 py-3.5 dark:border-slate-800 sm:px-5">
+        <div className="min-w-0">
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
             Sales
           </h3>
@@ -864,9 +867,9 @@ function SalesSummaryCard({
             This fiscal year
           </p>
         </div>
-        <TrendingUp className="h-4 w-4 text-slate-400" />
+        <TrendingUp className="h-4 w-4 shrink-0 text-slate-400" />
       </header>
-      <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:p-5">
         <div className="space-y-3">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -966,9 +969,16 @@ function UpcomingLeadsCard({
     });
   }, [leads]);
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollByPage = (direction: -1 | 1) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: direction * el.clientWidth * 0.85, behavior: "smooth" });
+  };
+
   return (
     <section className="relative overflow-hidden rounded-xl border border-slate-200 bg-gradient-to-br from-cine-primary/5 via-white to-white shadow-sm dark:border-slate-800 dark:from-cine-primary/15 dark:via-slate-900/60 dark:to-slate-900/60">
-      <header className="flex flex-col gap-2 border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+      <header className="flex flex-col gap-2 border-b border-slate-100 px-4 py-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div className="flex items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-cine-primary/10 text-cine-primary ring-1 ring-cine-primary/20 dark:bg-cine-primary/20">
             <CalendarDays className="h-5 w-5" />
@@ -997,10 +1007,10 @@ function UpcomingLeadsCard({
         </Link>
       </header>
 
-      <div className="p-5">
+      <div className="p-4 sm:p-5">
         {loading ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
+          <div className="grid auto-cols-[18rem] grid-flow-col grid-rows-2 gap-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:auto-cols-[20rem]">
+            {Array.from({ length: 8 }).map((_, i) => (
               <Skeleton key={i} className="h-28 rounded-xl" />
             ))}
           </div>
@@ -1013,10 +1023,36 @@ function UpcomingLeadsCard({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {sorted.slice(0, 6).map((lead) => (
-              <UpcomingLeadTile key={lead._id} lead={lead} />
-            ))}
+          <div className="relative">
+            <div
+              ref={scrollRef}
+              className="grid auto-cols-[18rem] grid-flow-col grid-rows-2 gap-3 overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:auto-cols-[20rem]"
+            >
+              {sorted.map((lead) => (
+                <UpcomingLeadTile key={lead._id} lead={lead} />
+              ))}
+            </div>
+
+            {sorted.length > 2 && (
+              <>
+                <button
+                  type="button"
+                  aria-label="Scroll left"
+                  onClick={() => scrollByPage(-1)}
+                  className="absolute -left-3 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-md transition-colors hover:border-cine-primary/40 hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 sm:flex"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Scroll right"
+                  onClick={() => scrollByPage(1)}
+                  className="absolute -right-3 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-md transition-colors hover:border-cine-primary/40 hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 sm:flex"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>

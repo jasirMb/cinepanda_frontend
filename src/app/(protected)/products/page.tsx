@@ -231,8 +231,8 @@ export default function ProductsPage() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
             Products
           </h2>
@@ -262,7 +262,7 @@ export default function ProductsPage() {
       </div>
 
       {/* Filters */}
-      <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 sm:grid-cols-2 lg:grid-cols-5">
         <Input
           placeholder="Search products..."
           value={filters.search}

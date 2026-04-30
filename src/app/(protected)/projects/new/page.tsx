@@ -90,7 +90,7 @@ export default function NewProjectPage() {
 
       <form
         onSubmit={handleSubmit}
-        className="max-w-2xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
+        className="max-w-4xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
       >
         {/* Customer selector */}
         <Field label="Customer (optional)">

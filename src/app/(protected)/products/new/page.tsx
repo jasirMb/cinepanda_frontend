@@ -308,7 +308,7 @@ export default function NewProductPage() {
       </div>
 
       {isEditMode && productQuery.isLoading ? (
-        <div className="max-w-2xl rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="max-w-4xl rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
           <p className="text-sm text-slate-600 dark:text-slate-300">
             Loading product details...
           </p>
@@ -317,7 +317,7 @@ export default function NewProductPage() {
         <form
           onSubmit={handleSubmit}
           noValidate
-          className="max-w-2xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
+          className="max-w-4xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
         >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Product Name *" error={formErrors.name}>

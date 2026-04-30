@@ -97,7 +97,7 @@ export default function EditProjectPage({
     return (
       <div className="space-y-4">
         <Skeleton className="h-6 w-48" />
-        <Skeleton className="h-96 w-full max-w-2xl rounded-lg" />
+        <Skeleton className="h-96 w-full max-w-4xl rounded-lg" />
       </div>
     );
   }
@@ -119,7 +119,7 @@ export default function EditProjectPage({
 
       <form
         onSubmit={handleSubmit}
-        className="max-w-2xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
+        className="max-w-4xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
       >
         <Field label="Customer (optional)">
           <Select

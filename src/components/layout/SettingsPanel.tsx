@@ -1,7 +1,10 @@
 "use client";
 
-import { Check, Moon, Sun, User } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, Loader2, Moon, Sun, User } from "lucide-react";
 import clsx from "clsx";
+import { toast } from "sonner";
+
 import {
   BACKGROUND_PRESETS,
   PATTERN_PRESETS,
@@ -10,6 +13,8 @@ import {
   useSettingsStore,
 } from "@/store/settings-store";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
 
 export function SettingsPanel() {
   const theme = useSettingsStore((s) => s.theme);
@@ -21,7 +26,43 @@ export function SettingsPanel() {
   const setBackgroundId = useSettingsStore((s) => s.setBackgroundId);
   const setSidebarId = useSettingsStore((s) => s.setSidebarId);
   const setPatternId = useSettingsStore((s) => s.setPatternId);
-  const setProfile = useSettingsStore((s) => s.setProfile);
+
+  // Ensure the profile query is running while this panel is mounted
+  // (hydrator in the protected layout handles the broader case, but this
+  // guarantees a fresh fetch if the settings panel is the first place
+  // touched after auth).
+  useProfile();
+  const updateProfile = useUpdateProfile();
+
+  // Local form state — initialized from the store and kept in sync when the
+  // server-backed profile arrives. Separate from the store so the Save button
+  // has something to diff against.
+  const [nameDraft, setNameDraft] = useState(profile.name);
+  const [emailDraft, setEmailDraft] = useState(profile.email);
+
+  useEffect(() => {
+    setNameDraft(profile.name);
+    setEmailDraft(profile.email);
+  }, [profile.name, profile.email]);
+
+  const profileDirty =
+    nameDraft.trim() !== profile.name.trim() ||
+    emailDraft.trim() !== profile.email.trim();
+
+  function handleSaveProfile() {
+    const payload = {
+      name: nameDraft.trim(),
+      email: emailDraft.trim(),
+    };
+    if (payload.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+      toast.error("Enter a valid email address.");
+      return;
+    }
+    updateProfile.mutate(payload, {
+      onSuccess: () => toast.success("Profile updated"),
+      onError: () => toast.error("Failed to update profile"),
+    });
+  }
 
   const currentBg = getBackgroundPreset(backgroundId);
   const currentBgColor = theme === "dark" ? currentBg.dark : currentBg.light;
@@ -40,8 +81,8 @@ export function SettingsPanel() {
           <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">
             Display name
             <Input
-              value={profile.name}
-              onChange={(e) => setProfile({ name: e.target.value })}
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
               placeholder="Your name"
               className="mt-1 h-8 text-xs"
             />
@@ -50,12 +91,30 @@ export function SettingsPanel() {
             Email
             <Input
               type="email"
-              value={profile.email}
-              onChange={(e) => setProfile({ email: e.target.value })}
+              value={emailDraft}
+              onChange={(e) => setEmailDraft(e.target.value)}
               placeholder="you@example.com"
               className="mt-1 h-8 text-xs"
             />
           </label>
+          <div className="flex justify-end pt-1">
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSaveProfile}
+              disabled={!profileDirty || updateProfile.isPending}
+              className="h-7 px-3 text-xs"
+            >
+              {updateProfile.isPending ? (
+                <>
+                  <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                "Save profile"
+              )}
+            </Button>
+          </div>
         </div>
       </Section>
 

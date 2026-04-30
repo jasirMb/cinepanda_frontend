@@ -257,7 +257,7 @@ export default function LedgerPage() {
       </div>
 
       {/* KPI strip */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiTile
           label="Total Income"
           value={formatINR(totalIncome)}
@@ -975,7 +975,8 @@ function ProjectActivityList({
           <EmptyBlock label="No project activity in the current filter" />
         </div>
       ) : (
-        <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+        <div className="overflow-x-auto">
+          <ul className="min-w-[640px] divide-y divide-slate-100 dark:divide-slate-800">
           {projects.map((p, i) => {
             const incomePct = Math.round((p.income / globalMax) * 100);
             const expensePct = Math.round((p.expense / globalMax) * 100);
@@ -1079,7 +1080,8 @@ function ProjectActivityList({
               </li>
             );
           })}
-        </ul>
+          </ul>
+        </div>
       )}
     </section>
   );

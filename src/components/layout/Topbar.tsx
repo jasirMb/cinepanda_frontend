@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { Menu } from "lucide-react";
+import { useShellStore } from "@/store/shell-store";
 
 interface PageMeta {
   title: string;
@@ -100,9 +102,18 @@ function resolveMeta(pathname: string): PageMeta {
 export function Topbar() {
   const pathname = usePathname();
   const meta = resolveMeta(pathname);
+  const openMobileSidebar = useShellStore((s) => s.openMobileSidebar);
 
   return (
-    <header className="flex h-14 items-center border-b border-slate-200 bg-white/80 px-6 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:border-slate-800 dark:bg-slate-950/80">
+    <header className="flex h-14 items-center gap-3 border-b border-slate-200 bg-white/80 px-4 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:border-slate-800 dark:bg-slate-950/80 sm:px-6">
+      <button
+        type="button"
+        onClick={openMobileSidebar}
+        aria-label="Open menu"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 lg:hidden"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
       <div className="flex min-w-0 items-center gap-3">
         <Image
           src="/cinepanda-logo.png"
@@ -110,7 +121,7 @@ export function Topbar() {
           width={32}
           height={32}
           priority
-          className="shrink-0 drop-shadow-sm"
+          className="hidden shrink-0 drop-shadow-sm sm:block"
         />
         <div className="min-w-0 leading-tight">
           <p className="truncate text-base font-semibold text-slate-900 dark:text-slate-50">
