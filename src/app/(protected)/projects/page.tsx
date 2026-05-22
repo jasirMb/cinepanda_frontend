@@ -271,32 +271,42 @@ export default function ProjectsPage() {
           ))}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-          <table className="w-full text-sm">
+        <div className="w-full overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <table className="w-full min-w-[1100px] table-fixed text-sm">
+            <colgroup>
+              <col className="w-[20%]" />
+              <col className="w-[14%]" />
+              <col className="w-[11%]" />
+              <col className="w-[12%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+              <col className="w-[10%]" />
+              <col className="w-[13%]" />
+            </colgroup>
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/80">
-                <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300">
+                <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-slate-700 dark:text-slate-300">
                   Client
                 </th>
-                <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300">
+                <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-slate-700 dark:text-slate-300">
                   Service
                 </th>
-                <th className="px-4 py-3 text-right font-medium text-slate-700 dark:text-slate-300">
+                <th className="px-4 py-3 text-right text-[11px] font-medium uppercase tracking-wide text-slate-700 dark:text-slate-300">
                   Value
                 </th>
-                <th className="px-4 py-3 text-right font-medium text-slate-700 dark:text-slate-300">
+                <th className="px-4 py-3 text-right text-[11px] font-medium uppercase tracking-wide text-slate-700 dark:text-slate-300">
                   Net P/L
                 </th>
-                <th className="px-4 py-3 text-center font-medium text-slate-700 dark:text-slate-300">
+                <th className="px-4 py-3 text-center text-[11px] font-medium uppercase tracking-wide text-slate-700 dark:text-slate-300">
                   Status
                 </th>
-                <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300">
+                <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-slate-700 dark:text-slate-300">
                   Start
                 </th>
-                <th className="px-4 py-3 text-left font-medium text-slate-700 dark:text-slate-300">
+                <th className="px-4 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-slate-700 dark:text-slate-300">
                   Expected End
                 </th>
-                <th className="px-4 py-3 text-right font-medium text-slate-700 dark:text-slate-300">
+                <th className="px-4 py-3 text-right text-[11px] font-medium uppercase tracking-wide text-slate-700 dark:text-slate-300">
                   Actions
                 </th>
               </tr>
@@ -307,16 +317,22 @@ export default function ProjectsPage() {
                   key={p._id}
                   className="border-b border-slate-100 last:border-0 dark:border-slate-800/50"
                 >
-                  <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-50">
+                  <td
+                    className="truncate px-4 py-3 font-medium text-slate-900 dark:text-slate-50"
+                    title={p.clientName}
+                  >
                     {p.clientName}
                   </td>
-                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                  <td
+                    className="truncate px-4 py-3 text-slate-700 dark:text-slate-300"
+                    title={p.serviceType}
+                  >
                     {p.serviceType}
                   </td>
-                  <td className="px-4 py-3 text-right text-slate-700 dark:text-slate-300">
+                  <td className="truncate px-4 py-3 text-right tabular-nums text-slate-700 dark:text-slate-300">
                     {formatINR(p.projectValue)}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right tabular-nums">
                     {(() => {
                       const fin = financialsByProject.get(p._id);
                       if (!fin || (fin.income === 0 && fin.expense === 0)) {
@@ -349,10 +365,10 @@ export default function ProjectsPage() {
                       {p.status.replace("_", " ")}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                  <td className="truncate px-4 py-3 tabular-nums text-slate-700 dark:text-slate-300">
                     {formatDate(p.startDate)}
                   </td>
-                  <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                  <td className="truncate px-4 py-3 tabular-nums text-slate-700 dark:text-slate-300">
                     {formatDate(p.expectedCompletionDate)}
                   </td>
                   <td className="px-4 py-3 text-right">

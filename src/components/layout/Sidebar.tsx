@@ -27,6 +27,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SettingsPanel } from "@/components/layout/SettingsPanel";
 
 const navItems: {
@@ -51,6 +52,7 @@ export function Sidebar() {
   const logout = useAuthStore((s) => s.logout);
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const sidebarId = useSettingsStore((s) => s.sidebarId);
   const sidebarPreset = getSidebarPreset(sidebarId);
   const mobileOpen = useShellStore((s) => s.mobileSidebarOpen);
@@ -94,6 +96,11 @@ export function Sidebar() {
   function handleLogout() {
     logout();
     router.replace("/login");
+  }
+
+  function requestLogout() {
+    setShowLogoutDialog(true);
+    closeMobile();
   }
 
   // Mobile ignores the desktop `collapsed` preference — always show the full drawer
@@ -245,7 +252,7 @@ export function Sidebar() {
         </button>
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={requestLogout}
           title="Logout"
           aria-label="Logout"
           className={clsx(
@@ -258,6 +265,16 @@ export function Sidebar() {
         </button>
       </div>
       </aside>
+
+      <ConfirmDialog
+        open={showLogoutDialog}
+        onOpenChange={setShowLogoutDialog}
+        title="Log out?"
+        description="You'll need to sign in again to access your dashboard, quotations, and projects."
+        confirmLabel="Log out"
+        variant="destructive"
+        onConfirm={handleLogout}
+      />
     </>
   );
 }

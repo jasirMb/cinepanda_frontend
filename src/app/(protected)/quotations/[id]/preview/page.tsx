@@ -1,13 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 
 import { useQuotation } from "@/hooks/useQuotations";
 import { QuotationPreview } from "@/components/quotation/QuotationPreview";
-import { downloadHtmlToPdf } from "@/lib/api/quotations";
+import { downloadProposalPdf } from "@/lib/quotation-pdf";
 import { Button } from "@/components/ui/button";
 
 export default function QuotationPreviewPage() {
@@ -16,21 +16,15 @@ export default function QuotationPreviewPage() {
   const quotationQuery = useQuotation(quotationId);
   const quotation = quotationQuery.data;
 
-  const previewRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
 
   async function handleDownload() {
-    if (!previewRef.current || !quotation) return;
+    if (!quotation) return;
     setDownloading(true);
     try {
-      const customerName = quotation.customerId.name
-        .replace(/\s+/g, "-")
-        .toLowerCase();
-      const idSuffix = quotation._id.slice(-6);
-      const filename = `CinePanda-Quotation-${customerName}-${idSuffix}.pdf`;
-      const html = previewRef.current.outerHTML;
-      await downloadHtmlToPdf(html, filename);
-    } catch {
+      await downloadProposalPdf(quotation);
+    } catch (err) {
+      console.error("Download proposal PDF failed:", err);
       toast.error("Failed to generate PDF");
     } finally {
       setDownloading(false);
@@ -75,7 +69,7 @@ export default function QuotationPreviewPage() {
 
       {/* Preview container with paper-like styling */}
       <div className="mx-auto max-w-[850px] rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700">
-        <QuotationPreview ref={previewRef} quotation={quotation} />
+        <QuotationPreview quotation={quotation} />
       </div>
     </div>
   );

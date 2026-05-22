@@ -11,11 +11,10 @@ import {
   updateQuotation,
   updateQuotationStatus,
   deleteQuotation,
-  downloadServerPdf,
   type Quotation,
 } from "@/lib/api/quotations";
+import { downloadProposalPdf } from "@/lib/quotation-pdf";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Spinner } from "@/components/ui/spinner";
@@ -119,10 +118,12 @@ export default function QuotationDetailPage() {
   });
 
   async function handleDownloadPdf() {
+    if (!quotation) return;
     setDownloadingPdf(true);
     try {
-      await downloadServerPdf(quotationId);
-    } catch {
+      await downloadProposalPdf(quotation);
+    } catch (err) {
+      console.error("Download proposal PDF failed:", err);
       toast.error("Failed to download PDF");
     } finally {
       setDownloadingPdf(false);
@@ -486,6 +487,7 @@ export default function QuotationDetailPage() {
           setShowDeleteDialog(false);
         }}
       />
+
     </div>
   );
 }

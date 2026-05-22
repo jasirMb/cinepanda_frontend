@@ -500,16 +500,24 @@ export default function ProjectDetailPage({
             No ledger entries linked to this project yet.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-            <table className="w-full text-sm">
+          <div className="w-full overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+            <table className="w-full min-w-[760px] table-fixed text-sm">
+              <colgroup>
+                <col className="w-[12%]" />
+                <col className="w-[12%]" />
+                <col className="w-[18%]" />
+                <col className="w-[34%]" />
+                <col className="w-[14%]" />
+                <col className="w-[10%]" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
-                  <th className="px-4 py-2.5">Date</th>
-                  <th className="px-4 py-2.5">Type</th>
-                  <th className="px-4 py-2.5">Category</th>
-                  <th className="px-4 py-2.5">Description</th>
-                  <th className="px-4 py-2.5 text-right">Amount</th>
-                  <th className="px-4 py-2.5 text-center">Status</th>
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3">Category</th>
+                  <th className="px-4 py-3">Description</th>
+                  <th className="px-4 py-3 text-right">Amount</th>
+                  <th className="px-4 py-3 text-center">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -518,7 +526,7 @@ export default function ProjectDetailPage({
                     key={entry._id}
                     className="border-b border-slate-100 last:border-0 dark:border-slate-800/50"
                   >
-                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                    <td className="truncate px-4 py-3 tabular-nums text-slate-700 dark:text-slate-300">
                       {formatDate(entry.entryDate)}
                     </td>
                     <td className="px-4 py-3">
@@ -537,14 +545,20 @@ export default function ProjectDetailPage({
                         {entry.entryType}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                    <td
+                      className="truncate px-4 py-3 text-slate-700 dark:text-slate-300"
+                      title={entry.category.replace(/_/g, " ")}
+                    >
                       {entry.category.replace(/_/g, " ")}
                     </td>
-                    <td className="max-w-[280px] truncate px-4 py-3 text-slate-700 dark:text-slate-300">
+                    <td
+                      className="truncate px-4 py-3 text-slate-700 dark:text-slate-300"
+                      title={entry.description}
+                    >
                       {entry.description}
                     </td>
                     <td
-                      className={`px-4 py-3 text-right font-semibold ${
+                      className={`truncate px-4 py-3 text-right font-semibold tabular-nums ${
                         entry.entryType === "INCOME"
                           ? "text-emerald-700 dark:text-emerald-300"
                           : "text-red-600 dark:text-red-400"

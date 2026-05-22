@@ -32,6 +32,7 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const router = useRouter();
@@ -47,19 +48,39 @@ function LoginForm() {
     try {
       const { token } = await loginAdmin({ username: email, password });
       login(token);
+      // Keep the loading state on until navigation actually swaps the page,
+      // otherwise the spinner vanishes and the user sees a static login page
+      // while the dashboard is still loading.
+      setRedirecting(true);
       router.replace(redirectTo);
     } catch (err: any) {
       const message =
         err?.response?.data?.message ??
         "Invalid credentials. Please try again.";
       setError(message);
-    } finally {
       setSubmitting(false);
     }
   }
 
   return (
     <div className="flex min-h-screen w-full bg-slate-50 dark:bg-slate-950">
+      {redirecting && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-slate-950/60 backdrop-blur-sm"
+        >
+          <div className="flex flex-col items-center gap-3 rounded-xl bg-white/95 px-8 py-6 shadow-xl ring-1 ring-slate-200 dark:bg-slate-900/95 dark:ring-slate-800">
+            <Loader2 className="h-8 w-8 animate-spin text-cine-primary" />
+            <div className="text-sm font-medium text-slate-700 dark:text-slate-200">
+              Signing you in…
+            </div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              Loading your dashboard
+            </div>
+          </div>
+        </div>
+      )}
       {/* Left cinematic panel */}
       <div className="relative hidden lg:flex lg:w-[55%] xl:w-[60%] flex-col justify-between overflow-hidden bg-gradient-to-br from-[#0B1220] via-[#1B3A57] to-[#0B1220] p-12 text-white">
         {/* Ambient blobs */}
@@ -157,7 +178,7 @@ function LoginForm() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5" aria-busy={submitting || redirecting}>
             <div>
               <label
                 htmlFor="email"
@@ -238,13 +259,13 @@ function LoginForm() {
 
             <Button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || redirecting}
               className="h-11 w-full bg-cine-primary text-white shadow-sm transition-all hover:bg-cine-primary/90 hover:shadow-md focus-visible:ring-cine-primary disabled:opacity-70 dark:bg-cine-primary dark:text-white dark:hover:bg-cine-primary/90"
             >
-              {submitting ? (
+              {submitting || redirecting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Signing in...
+                  {redirecting ? "Redirecting…" : "Signing in..."}
                 </>
               ) : (
                 "Sign in"

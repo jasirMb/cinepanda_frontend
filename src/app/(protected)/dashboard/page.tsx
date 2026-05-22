@@ -585,15 +585,22 @@ export default function DashboardPage() {
         ) : pipelineProjects.length === 0 ? (
           <EmptyBlock label="No active or upcoming projects" />
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-            <table className="w-full min-w-[560px] text-sm">
+          <div className="w-full overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+            <table className="w-full min-w-[560px] table-fixed text-sm">
+              <colgroup>
+                <col className="w-[28%]" />
+                <col className="w-[22%]" />
+                <col className="w-[16%]" />
+                <col className="w-[18%]" />
+                <col className="w-[16%]" />
+              </colgroup>
               <thead className="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-400">
                 <tr>
-                  <th className="px-4 py-2.5">Client</th>
-                  <th className="px-4 py-2.5">Service</th>
-                  <th className="px-4 py-2.5">Due</th>
-                  <th className="px-4 py-2.5">Status</th>
-                  <th className="px-4 py-2.5 text-right">Value</th>
+                  <th className="px-4 py-3">Client</th>
+                  <th className="px-4 py-3">Service</th>
+                  <th className="px-4 py-3">Due</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Value</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -602,19 +609,25 @@ export default function DashboardPage() {
                     key={p._id}
                     className="bg-white transition-colors hover:bg-slate-50 dark:bg-slate-950/20 dark:hover:bg-slate-800/40"
                   >
-                    <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-50">
+                    <td
+                      className="truncate px-4 py-3 font-medium text-slate-900 dark:text-slate-50"
+                      title={p.clientName}
+                    >
                       {p.clientName}
                     </td>
-                    <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                    <td
+                      className="truncate px-4 py-3 text-slate-600 dark:text-slate-400"
+                      title={p.serviceType}
+                    >
                       {p.serviceType}
                     </td>
-                    <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                    <td className="truncate px-4 py-3 tabular-nums text-slate-600 dark:text-slate-400">
                       {formatDate(p.expectedCompletionDate)}
                     </td>
                     <td className="px-4 py-3">
                       <StatusPill status={p.status} />
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-900 dark:text-slate-50">
+                    <td className="truncate px-4 py-3 text-right font-semibold tabular-nums text-slate-900 dark:text-slate-50">
                       {formatINR(p.projectValue)}
                     </td>
                   </tr>

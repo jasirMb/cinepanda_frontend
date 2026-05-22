@@ -670,9 +670,18 @@ function EntriesTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+    <div className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+      <div className="w-full overflow-x-auto">
+        <table className="w-full min-w-[1000px] table-fixed text-sm">
+          <colgroup>
+            <col className="w-[11%]" />
+            <col className="w-[32%]" />
+            <col className="w-[15%]" />
+            <col className="w-[12%]" />
+            <col className="w-[10%]" />
+            <col className="w-[10%]" />
+            <col className="w-[10%]" />
+          </colgroup>
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
               <th className="px-4 py-3 text-left font-medium">Date</th>
@@ -696,7 +705,7 @@ function EntriesTable({
                   key={entry._id}
                   className={`${highlight} transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40`}
                 >
-                  <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-400">
+                  <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-600 dark:text-slate-400">
                     {formatDate(entry.entryDate)}
                   </td>
                   <td className="px-4 py-3">
@@ -739,7 +748,7 @@ function EntriesTable({
                     )}
                   </td>
                   <td
-                    className={`whitespace-nowrap px-4 py-3 text-right font-semibold ${
+                    className={`whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums ${
                       isIncome
                         ? "text-emerald-600 dark:text-emerald-400"
                         : "text-red-600 dark:text-red-400"
