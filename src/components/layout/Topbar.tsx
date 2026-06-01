@@ -17,8 +17,15 @@ function avatarInitials(name: string, email: string): string {
 
 function TopbarAvatar() {
   const profile = useSettingsStore((s) => s.profile);
+  const openSettings = useShellStore((s) => s.openSettings);
   return (
-    <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+    <button
+      type="button"
+      onClick={openSettings}
+      title="Settings"
+      aria-label="Open settings"
+      className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-xs font-semibold text-slate-600 transition hover:ring-2 hover:ring-cine-primary/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+    >
       {profile.avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -29,7 +36,7 @@ function TopbarAvatar() {
       ) : (
         avatarInitials(profile.name, profile.email)
       )}
-    </div>
+    </button>
   );
 }
 

@@ -1,7 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, ImagePlus, Loader2, Moon, Sun, Trash2, User } from "lucide-react";
+import {
+  Check,
+  ImagePlus,
+  Loader2,
+  Moon,
+  Palette,
+  SlidersHorizontal,
+  Sun,
+  Trash2,
+  User,
+} from "lucide-react";
 import clsx from "clsx";
 import { toast } from "sonner";
 
@@ -17,6 +27,8 @@ import { deleteFile, uploadFile } from "@/lib/api/files";
 import { compressImageToLimit } from "@/lib/compress-image";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
+import { useShellStore } from "@/store/shell-store";
 import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
 
 const MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -110,6 +122,8 @@ export function SettingsPanel() {
 
   const avatarFileRef = useRef<HTMLInputElement>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const [tab, setTab] = useState<"profile" | "appearance">("profile");
 
   async function handleAvatarFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -206,20 +220,49 @@ export function SettingsPanel() {
   const currentBgColor = theme === "dark" ? currentBg.dark : currentBg.light;
 
   return (
-    <div className="space-y-5 text-slate-900 dark:text-slate-100">
-      <div>
-        <h3 className="text-sm font-semibold">Settings</h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Personalize your workspace appearance.
-        </p>
+    <div className="flex h-[min(85vh,620px)] flex-col text-slate-900 dark:text-slate-100 sm:flex-row">
+      {/* Left tab rail */}
+      <div className="flex shrink-0 flex-col border-b border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950 sm:w-56 sm:border-b-0 sm:border-r">
+        <div className="mb-3 flex items-center gap-2.5 px-2 pt-1">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cine-primary/10 text-cine-primary ring-1 ring-cine-primary/20">
+            <SlidersHorizontal className="h-4 w-4" />
+          </div>
+          <div className="leading-tight">
+            <h2 className="text-sm font-semibold">Settings</h2>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Account &amp; appearance
+            </p>
+          </div>
+        </div>
+        <nav className="flex gap-1.5 sm:flex-col">
+          <RailTab
+            active={tab === "profile"}
+            onClick={() => setTab("profile")}
+            icon={<User className="h-4 w-4" />}
+            label="Profile"
+          />
+          <RailTab
+            active={tab === "appearance"}
+            onClick={() => setTab("appearance")}
+            icon={<Palette className="h-4 w-4" />}
+            label="Appearance"
+          />
+        </nav>
       </div>
 
-      <Section title="Profile" icon={<User className="h-3.5 w-3.5" />}>
-        <div className="space-y-3">
-          {/* Profile photo */}
-          <div className="flex items-center gap-3">
-            <div className="relative h-14 w-14 shrink-0">
-              <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-sm font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+      {/* Right content pane */}
+      <div className="flex-1 scroll-smooth overflow-y-auto bg-slate-50 p-6 dark:bg-slate-950/40">
+      {tab === "profile" && (
+        <div className="space-y-4">
+          <TabHeader
+            title="Profile"
+            subtitle="Your name, email and photo."
+          />
+
+          {/* Avatar header card */}
+          <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+            <div className="relative h-16 w-16 shrink-0">
+              <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-base font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                 {profile.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -237,29 +280,37 @@ export function SettingsPanel() {
                 </div>
               )}
             </div>
-            <div className="flex flex-col gap-1">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => avatarFileRef.current?.click()}
-                disabled={uploadingAvatar || updateProfile.isPending}
-                className="h-7 px-3 text-xs"
-              >
-                <ImagePlus className="mr-1.5 h-3 w-3" />
-                {profile.avatarUrl ? "Change photo" : "Upload photo"}
-              </Button>
-              {profile.avatarUrl && (
-                <button
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">
+                {nameDraft.trim() || "Admin"}
+              </p>
+              <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                {emailDraft.trim() || "No email set"}
+              </p>
+              <div className="mt-2 flex items-center gap-3">
+                <Button
                   type="button"
-                  onClick={handleRemoveAvatar}
+                  size="sm"
+                  variant="outline"
+                  onClick={() => avatarFileRef.current?.click()}
                   disabled={uploadingAvatar || updateProfile.isPending}
-                  className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-red-600 disabled:opacity-50 dark:text-slate-400"
+                  className="h-7 px-3 text-xs"
                 >
-                  <Trash2 className="h-3 w-3" />
-                  Remove
-                </button>
-              )}
+                  <ImagePlus className="mr-1.5 h-3 w-3" />
+                  {profile.avatarUrl ? "Change" : "Upload"}
+                </Button>
+                {profile.avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveAvatar}
+                    disabled={uploadingAvatar || updateProfile.isPending}
+                    className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-red-600 disabled:opacity-50 dark:text-slate-400"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    Remove
+                  </button>
+                )}
+              </div>
             </div>
           </div>
           <input
@@ -270,58 +321,68 @@ export function SettingsPanel() {
             onChange={handleAvatarFile}
           />
 
-          <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">
-            Display name
-            <Input
-              value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
-              placeholder="Your name"
-              className="mt-1 h-8 text-xs"
-            />
-          </label>
-          <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">
-            Email
-            <Input
-              type="email"
-              value={emailDraft}
-              onChange={(e) => setEmailDraft(e.target.value)}
-              placeholder="you@example.com"
-              className="mt-1 h-8 text-xs"
-            />
-          </label>
-          <div className="flex justify-end pt-1">
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleSaveProfile}
-              disabled={!profileDirty || updateProfile.isPending}
-              className="h-7 px-3 text-xs"
-            >
-              {updateProfile.isPending ? (
-                <>
-                  <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
-                  Saving…
-                </>
-              ) : (
-                "Save profile"
-              )}
-            </Button>
-          </div>
+          <Section title="Account details">
+            <div className="space-y-3">
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">
+                Display name
+                <Input
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  placeholder="Your name"
+                  className="mt-1 h-9 text-sm"
+                />
+              </label>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">
+                Email
+                <Input
+                  type="email"
+                  value={emailDraft}
+                  onChange={(e) => setEmailDraft(e.target.value)}
+                  placeholder="you@example.com"
+                  className="mt-1 h-9 text-sm"
+                />
+              </label>
+              <div className="flex justify-end pt-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleSaveProfile}
+                  disabled={!profileDirty || updateProfile.isPending}
+                  className="h-8 px-4 text-xs"
+                >
+                  {updateProfile.isPending ? (
+                    <>
+                      <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                      Saving…
+                    </>
+                  ) : (
+                    "Save profile"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </Section>
         </div>
-      </Section>
+      )}
 
+      {tab === "appearance" && (
+      <div className="space-y-4">
+      <TabHeader
+        title="Appearance"
+        subtitle="Theme, colors and background."
+      />
       <Section title="Theme">
         <div className="grid grid-cols-2 gap-2">
           <ThemeButton
             active={theme === "light"}
             onClick={() => setTheme("light")}
-            icon={<Sun className="h-3.5 w-3.5" />}
+            icon={<Sun className="h-4 w-4" />}
             label="Light"
           />
           <ThemeButton
             active={theme === "dark"}
             onClick={() => setTheme("dark")}
-            icon={<Moon className="h-3.5 w-3.5" />}
+            icon={<Moon className="h-4 w-4" />}
             label="Dark"
           />
         </div>
@@ -340,7 +401,7 @@ export function SettingsPanel() {
                 title={preset.label}
                 aria-label={`Background ${preset.label}`}
                 className={clsx(
-                  "relative h-8 w-8 rounded-md border transition",
+                  "relative h-9 w-9 rounded-lg border transition",
                   active
                     ? "border-cine-primary ring-2 ring-cine-primary/40"
                     : "border-slate-200 hover:border-slate-400 dark:border-slate-700 dark:hover:border-slate-500"
@@ -493,7 +554,7 @@ export function SettingsPanel() {
                 title={preset.label}
                 aria-label={`Sidebar ${preset.label}`}
                 className={clsx(
-                  "relative h-8 w-8 rounded-md border transition",
+                  "relative h-9 w-9 rounded-lg border transition",
                   active
                     ? "border-cine-primary ring-2 ring-cine-primary/40"
                     : "border-slate-200 hover:border-slate-400 dark:border-slate-700 dark:hover:border-slate-500"
@@ -507,8 +568,60 @@ export function SettingsPanel() {
             );
           })}
         </div>
+        <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+          Current: {SIDEBAR_PRESETS.find((p) => p.id === sidebarId)?.label}
+        </p>
       </Section>
+      </div>
+      )}
+      </div>
     </div>
+  );
+}
+
+function TabHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="border-b border-slate-200 pb-3 dark:border-slate-800">
+      <h3 className="text-base font-semibold">{title}</h3>
+      <p className="text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>
+    </div>
+  );
+}
+
+function RailTab({
+  active,
+  onClick,
+  icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={clsx(
+        "flex flex-1 items-center justify-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors sm:flex-none sm:justify-start",
+        active
+          ? "bg-cine-primary/10 text-cine-primary ring-1 ring-inset ring-cine-primary/20"
+          : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/70"
+      )}
+    >
+      <span
+        className={clsx(
+          "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+          active
+            ? "bg-cine-primary/15 text-cine-primary"
+            : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+        )}
+      >
+        {icon}
+      </span>
+      {label}
+    </button>
   );
 }
 
@@ -522,12 +635,12 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div>
-      <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+      <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 dark:border-slate-800 dark:text-slate-50">
         {icon}
         {title}
       </div>
-      {children}
+      <div className="p-4">{children}</div>
     </div>
   );
 }
@@ -548,7 +661,7 @@ function ThemeButton({
       type="button"
       onClick={onClick}
       className={clsx(
-        "flex items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium transition",
+        "flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition",
         active
           ? "border-cine-primary bg-cine-primary/10 text-cine-primary"
           : "border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -557,5 +670,19 @@ function ThemeButton({
       {icon}
       {label}
     </button>
+  );
+}
+
+/**
+ * App-wide Settings modal. Renders once (e.g. in the protected layout) and is
+ * opened via the shell store's `openSettings()` from the sidebar / topbar.
+ */
+export function SettingsModal() {
+  const open = useShellStore((s) => s.settingsOpen);
+  const close = useShellStore((s) => s.closeSettings);
+  return (
+    <Dialog open={open} onClose={close} className="max-w-3xl p-0">
+      <SettingsPanel />
+    </Dialog>
   );
 }

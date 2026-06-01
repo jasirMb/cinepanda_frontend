@@ -23,13 +23,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/auth-store";
 import { getSidebarPreset, useSettingsStore } from "@/store/settings-store";
 import { useShellStore } from "@/store/shell-store";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { SettingsPanel } from "@/components/layout/SettingsPanel";
 
 const navItems: {
   href: string;
@@ -59,6 +53,7 @@ export function Sidebar() {
   const sidebarPreset = getSidebarPreset(sidebarId);
   const mobileOpen = useShellStore((s) => s.mobileSidebarOpen);
   const closeMobile = useShellStore((s) => s.closeMobileSidebar);
+  const openSettings = useShellStore((s) => s.openSettings);
 
   useEffect(() => {
     const saved =
@@ -211,31 +206,19 @@ export function Sidebar() {
 
       {/* Footer actions */}
       <div className="space-y-1 border-t border-white/10 p-2">
-        <Popover>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              title="Settings"
-              aria-label="Settings"
-              className={clsx(
-                "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white",
-                !showExpanded && "justify-center px-2"
-              )}
-            >
-              <Settings className="h-4 w-4 shrink-0" />
-              {showExpanded && <span>Settings</span>}
-            </button>
-          </PopoverTrigger>
-          <PopoverContent
-            side="top"
-            align="start"
-            sideOffset={12}
-            collisionPadding={12}
-            className="w-80 max-w-[calc(100vw-1.5rem)] max-h-[80vh] overflow-y-auto"
-          >
-            <SettingsPanel />
-          </PopoverContent>
-        </Popover>
+        <button
+          type="button"
+          title="Settings"
+          aria-label="Settings"
+          onClick={openSettings}
+          className={clsx(
+            "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white",
+            !showExpanded && "justify-center px-2"
+          )}
+        >
+          <Settings className="h-4 w-4 shrink-0" />
+          {showExpanded && <span>Settings</span>}
+        </button>
 
         <button
           type="button"

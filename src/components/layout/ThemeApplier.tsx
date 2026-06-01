@@ -27,14 +27,30 @@ export function ThemeApplier() {
     const bg = getBackgroundPreset(backgroundId);
     const color = theme === "dark" ? bg.dark : bg.light;
     const image = resolvePatternImage(patternId, customPatternUrl, theme);
-    // A custom photo should fit/cover the screen; presets tile seamlessly.
-    const isCustom = patternId === CUSTOM_PATTERN_ID && !!image;
+    // A custom photo becomes a full-screen wallpaper rendered by <AppBackdrop>,
+    // which also flips on glass styling for the chrome + cards via this flag.
+    const isWallpaper = patternId === CUSTOM_PATTERN_ID && !!image;
+
+    if (isWallpaper) {
+      document.documentElement.dataset.wallpaper = "true";
+    } else {
+      delete document.documentElement.dataset.wallpaper;
+    }
+
     document.body.style.backgroundColor = color;
-    document.body.style.backgroundImage = image ? `url("${image}")` : "";
-    document.body.style.backgroundRepeat = isCustom ? "no-repeat" : "repeat";
-    document.body.style.backgroundSize = isCustom ? "cover" : "auto";
-    document.body.style.backgroundPosition = isCustom ? "center center" : "";
+    // Tiled presets paint on the body; the wallpaper is handled by the backdrop.
+    document.body.style.backgroundImage =
+      image && !isWallpaper ? `url("${image}")` : "";
+    document.body.style.backgroundRepeat = "repeat";
+    document.body.style.backgroundSize = "auto";
+    document.body.style.backgroundPosition = "";
     document.body.style.backgroundAttachment = "fixed";
+
+    // Don't let the wallpaper flag linger after this layout unmounts (e.g. logout
+    // → login page), which would otherwise frost the login surfaces.
+    return () => {
+      delete document.documentElement.dataset.wallpaper;
+    };
   }, [theme, backgroundId, patternId, customPatternUrl, hasHydrated]);
 
   return null;
