@@ -46,8 +46,8 @@ function LoginForm() {
     setError(null);
     setSubmitting(true);
     try {
-      const { token } = await loginAdmin({ username: email, password });
-      login(token);
+      const { token, refreshToken } = await loginAdmin({ username: email, password });
+      login(token, refreshToken);
       // Keep the loading state on until navigation actually swaps the page,
       // otherwise the spinner vanishes and the user sees a static login page
       // while the dashboard is still loading.

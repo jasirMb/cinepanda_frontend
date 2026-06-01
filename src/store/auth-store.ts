@@ -5,9 +5,11 @@ import { persist } from "zustand/middleware";
 
 interface AuthState {
   token: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
   hasHydrated: boolean;
-  login: (token: string) => void;
+  login: (token: string, refreshToken: string) => void;
+  setTokens: (token: string, refreshToken: string) => void;
   logout: () => void;
 }
 
@@ -20,16 +22,25 @@ export const useAuthStore = create<AuthState>()(
       setAuthState = set;
       return {
       token: null,
+      refreshToken: null,
       isAuthenticated: false,
       hasHydrated: false,
-      login: (token: string) =>
+      login: (token: string, refreshToken: string) =>
         set({
           token,
+          refreshToken,
+          isAuthenticated: true
+        }),
+      setTokens: (token: string, refreshToken: string) =>
+        set({
+          token,
+          refreshToken,
           isAuthenticated: true
         }),
       logout: () =>
         set({
           token: null,
+          refreshToken: null,
           isAuthenticated: false
         })
       };
@@ -38,6 +49,7 @@ export const useAuthStore = create<AuthState>()(
       name: "cinepanda-auth",
       partialize: (state) => ({
         token: state.token,
+        refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated
       }),
       onRehydrateStorage: () => (state, error) => {

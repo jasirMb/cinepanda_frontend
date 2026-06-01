@@ -16,22 +16,83 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// On 401/403 (expired or invalid token), clear auth state and bounce to login so the
-// app doesn't get stuck "authenticated" while every request fails.
+// Auth endpoints must never trigger refresh/logout side effects (a 401 from
+// /auth/login just means wrong credentials).
+function isAuthEndpoint(url?: string): boolean {
+  return !!url && (url.includes("/auth/login") || url.includes("/auth/refresh"));
+}
+
+function forceLogout() {
+  useAuthStore.getState().logout();
+  if (window.location.pathname !== "/login") {
+    window.location.assign("/login");
+  }
+}
+
+// Single-flight refresh: if many requests 401 at once, they all await ONE
+// /auth/refresh call instead of stampeding the endpoint.
+let refreshPromise: Promise<string | null> | null = null;
+
+function refreshAccessToken(): Promise<string | null> {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      const refreshToken = useAuthStore.getState().refreshToken;
+      if (!refreshToken) return null;
+      try {
+        // Use a bare axios call (not `api`) so this request can't recurse
+        // through these interceptors.
+        const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, {
+          refreshToken,
+        });
+        useAuthStore.getState().setTokens(data.token, data.refreshToken);
+        return data.token as string;
+      } catch {
+        return null;
+      }
+    })().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    if (typeof window === "undefined") return Promise.reject(error);
+
     const status = error?.response?.status;
+    const original = error.config;
+
     if (
-      typeof window !== "undefined" &&
-      (status === 401 || status === 403) &&
+      status === 401 &&
+      original &&
+      !original._retry &&
+      !isAuthEndpoint(original.url) &&
       useAuthStore.getState().isAuthenticated
     ) {
-      useAuthStore.getState().logout();
-      if (window.location.pathname !== "/login") {
-        window.location.assign("/login");
+      // Access token likely expired — try to refresh once, then replay the request.
+      original._retry = true;
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        original.headers = original.headers ?? {};
+        original.headers.Authorization = `Bearer ${newToken}`;
+        return api(original);
       }
+      // Refresh failed (no/expired refresh token) → session is truly over.
+      forceLogout();
+      return Promise.reject(error);
     }
+
+    // A 403 (invalid token) or an un-refreshable 401 means hard logout.
+    if (
+      (status === 401 || status === 403) &&
+      !isAuthEndpoint(original?.url) &&
+      useAuthStore.getState().isAuthenticated
+    ) {
+      forceLogout();
+    }
+
     return Promise.reject(error);
   }
 );

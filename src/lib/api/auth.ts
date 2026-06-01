@@ -7,6 +7,7 @@ interface LoginPayload {
 
 interface LoginResponse {
   token: string;
+  refreshToken: string;
 }
 
 export async function loginAdmin(payload: LoginPayload): Promise<LoginResponse> {
