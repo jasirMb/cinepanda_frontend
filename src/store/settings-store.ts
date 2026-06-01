@@ -61,17 +61,23 @@ export interface ProfileSettings {
   email: string;
 }
 
+// The id used for a user-uploaded background image.
+export const CUSTOM_PATTERN_ID = "custom";
+
 interface SettingsState {
   theme: Theme;
   backgroundId: string;
   sidebarId: string;
   patternId: string;
+  customPatternUrl: string | null;
+  customPatternKey: string | null;
   profile: ProfileSettings;
   hasHydrated: boolean;
   setTheme: (t: Theme) => void;
   setBackgroundId: (id: string) => void;
   setSidebarId: (id: string) => void;
   setPatternId: (id: string) => void;
+  setCustomPattern: (url: string | null, key: string | null) => void;
   setProfile: (p: Partial<ProfileSettings>) => void;
 }
 
@@ -87,12 +93,16 @@ export const useSettingsStore = create<SettingsState>()(
         backgroundId: "default",
         sidebarId: "slate",
         patternId: "none",
+        customPatternUrl: null,
+        customPatternKey: null,
         profile: { name: "", email: "" },
         hasHydrated: false,
         setTheme: (theme) => set({ theme }),
         setBackgroundId: (backgroundId) => set({ backgroundId }),
         setSidebarId: (sidebarId) => set({ sidebarId }),
         setPatternId: (patternId) => set({ patternId }),
+        setCustomPattern: (customPatternUrl, customPatternKey) =>
+          set({ customPatternUrl, customPatternKey }),
         setProfile: (p) =>
           set((s) => ({ profile: { ...s.profile, ...p } })),
       };
@@ -104,6 +114,8 @@ export const useSettingsStore = create<SettingsState>()(
         backgroundId: state.backgroundId,
         sidebarId: state.sidebarId,
         patternId: state.patternId,
+        customPatternUrl: state.customPatternUrl,
+        customPatternKey: state.customPatternKey,
         profile: state.profile,
       }),
       onRehydrateStorage: () => () => {
@@ -123,4 +135,18 @@ export function getSidebarPreset(id: string): SidebarPreset {
 
 export function getPatternPreset(id: string): PatternPreset {
   return PATTERN_PRESETS.find((p) => p.id === id) ?? PATTERN_PRESETS[0];
+}
+
+/**
+ * Resolve the background-image URL to apply for the current pattern selection.
+ * Custom uploads use the same image for both themes; presets pick per-theme.
+ */
+export function resolvePatternImage(
+  patternId: string,
+  customPatternUrl: string | null,
+  theme: Theme
+): string | null {
+  if (patternId === CUSTOM_PATTERN_ID) return customPatternUrl;
+  const preset = getPatternPreset(patternId);
+  return theme === "dark" ? preset.dark : preset.light;
 }

@@ -5,6 +5,7 @@ export type UploadFolder =
   | "products"
   | "quotations"
   | "logos"
+  | "patterns"
   | "misc";
 
 export interface UploadedFile {
