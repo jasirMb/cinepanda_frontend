@@ -7,6 +7,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Banknote,
   Briefcase,
+  ImagePlus,
+  Loader2,
+  MapPin,
   Pencil,
   Phone,
   Plus,
@@ -16,12 +19,16 @@ import {
 } from "lucide-react";
 
 import { laboursKeys, useLabours, useLabourRoles } from "@/hooks/useLabours";
+import { uploadFile, deleteFile } from "@/lib/api/files";
+import { compressImageToLimit } from "@/lib/compress-image";
 import {
   createLabour,
   updateLabour,
   deleteLabour,
+  LABOUR_REGIONS,
   type Labour,
   type LabourPayload,
+  type LabourRegion,
 } from "@/lib/api/labours";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,7 +61,19 @@ function avatarColor(seed: string) {
   return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length];
 }
 
-const EMPTY_FORM = { name: "", role: "", phone: "", dailyWage: "", details: "" };
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024; // 5 MB
+
+const EMPTY_FORM = {
+  name: "",
+  role: "",
+  phone: "",
+  dailyWage: "",
+  region: "",
+  state: "",
+  details: "",
+  avatarUrl: "",
+  avatarKey: "",
+};
 
 export default function LaboursPage() {
   const queryClient = useQueryClient();
@@ -67,10 +86,52 @@ export default function LaboursPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [pendingDelete, setPendingDelete] = useState<Labour | null>(null);
 
+  const avatarFileRef = useRef<HTMLInputElement>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
   function resetForm() {
     setForm(EMPTY_FORM);
     setEditingId(null);
     setShowForm(false);
+  }
+
+  async function handleAvatarFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file.");
+      return;
+    }
+    let toUpload = file;
+    if (file.size > MAX_AVATAR_BYTES) {
+      try {
+        toUpload = await compressImageToLimit(file, MAX_AVATAR_BYTES);
+        toast.info("Image was over 5 MB — compressed it before uploading.");
+      } catch {
+        toast.error("Image is too large. Please pick one under 5 MB.");
+        return;
+      }
+    }
+    const previousKey = form.avatarKey;
+    setUploadingAvatar(true);
+    try {
+      const uploaded = await uploadFile(toUpload, "avatars");
+      setForm((f) => ({ ...f, avatarUrl: uploaded.fileUrl, avatarKey: uploaded.key }));
+      if (previousKey && previousKey !== uploaded.key) {
+        deleteFile(previousKey).catch(() => {});
+      }
+    } catch {
+      toast.error("Failed to upload photo");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
+  function handleRemoveAvatar() {
+    const key = form.avatarKey;
+    setForm((f) => ({ ...f, avatarUrl: "", avatarKey: "" }));
+    if (key) deleteFile(key).catch(() => {});
   }
 
   const createMutation = useMutation({
@@ -118,10 +179,25 @@ export default function LaboursPage() {
       role: labour.role ?? "",
       phone: labour.phone ?? "",
       dailyWage: labour.dailyWage != null ? String(labour.dailyWage) : "",
+      region: labour.region ?? "",
+      state: labour.state ?? "",
       details: labour.details ?? "",
+      avatarUrl: labour.avatarUrl ?? "",
+      avatarKey: labour.avatarKey ?? "",
     });
     setEditingId(labour._id);
     setShowForm(true);
+  }
+
+  // Region drives the second field: Kerala auto-fills state="Kerala";
+  // Non-Kerala asks for a state; Non-Indian asks for a country.
+  function handleRegionChange(region: string) {
+    setForm((f) => {
+      if (region === "Kerala") return { ...f, region, state: "Kerala" };
+      // Leaving the auto-filled Kerala → clear so they can type the new place.
+      if (f.region === "Kerala") return { ...f, region, state: "" };
+      return { ...f, region };
+    });
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -130,17 +206,27 @@ export default function LaboursPage() {
       toast.error("Labour name is required");
       return;
     }
+    const phone = form.phone.trim();
+    if (phone && !/^\d{10}$/.test(phone)) {
+      toast.error("Phone must be exactly 10 digits");
+      return;
+    }
+    const wage = form.dailyWage.trim() ? Number(form.dailyWage) : undefined;
+    if (wage != null && (Number.isNaN(wage) || wage < 0)) {
+      toast.error("Daily wage must be a positive number");
+      return;
+    }
     const payload: LabourPayload = {
       name: form.name.trim(),
       role: form.role.trim() || undefined,
-      phone: form.phone.trim() || undefined,
-      dailyWage: form.dailyWage.trim() ? Number(form.dailyWage) : undefined,
+      phone: phone || undefined,
+      dailyWage: wage,
+      region: (form.region as LabourRegion) || undefined,
+      state: form.state.trim() || undefined,
       details: form.details.trim() || undefined,
+      avatarUrl: form.avatarUrl || undefined,
+      avatarKey: form.avatarKey || undefined,
     };
-    if (payload.dailyWage != null && Number.isNaN(payload.dailyWage)) {
-      toast.error("Daily wage must be a number");
-      return;
-    }
     if (editingId) {
       updateMutation.mutate({ id: editingId, payload });
     } else {
@@ -218,6 +304,63 @@ export default function LaboursPage() {
           onSubmit={handleSubmit}
           className="max-w-4xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
         >
+          {/* Profile photo */}
+          <div className="flex items-center gap-4">
+            <div className="relative h-16 w-16 shrink-0">
+              <div
+                className={`flex h-16 w-16 items-center justify-center overflow-hidden rounded-full text-lg font-semibold ${avatarColor(
+                  form.name || "?"
+                )}`}
+              >
+                {form.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={form.avatarUrl}
+                    alt="Labour photo"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  getInitials(form.name || "?")
+                )}
+              </div>
+              {uploadingAvatar && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => avatarFileRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="h-7 px-3 text-xs"
+              >
+                <ImagePlus className="mr-1.5 h-3 w-3" />
+                {form.avatarUrl ? "Change photo" : "Upload photo"}
+              </Button>
+              {form.avatarUrl && (
+                <button
+                  type="button"
+                  onClick={handleRemoveAvatar}
+                  disabled={uploadingAvatar}
+                  className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-red-600 disabled:opacity-50 dark:text-slate-400"
+                >
+                  <Trash2 className="h-3 w-3" /> Remove
+                </button>
+              )}
+            </div>
+            <input
+              ref={avatarFileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="hidden"
+              onChange={handleAvatarFile}
+            />
+          </div>
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Name *">
               <Input
@@ -252,6 +395,37 @@ export default function LaboursPage() {
                 }
               />
             </Field>
+            <Field label="Place / region">
+              <select
+                value={form.region}
+                onChange={(e) => handleRegionChange(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+              >
+                <option value="">Not set</option>
+                {LABOUR_REGIONS.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {form.region && (
+              <Field label={form.region === "Non-Indian" ? "Country" : "State"}>
+                <Input
+                  placeholder={
+                    form.region === "Non-Indian"
+                      ? "e.g. Nepal, Bangladesh"
+                      : "e.g. Tamil Nadu, Karnataka"
+                  }
+                  value={form.state}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, state: e.target.value }))
+                  }
+                  disabled={form.region === "Kerala"}
+                  className="disabled:bg-slate-100 disabled:text-slate-500 dark:disabled:bg-slate-800"
+                />
+              </Field>
+            )}
           </div>
           <Field label="Details">
             <textarea
@@ -339,11 +513,20 @@ function LabourCard({
     <div className="group flex h-full flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
       <div className="flex items-start gap-3">
         <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${avatarColor(
+          className={`flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-semibold ${avatarColor(
             labour.name
           )}`}
         >
-          {getInitials(labour.name)}
+          {labour.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={labour.avatarUrl}
+              alt={labour.name}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            getInitials(labour.name)
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <Link
@@ -392,6 +575,16 @@ function LabourCard({
           <p className="flex items-center gap-2">
             <Banknote className="h-3.5 w-3.5 shrink-0 text-slate-400" />
             <span>₹{labour.dailyWage.toLocaleString("en-IN")} / day</span>
+          </p>
+        )}
+        {(labour.region || labour.state) && (
+          <p className="flex items-center gap-2">
+            <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+            <span className="truncate">
+              {Array.from(
+                new Set([labour.region, labour.state].filter(Boolean))
+              ).join(" · ")}
+            </span>
           </p>
         )}
         {labour.details && (

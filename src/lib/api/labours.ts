@@ -4,13 +4,20 @@ import api from "@/lib/axios-client";
    Types
    ──────────────────────────────────────────── */
 
+export const LABOUR_REGIONS = ["Kerala", "Non-Kerala", "Non-Indian"] as const;
+export type LabourRegion = (typeof LABOUR_REGIONS)[number];
+
 export interface Labour {
   _id: string;
   name: string;
   phone?: string;
   role?: string;
   dailyWage?: number;
+  region?: LabourRegion;
+  state?: string;
   details?: string;
+  avatarUrl?: string;
+  avatarKey?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -26,7 +33,11 @@ export interface LabourPayload {
   phone?: string;
   role?: string;
   dailyWage?: number;
+  region?: LabourRegion;
+  state?: string;
   details?: string;
+  avatarUrl?: string;
+  avatarKey?: string;
 }
 
 /* ────────────────────────────────────────────
