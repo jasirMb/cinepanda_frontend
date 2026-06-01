@@ -1,4 +1,5 @@
 import api from "@/lib/axios-client";
+import { API_BASE_URL } from "@/lib/api-base";
 
 /* ────────────────────────────────────────────
    Types
@@ -139,10 +140,8 @@ export async function deleteQuotation(
 }
 
 export function getQuotationPdfUrl(id: string): string {
-  const baseURL =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "";
-  // Strip a trailing slash so we don't produce a double slash (//quotations).
-  return `${baseURL.replace(/\/+$/, "")}/quotations/${id}/pdf`;
+  // API_BASE_URL is already protocol-normalized and trailing-slash-stripped.
+  return `${API_BASE_URL}/quotations/${id}/pdf`;
 }
 
 /**

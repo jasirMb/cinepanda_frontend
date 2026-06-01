@@ -1,17 +1,9 @@
 import axios from "axios";
 import { useAuthStore } from "@/store/auth-store";
-
-const baseURL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL;
-
-if (!baseURL) {
-  throw new Error(
-    "Missing API base URL. Set NEXT_PUBLIC_API_BASE_URL in .env.local."
-  );
-}
+import { API_BASE_URL } from "@/lib/api-base";
 
 const api = axios.create({
-  baseURL
+  baseURL: API_BASE_URL
 });
 
 api.interceptors.request.use((config) => {
