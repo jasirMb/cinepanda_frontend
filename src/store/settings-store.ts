@@ -59,6 +59,8 @@ export const SIDEBAR_PRESETS: SidebarPreset[] = [
 export interface ProfileSettings {
   name: string;
   email: string;
+  avatarUrl: string;
+  avatarKey: string;
 }
 
 // The id used for a user-uploaded background image.
@@ -95,7 +97,7 @@ export const useSettingsStore = create<SettingsState>()(
         patternId: "none",
         customPatternUrl: null,
         customPatternKey: null,
-        profile: { name: "", email: "" },
+        profile: { name: "", email: "", avatarUrl: "", avatarKey: "" },
         hasHydrated: false,
         setTheme: (theme) => set({ theme }),
         setBackgroundId: (backgroundId) => set({ backgroundId }),

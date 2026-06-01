@@ -3,6 +3,8 @@ import api from "@/lib/axios-client";
 export interface Profile {
   name: string;
   email: string;
+  avatarUrl?: string;
+  avatarKey?: string;
 }
 
 export interface ProfileResponse {
@@ -13,6 +15,8 @@ export interface ProfileResponse {
 export interface UpdateProfilePayload {
   name?: string;
   email?: string;
+  avatarUrl?: string;
+  avatarKey?: string;
 }
 
 export async function fetchProfile(): Promise<Profile> {

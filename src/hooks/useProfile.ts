@@ -34,7 +34,12 @@ export function useUpdateProfile() {
     mutationFn: (payload: UpdateProfilePayload) => updateProfile(payload),
     onSuccess: (data) => {
       queryClient.setQueryData(profileKeys.me(), data);
-      setProfile({ name: data.name, email: data.email });
+      setProfile({
+        name: data.name,
+        email: data.email,
+        avatarUrl: data.avatarUrl ?? "",
+        avatarKey: data.avatarKey ?? "",
+      });
     },
   });
 }
@@ -51,7 +56,12 @@ export function useProfileHydrator() {
   const setProfile = useSettingsStore((s) => s.setProfile);
   useEffect(() => {
     if (query.data) {
-      setProfile({ name: query.data.name, email: query.data.email });
+      setProfile({
+        name: query.data.name,
+        email: query.data.email,
+        avatarUrl: query.data.avatarUrl ?? "",
+        avatarKey: query.data.avatarKey ?? "",
+      });
     }
   }, [query.data, setProfile]);
 }

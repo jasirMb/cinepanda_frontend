@@ -15,11 +15,20 @@ import {
 } from "@/store/settings-store";
 import { deleteFile, uploadFile } from "@/lib/api/files";
 import { compressImageToLimit } from "@/lib/compress-image";
-
-const MAX_PATTERN_BYTES = 5 * 1024 * 1024; // 5 MB
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
+
+const MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024; // 5 MB
+
+/** Initials fallback for the avatar (e.g. "Jane Doe" → "JD"). */
+function initialsFrom(name: string, email: string): string {
+  const source = name.trim() || email.trim();
+  if (!source) return "A";
+  const parts = source.split(/[\s@.]+/).filter(Boolean);
+  const letters = (parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "");
+  return letters.toUpperCase() || source[0].toUpperCase();
+}
 
 export function SettingsPanel() {
   const theme = useSettingsStore((s) => s.theme);
@@ -50,9 +59,9 @@ export function SettingsPanel() {
 
     // Keep uploads under 5 MB: shrink larger images, refuse if we can't.
     let toUpload = file;
-    if (file.size > MAX_PATTERN_BYTES) {
+    if (file.size > MAX_IMAGE_UPLOAD_BYTES) {
       try {
-        toUpload = await compressImageToLimit(file, MAX_PATTERN_BYTES);
+        toUpload = await compressImageToLimit(file, MAX_IMAGE_UPLOAD_BYTES);
         toast.info("Image was over 5 MB — compressed it before uploading.");
       } catch {
         toast.error("Image is too large. Please pick one under 5 MB.");
@@ -99,6 +108,70 @@ export function SettingsPanel() {
   useProfile();
   const updateProfile = useUpdateProfile();
 
+  const avatarFileRef = useRef<HTMLInputElement>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  async function handleAvatarFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file.");
+      return;
+    }
+
+    let toUpload = file;
+    if (file.size > MAX_IMAGE_UPLOAD_BYTES) {
+      try {
+        toUpload = await compressImageToLimit(file, MAX_IMAGE_UPLOAD_BYTES);
+        toast.info("Image was over 5 MB — compressed it before uploading.");
+      } catch {
+        toast.error("Image is too large. Please pick one under 5 MB.");
+        return;
+      }
+    }
+
+    const previousKey = profile.avatarKey;
+    setUploadingAvatar(true);
+    try {
+      const uploaded = await uploadFile(toUpload, "avatars");
+      updateProfile.mutate(
+        { avatarUrl: uploaded.fileUrl, avatarKey: uploaded.key },
+        {
+          onSuccess: () => {
+            toast.success("Profile photo updated");
+            if (previousKey && previousKey !== uploaded.key) {
+              deleteFile(previousKey).catch(() => {});
+            }
+          },
+          onError: () => {
+            // Saving the profile failed — don't leave the just-uploaded file orphaned.
+            deleteFile(uploaded.key).catch(() => {});
+            toast.error("Failed to save profile photo");
+          },
+        }
+      );
+    } catch {
+      toast.error("Failed to upload photo");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
+  function handleRemoveAvatar() {
+    const key = profile.avatarKey;
+    updateProfile.mutate(
+      { avatarUrl: "", avatarKey: "" },
+      {
+        onSuccess: () => {
+          toast.success("Profile photo removed");
+          if (key) deleteFile(key).catch(() => {});
+        },
+        onError: () => toast.error("Failed to remove photo"),
+      }
+    );
+  }
+
   // Local form state — initialized from the store and kept in sync when the
   // server-backed profile arrives. Separate from the store so the Save button
   // has something to diff against.
@@ -142,7 +215,61 @@ export function SettingsPanel() {
       </div>
 
       <Section title="Profile" icon={<User className="h-3.5 w-3.5" />}>
-        <div className="space-y-2">
+        <div className="space-y-3">
+          {/* Profile photo */}
+          <div className="flex items-center gap-3">
+            <div className="relative h-14 w-14 shrink-0">
+              <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-sm font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                {profile.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={profile.avatarUrl}
+                    alt="Profile photo"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  initialsFrom(nameDraft, emailDraft)
+                )}
+              </div>
+              {uploadingAvatar && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => avatarFileRef.current?.click()}
+                disabled={uploadingAvatar || updateProfile.isPending}
+                className="h-7 px-3 text-xs"
+              >
+                <ImagePlus className="mr-1.5 h-3 w-3" />
+                {profile.avatarUrl ? "Change photo" : "Upload photo"}
+              </Button>
+              {profile.avatarUrl && (
+                <button
+                  type="button"
+                  onClick={handleRemoveAvatar}
+                  disabled={uploadingAvatar || updateProfile.isPending}
+                  className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-red-600 disabled:opacity-50 dark:text-slate-400"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+          <input
+            ref={avatarFileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            className="hidden"
+            onChange={handleAvatarFile}
+          />
+
           <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">
             Display name
             <Input
