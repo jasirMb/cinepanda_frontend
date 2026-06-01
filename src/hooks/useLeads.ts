@@ -13,6 +13,7 @@ import {
 export const leadsKeys = {
   all: ["leads"] as const,
   list: (params?: LeadsListQuery) => [...leadsKeys.all, params] as const,
+  detail: (id: string) => [...leadsKeys.all, "detail", id] as const,
   followup: (params: FollowupQuery) => [...leadsKeys.all, "followup", params] as const
 };
 

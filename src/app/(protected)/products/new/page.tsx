@@ -95,7 +95,7 @@ export default function NewProductPage() {
   const specTemplate = specTemplateQuery.data ?? {};
 
   const productQuery = useQuery({
-    queryKey: ["product", editId],
+    queryKey: productsKeys.detail(editId as string),
     queryFn: () => fetchProduct(editId as string),
     enabled: isEditMode,
   });

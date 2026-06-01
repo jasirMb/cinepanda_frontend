@@ -76,7 +76,7 @@ export default function NewLeadPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const leadQuery = useQuery({
-    queryKey: ["lead", editId],
+    queryKey: leadsKeys.detail(editId as string),
     queryFn: () => fetchLead(editId as string),
     enabled: isEditMode,
   });

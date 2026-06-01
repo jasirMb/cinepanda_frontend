@@ -19,6 +19,7 @@ import {
   Wallet,
   X,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/auth-store";
 import { getSidebarPreset, useSettingsStore } from "@/store/settings-store";
 import { useShellStore } from "@/store/shell-store";
@@ -51,6 +52,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const logout = useAuthStore((s) => s.logout);
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const sidebarId = useSettingsStore((s) => s.sidebarId);
@@ -95,6 +97,9 @@ export function Sidebar() {
 
   function handleLogout() {
     logout();
+    // Drop all cached server data so the next user can't see the previous user's
+    // leads/customers/quotations on a shared device.
+    queryClient.clear();
     router.replace("/login");
   }
 

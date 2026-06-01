@@ -24,5 +24,25 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// On 401/403 (expired or invalid token), clear auth state and bounce to login so the
+// app doesn't get stuck "authenticated" while every request fails.
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    if (
+      typeof window !== "undefined" &&
+      (status === 401 || status === 403) &&
+      useAuthStore.getState().isAuthenticated
+    ) {
+      useAuthStore.getState().logout();
+      if (window.location.pathname !== "/login") {
+        window.location.assign("/login");
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;
 

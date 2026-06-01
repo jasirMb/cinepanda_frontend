@@ -140,8 +140,9 @@ export async function deleteQuotation(
 
 export function getQuotationPdfUrl(id: string): string {
   const baseURL =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL;
-  return `${baseURL}/quotations/${id}/pdf`;
+    process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "";
+  // Strip a trailing slash so we don't produce a double slash (//quotations).
+  return `${baseURL.replace(/\/+$/, "")}/quotations/${id}/pdf`;
 }
 
 /**
