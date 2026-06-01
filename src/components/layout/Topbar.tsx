@@ -97,6 +97,11 @@ const ROUTE_META: { match: (p: string) => boolean; meta: PageMeta }[] = [
   },
 
   {
+    match: (p) => p.startsWith("/labours"),
+    meta: { title: "Labours", subtitle: "Your labour / crew directory" },
+  },
+
+  {
     match: (p) => p === "/projects/new",
     meta: { title: "New Project", subtitle: "Start a new project" },
   },

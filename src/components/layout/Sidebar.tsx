@@ -9,6 +9,7 @@ import {
   ChevronsLeft,
   FileText,
   FolderKanban,
+  HardHat,
   LayoutDashboard,
   LogOut,
   Package,
@@ -36,6 +37,7 @@ const navItems: {
   { href: "/templates", label: "Templates", icon: FileText },
   { href: "/quotations", label: "Quotations", icon: Receipt },
   { href: "/customers", label: "Customers", icon: Users },
+  { href: "/labours", label: "Labours", icon: HardHat },
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/ledger", label: "Ledger", icon: Wallet },
 ];
