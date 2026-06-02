@@ -21,6 +21,7 @@ import { downloadStatementPdf, type StatementRow } from "@/lib/statement-pdf";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog } from "@/components/ui/dialog";
+import { ProjectFilter } from "@/components/ui/project-filter";
 
 type Period = "all" | "week" | "month" | "year" | "custom";
 
@@ -86,7 +87,11 @@ function buildRows(
       if (end && ts > end.getTime()) return false;
       if (projectId) {
         const p = projOf(e.projectId);
-        if (!p || p._id !== projectId) return false;
+        if (projectId === "NONE") {
+          if (p) return false;
+        } else if (!p || p._id !== projectId) {
+          return false;
+        }
       }
       return true;
     })
@@ -222,7 +227,9 @@ export default function PaymentAccountStatementPage({
         rows: pdfRows,
         periodLabel: periodLabelFor(dlgPeriod, r.start, r.end),
         projectLabel: dlgProject
-          ? projects.find((p) => p._id === dlgProject)?.name
+          ? dlgProject === "NONE"
+            ? "Without project"
+            : projects.find((p) => p._id === dlgProject)?.name
           : undefined,
         generatedOn: new Date().toLocaleString("en-GB"),
       });
@@ -322,18 +329,11 @@ export default function PaymentAccountStatementPage({
           </>
         )}
         <FilterField label="Project">
-          <select
+          <ProjectFilter
             value={projectId}
-            onChange={(e) => setProjectId(e.target.value)}
-            className="h-8 max-w-[180px] rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-          >
-            <option value="">All projects</option>
-            {projects.map((p) => (
-              <option key={p._id} value={p._id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+            onChange={setProjectId}
+            options={projects}
+          />
         </FilterField>
         <Button size="sm" onClick={openDownload} className="ml-auto">
           <Download className="h-4 w-4" /> Download statement

@@ -26,6 +26,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog } from "@/components/ui/dialog";
+import { ProjectFilter } from "@/components/ui/project-filter";
 
 type Period = "all" | "week" | "month" | "year" | "custom";
 
@@ -71,7 +72,7 @@ function inr(n: number) {
   return `₹${(n ?? 0).toLocaleString("en-IN")}`;
 }
 function projectName(p: LedgerEntryPopulated["projectId"]): string {
-  return p && typeof p === "object" ? p.clientName : "—";
+  return p && typeof p === "object" ? p.clientName : "No project";
 }
 function accountName(a: LedgerEntryPopulated["paymentAccountId"]): string | null {
   return a && typeof a === "object" ? a.name : null;
@@ -141,7 +142,12 @@ export default function VendorDetailPage({
         if (end && ts > end.getTime()) return false;
         if (fProject) {
           const p = e.projectId;
-          if (!(p && typeof p === "object" && p._id === fProject)) return false;
+          const hasProj = p && typeof p === "object";
+          if (fProject === "NONE") {
+            if (hasProj) return false;
+          } else if (!(hasProj && p._id === fProject)) {
+            return false;
+          }
         }
         return true;
       })
@@ -212,7 +218,12 @@ export default function VendorDetailPage({
           if (end && ts > end.getTime()) return false;
           if (dlgProject) {
             const p = e.projectId;
-            if (!(p && typeof p === "object" && p._id === dlgProject)) return false;
+            const hasProj = p && typeof p === "object";
+            if (dlgProject === "NONE") {
+              if (hasProj) return false;
+            } else if (!(hasProj && p._id === dlgProject)) {
+              return false;
+            }
           }
           return true;
         })
@@ -243,7 +254,9 @@ export default function VendorDetailPage({
         rows: pdfRows,
         periodLabel: periodLabelFor(dlgPeriod, start, end),
         projectLabel: dlgProject
-          ? projectList.find((p) => p._id === dlgProject)?.name
+          ? dlgProject === "NONE"
+            ? "Without project"
+            : projectList.find((p) => p._id === dlgProject)?.name
           : undefined,
         generatedOn: new Date().toLocaleString("en-GB"),
       });
@@ -348,18 +361,11 @@ export default function VendorDetailPage({
           </>
         )}
         <FilterField label="Project">
-          <select
+          <ProjectFilter
             value={fProject}
-            onChange={(e) => setFProject(e.target.value)}
-            className="h-8 max-w-[180px] rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-          >
-            <option value="">All projects</option>
-            {projectList.map((p) => (
-              <option key={p._id} value={p._id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+            onChange={setFProject}
+            options={projectList}
+          />
         </FilterField>
         <span className="ml-auto self-center text-xs text-slate-500 dark:text-slate-400">
           {filteredEntries.length} of {entries.length}
@@ -370,7 +376,7 @@ export default function VendorDetailPage({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Stat icon={<Banknote className="h-4 w-4" />} label="Total paid" value={inr(total)} accent />
         <Stat icon={<Receipt className="h-4 w-4" />} label="Entries" value={String(filteredEntries.length)} />
-        <Stat icon={<FolderKanban className="h-4 w-4" />} label="Projects" value={String(byProject.filter((p) => p.name !== "—").length)} />
+        <Stat icon={<FolderKanban className="h-4 w-4" />} label="Projects" value={String(byProject.filter((p) => p.name !== "No project").length)} />
       </div>
 
       {/* By project — horizontal slider */}

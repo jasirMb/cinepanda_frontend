@@ -33,6 +33,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ProjectFilter } from "@/components/ui/project-filter";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -486,18 +487,12 @@ export default function LabourDetailPage({
                   className="pl-9"
                 />
               </div>
-              <select
+              <ProjectFilter
                 value={logProject}
-                onChange={(e) => setLogProject(e.target.value)}
-                className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 sm:w-56"
-              >
-                <option value="">All projects</option>
-                {byProject.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+                onChange={setLogProject}
+                options={byProject.map((p) => ({ _id: p.id, name: p.name }))}
+                includeNone={false}
+              />
             </div>
             {selectedProject && (
               <p className="text-xs text-slate-600 dark:text-slate-300">
