@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Area,
@@ -36,6 +36,14 @@ import { useLedger, useLedgerSummary } from "@/hooks/useLedger";
 import { useFollowupLeads } from "@/hooks/useLeads";
 import { useProjects } from "@/hooks/useProjects";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useSettingsStore } from "@/store/settings-store";
 import type { Lead } from "@/lib/api/leads";
 import type {
@@ -100,6 +108,118 @@ function toIsoDate(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
+/* ── Cash-flow period filter ──────────────────────────────────────────────── */
+
+type CashPeriod = "week" | "month" | "6months" | "year" | "all" | "custom";
+
+const CASH_PERIODS: { value: CashPeriod; label: string }[] = [
+  { value: "week", label: "Last 7 days" },
+  { value: "month", label: "Last 30 days" },
+  { value: "6months", label: "Last 6 months" },
+  { value: "year", label: "Last 1 year" },
+  { value: "all", label: "All time" },
+  { value: "custom", label: "Custom" },
+];
+
+const CASH_PERIOD_LABEL: Record<CashPeriod, string> = {
+  week: "last 7 days",
+  month: "last 30 days",
+  "6months": "last 6 months",
+  year: "last 1 year",
+  all: "all time",
+  custom: "custom range",
+};
+
+/** Date window for a cash-flow period. null start/end = unbounded (all time). */
+function cashRange(
+  period: CashPeriod,
+  from: string,
+  to: string
+): { start: Date | null; end: Date | null } {
+  if (period === "all") return { start: null, end: null };
+  if (period === "custom") {
+    return {
+      start: from ? new Date(from) : null,
+      end: to ? new Date(`${to}T23:59:59`) : null,
+    };
+  }
+  const now = new Date();
+  const start = new Date(now);
+  if (period === "week") start.setDate(now.getDate() - 7);
+  else if (period === "month") start.setDate(now.getDate() - 30);
+  else if (period === "6months") start.setMonth(now.getMonth() - 6);
+  else start.setFullYear(now.getFullYear() - 1); // year
+  start.setHours(0, 0, 0, 0);
+  return { start, end: now };
+}
+
+/** Bucket by day for short spans, otherwise by month. */
+function cashGranularity(start: Date | null, end: Date | null): "day" | "month" {
+  if (!start || !end) return "month";
+  const days = (end.getTime() - start.getTime()) / 86_400_000;
+  return days <= 62 ? "day" : "month";
+}
+
+function dayKey(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+}
+function shortDay(d: Date) {
+  return d.toLocaleString("en-US", { day: "2-digit", month: "short" });
+}
+
+interface CashPoint {
+  key: string;
+  month: string; // axis label (kept name "month" to match the chart)
+  income: number;
+  expense: number;
+  profit: number;
+}
+
+/** Build an income/expense/profit series bucketed by day or month over a range. */
+function buildCashSeries(
+  entries: LedgerEntryPopulated[],
+  start: Date | null,
+  end: Date | null,
+  granularity: "day" | "month"
+): CashPoint[] {
+  // Resolve an effective window: fall back to the data's own min/max ("all time").
+  const times = entries.map((e) => new Date(e.entryDate).getTime());
+  const effEnd = end ?? (times.length ? new Date(Math.max(...times)) : new Date());
+  const effStart =
+    start ?? (times.length ? new Date(Math.min(...times)) : effEnd);
+
+  const base: Record<string, CashPoint> = {};
+  const cursor = new Date(effStart);
+  if (granularity === "day") {
+    cursor.setHours(0, 0, 0, 0);
+    while (cursor <= effEnd) {
+      const k = dayKey(cursor);
+      base[k] = { key: k, month: shortDay(cursor), income: 0, expense: 0, profit: 0 };
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  } else {
+    cursor.setDate(1);
+    cursor.setHours(0, 0, 0, 0);
+    while (cursor <= effEnd) {
+      const k = monthKey(cursor);
+      base[k] = { key: k, month: shortMonth(cursor), income: 0, expense: 0, profit: 0 };
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+  }
+
+  for (const e of entries) {
+    const d = new Date(e.entryDate);
+    const k = granularity === "day" ? dayKey(d) : monthKey(d);
+    const bucket = base[k];
+    if (!bucket) continue;
+    if (e.entryType === "INCOME") bucket.income += e.amount;
+    else if (e.entryType === "EXPENSE") bucket.expense += e.amount;
+  }
+  return Object.values(base).map((b) => ({ ...b, profit: b.income - b.expense }));
+}
+
 /* ────────────────────────────────────────────
    Design tokens (Zoho Books-inspired)
    ──────────────────────────────────────────── */
@@ -156,6 +276,39 @@ export default function DashboardPage() {
 
   const data = overviewQuery.data?.data;
 
+  // ── Cash Flow widget: date-period filter ──────────────────────────────────
+  const [cashPeriod, setCashPeriod] = useState<CashPeriod>("6months");
+  const [cashFrom, setCashFrom] = useState("");
+  const [cashTo, setCashTo] = useState("");
+
+  const cashWindow = useMemo(
+    () => cashRange(cashPeriod, cashFrom, cashTo),
+    [cashPeriod, cashFrom, cashTo]
+  );
+  const cashGran = useMemo(
+    () => cashGranularity(cashWindow.start, cashWindow.end),
+    [cashWindow]
+  );
+  const cashflowQuery = useLedger(
+    cashWindow.start && cashWindow.end
+      ? {
+          startDate: toIsoDate(cashWindow.start),
+          endDate: toIsoDate(cashWindow.end),
+        }
+      : {}
+  );
+  const cashflowSeries = useMemo(
+    () =>
+      buildCashSeries(
+        cashflowQuery.data?.data ?? [],
+        cashWindow.start,
+        cashWindow.end,
+        cashGran
+      ),
+    [cashflowQuery.data?.data, cashWindow, cashGran]
+  );
+  const hasCashflowData = cashflowSeries.some((m) => m.income || m.expense);
+
   const monthlySeries = useMemo(() => {
     const base: Record<
       string,
@@ -182,7 +335,6 @@ export default function DashboardPage() {
     }));
   }, [ledgerQuery.data?.data, sixMonthsAgo]);
 
-  const hasMonthlyData = monthlySeries.some((m) => m.income || m.expense);
 
   const projectStatusData = useMemo(
     () =>
@@ -346,19 +498,53 @@ export default function DashboardPage() {
       {/* Cash flow chart */}
       <SectionCard
         title="Cash Flow"
-        subtitle="Income, expense and profit — last 6 months"
+        subtitle={`Income, expense and profit — ${CASH_PERIOD_LABEL[cashPeriod]}`}
         action={
-          <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-            6 months
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            {cashPeriod === "custom" && (
+              <>
+                <div className="w-[130px]">
+                  <DatePicker
+                    value={cashFrom}
+                    onChange={setCashFrom}
+                    placeholder="From"
+                  />
+                </div>
+                <div className="w-[130px]">
+                  <DatePicker
+                    value={cashTo}
+                    onChange={setCashTo}
+                    placeholder="To"
+                  />
+                </div>
+              </>
+            )}
+            <div className="w-[150px]">
+              <Select
+                value={cashPeriod}
+                onValueChange={(v) => v && setCashPeriod(v as CashPeriod)}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CASH_PERIODS.map((p) => (
+                    <SelectItem key={p.value} value={p.value}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         }
       >
-        {ledgerQuery.isLoading ? (
+        {cashflowQuery.isLoading ? (
           <Skeleton className="h-[280px] rounded-lg" />
-        ) : hasMonthlyData ? (
+        ) : hasCashflowData ? (
           <ResponsiveContainer width="100%" height={280}>
             <AreaChart
-              data={monthlySeries}
+              data={cashflowSeries}
               margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
             >
               <defs>
@@ -424,7 +610,7 @@ export default function DashboardPage() {
             </AreaChart>
           </ResponsiveContainer>
         ) : (
-          <EmptyBlock label="No ledger activity in last 6 months" />
+          <EmptyBlock label={`No ledger activity — ${CASH_PERIOD_LABEL[cashPeriod]}`} />
         )}
       </SectionCard>
 
