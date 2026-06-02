@@ -174,18 +174,15 @@ export default function NewProductPage() {
     if (key) deleteFile(key).catch(() => {});
   }
 
-  const [initialLoaded, setInitialLoaded] = useState(false);
+  // Clear subcategory/specs only when the user actually SWITCHES category from
+  // an existing one — never on the initial prefill (prev is empty then), so an
+  // edited product keeps its subcategory + specs.
+  const prevCategoryRef = useRef("");
   useEffect(() => {
-    if (productQuery.data && !initialLoaded) {
-      setInitialLoaded(true);
-      return;
-    }
-    if (initialLoaded || !isEditMode) {
-      setFormValues((prev) => ({
-        ...prev,
-        subcategory: "",
-        specifications: {},
-      }));
+    const prev = prevCategoryRef.current;
+    prevCategoryRef.current = formValues.category;
+    if (prev && prev !== formValues.category) {
+      setFormValues((p) => ({ ...p, subcategory: "", specifications: {} }));
     }
   }, [formValues.category]);
 
@@ -291,7 +288,7 @@ export default function NewProductPage() {
       return (
         <Select
           value={String(value) || undefined}
-          onValueChange={(v) => handleSpecChange(key, v)}
+          onValueChange={(v) => v && handleSpecChange(key, v)}
         >
           <SelectTrigger>
             <SelectValue placeholder={`Select ${field.label}`} />
@@ -459,7 +456,7 @@ export default function NewProductPage() {
             <Field label="Category *" error={formErrors.category}>
               <Select
                 value={formValues.category || undefined}
-                onValueChange={(v) => handleChange("category", v)}
+                onValueChange={(v) => v && handleChange("category", v)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select category" />
@@ -476,7 +473,7 @@ export default function NewProductPage() {
             <Field label="Subcategory *" error={formErrors.subcategory}>
               <Select
                 value={formValues.subcategory || undefined}
-                onValueChange={(v) => handleChange("subcategory", v)}
+                onValueChange={(v) => v && handleChange("subcategory", v)}
               >
                 <SelectTrigger disabled={!formValues.category}>
                   <SelectValue placeholder="Select subcategory" />
@@ -512,7 +509,7 @@ export default function NewProductPage() {
           <Field label="Unit *" error={formErrors.unit}>
             <Select
               value={formValues.unit || undefined}
-              onValueChange={(v) => handleChange("unit", v)}
+              onValueChange={(v) => v && handleChange("unit", v)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select unit" />
