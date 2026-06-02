@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Building2, Pencil, Phone, Plus, Search, Trash2, X } from "lucide-react";
@@ -308,9 +309,12 @@ export default function VendorsPage() {
                 <Building2 className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
+                <Link
+                  href={`/vendors/${v._id}`}
+                  className="block truncate text-sm font-semibold text-slate-900 hover:text-cine-primary hover:underline dark:text-slate-50"
+                >
                   {v.name}
-                </h3>
+                </Link>
                 <div className="space-y-0.5 text-xs text-slate-500 dark:text-slate-400">
                   {v.phone && (
                     <p className="flex items-center gap-1">

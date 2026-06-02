@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Banknote, CreditCard, Pencil, Plus, Search, Trash2, X } from "lucide-react";
@@ -300,9 +301,12 @@ export default function PaymentAccountsPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  <Link
+                    href={`/payment-accounts/${a._id}`}
+                    className="truncate text-sm font-semibold text-slate-900 hover:text-cine-primary hover:underline dark:text-slate-50"
+                  >
                     {a.name}
-                  </h3>
+                  </Link>
                   <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     {a.type}
                   </span>

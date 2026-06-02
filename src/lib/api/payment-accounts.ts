@@ -42,6 +42,13 @@ export async function fetchPaymentAccounts(): Promise<PaymentAccountsListRespons
   return data;
 }
 
+export async function fetchPaymentAccount(id: string): Promise<PaymentAccount> {
+  const { data } = await api.get<{ success: boolean; data: PaymentAccount }>(
+    `/payment-accounts/${id}`
+  );
+  return data.data;
+}
+
 export async function createPaymentAccount(
   payload: PaymentAccountPayload
 ): Promise<PaymentAccount> {

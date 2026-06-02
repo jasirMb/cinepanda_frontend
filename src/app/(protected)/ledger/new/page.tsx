@@ -77,6 +77,12 @@ export default function NewLedgerEntryPage() {
     onError: () => toast.error("Failed to create entry"),
   });
 
+  // "Paid through" options filtered to match the selected payment method.
+  const accountType = accountTypeForMethod(form.paymentMethod);
+  const visibleAccounts = accountType
+    ? accounts.filter((a) => a.type === accountType)
+    : accounts;
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.category.trim() || !form.description.trim() || !form.entryDate) {
@@ -217,12 +223,21 @@ export default function NewLedgerEntryPage() {
           <Field label="Payment Method">
             <Select
               value={form.paymentMethod || "NONE"}
-              onValueChange={(v) =>
-                setForm((f) => ({
-                  ...f,
-                  paymentMethod: v === "NONE" ? ("" as PaymentMethod | "") : (v as PaymentMethod),
-                }))
-              }
+              onValueChange={(v) => {
+                const method =
+                  v === "NONE" ? ("" as PaymentMethod | "") : (v as PaymentMethod);
+                setForm((f) => {
+                  const t = accountTypeForMethod(method);
+                  const acc = accounts.find((a) => a._id === f.paymentAccountId);
+                  // Drop the selected account if it no longer matches the method.
+                  const keep = !f.paymentAccountId || !t || acc?.type === t;
+                  return {
+                    ...f,
+                    paymentMethod: method,
+                    paymentAccountId: keep ? f.paymentAccountId : "",
+                  };
+                });
+              }}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select method" />
@@ -279,34 +294,42 @@ export default function NewLedgerEntryPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="NONE">Not specified</SelectItem>
-                {accounts.map((a) => (
+                {visibleAccounts.map((a) => (
                   <SelectItem key={a._id} value={a._id}>
                     {a.name} — {a.type}
                   </SelectItem>
                 ))}
+                {visibleAccounts.length === 0 && (
+                  <div className="px-2 py-1.5 text-xs text-slate-500">
+                    No matching accounts. Add one under Payment Accounts.
+                  </div>
+                )}
               </SelectContent>
             </Select>
           </Field>
           {form.entryType === "EXPENSE" && (
             <Field label="Goods or Service">
-              <Select
-                value={form.itemType || "NONE"}
-                onValueChange={(v) =>
-                  setForm((f) => ({
-                    ...f,
-                    itemType: v === "NONE" ? "" : (v as "GOODS" | "SERVICE"),
-                  }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NONE">Not specified</SelectItem>
-                  <SelectItem value="GOODS">Goods</SelectItem>
-                  <SelectItem value="SERVICE">Service</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                {(["GOODS", "SERVICE"] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        itemType: f.itemType === opt ? "" : opt,
+                      }))
+                    }
+                    className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition ${
+                      form.itemType === opt
+                        ? "border-cine-primary bg-cine-primary/10 text-cine-primary"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    {opt === "GOODS" ? "Goods" : "Service"}
+                  </button>
+                ))}
+              </div>
             </Field>
           )}
         </div>
@@ -490,6 +513,22 @@ function methodForType(type: string): PaymentMethod {
       return "UPI";
     default:
       return "OTHER";
+  }
+}
+
+// Which account type a payment method maps to (for filtering "Paid through").
+// null = no filter (show all accounts).
+function accountTypeForMethod(method: string): string | null {
+  switch (method) {
+    case "BANK_TRANSFER":
+    case "CHEQUE":
+      return "BANK";
+    case "CASH":
+      return "CASH";
+    case "UPI":
+      return "UPI";
+    default:
+      return null;
   }
 }
 

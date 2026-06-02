@@ -94,6 +94,8 @@ export interface LedgerListQuery {
   category?: string;
   paymentStatus?: PaymentStatus;
   approvalStatus?: ApprovalStatus;
+  vendorId?: string;
+  paymentAccountId?: string;
 }
 
 export interface CreateLedgerPayload {

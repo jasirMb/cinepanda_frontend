@@ -43,6 +43,13 @@ export async function fetchVendors(): Promise<VendorsListResponse> {
   return data;
 }
 
+export async function fetchVendor(id: string): Promise<Vendor> {
+  const { data } = await api.get<{ success: boolean; data: Vendor }>(
+    `/vendors/${id}`
+  );
+  return data.data;
+}
+
 export async function createVendor(payload: VendorPayload): Promise<Vendor> {
   const { data } = await api.post<{ success: boolean; data: Vendor }>(
     "/vendors",
