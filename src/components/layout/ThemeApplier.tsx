@@ -13,6 +13,7 @@ export function ThemeApplier() {
   const backgroundId = useSettingsStore((s) => s.backgroundId);
   const patternId = useSettingsStore((s) => s.patternId);
   const customPatternUrl = useSettingsStore((s) => s.customPatternUrl);
+  const viewMode = useSettingsStore((s) => s.viewMode);
   const hasHydrated = useSettingsStore((s) => s.hasHydrated);
 
   useEffect(() => {
@@ -21,6 +22,20 @@ export function ThemeApplier() {
     if (theme === "dark") root.classList.add("dark");
     else root.classList.remove("dark");
   }, [theme, hasHydrated]);
+
+  // "Desktop" forces the wide layout even on phones (request-desktop-site);
+  // "auto"/"mobile" use the normal responsive viewport.
+  useEffect(() => {
+    if (!hasHydrated) return;
+    const meta = document.querySelector('meta[name="viewport"]');
+    if (!meta) return;
+    meta.setAttribute(
+      "content",
+      viewMode === "desktop"
+        ? "width=1280"
+        : "width=device-width, initial-scale=1, viewport-fit=cover"
+    );
+  }, [viewMode, hasHydrated]);
 
   useEffect(() => {
     if (!hasHydrated) return;

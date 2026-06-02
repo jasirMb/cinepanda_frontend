@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { useShellStore } from "@/store/shell-store";
 import { useSettingsStore } from "@/store/settings-store";
-import { InstallButton } from "@/components/layout/InstallButton";
 
 function avatarInitials(name: string, email: string): string {
   const source = name.trim() || email.trim();
@@ -21,7 +20,7 @@ function TopbarAvatar() {
   return (
     <button
       type="button"
-      onClick={openSettings}
+      onClick={() => openSettings()}
       title="Settings"
       aria-label="Open settings"
       className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-xs font-semibold text-slate-600 transition hover:ring-2 hover:ring-cine-primary/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
@@ -174,8 +173,7 @@ export function Topbar() {
           )}
         </div>
       </div>
-      <div className="ml-auto flex items-center gap-3">
-        <InstallButton />
+      <div className="ml-auto flex items-center gap-2">
         <TopbarAvatar />
       </div>
     </header>

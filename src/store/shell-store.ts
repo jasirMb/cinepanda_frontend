@@ -8,7 +8,9 @@ interface ShellState {
   closeMobileSidebar: () => void;
   toggleMobileSidebar: () => void;
   settingsOpen: boolean;
-  openSettings: () => void;
+  // Which tab to open Settings to (consumed once by the panel on open).
+  settingsTab: "profile" | "appearance" | "app" | null;
+  openSettings: (tab?: "profile" | "appearance" | "app") => void;
   closeSettings: () => void;
 }
 
@@ -19,6 +21,7 @@ export const useShellStore = create<ShellState>((set) => ({
   toggleMobileSidebar: () =>
     set((s) => ({ mobileSidebarOpen: !s.mobileSidebarOpen })),
   settingsOpen: false,
-  openSettings: () => set({ settingsOpen: true }),
+  settingsTab: null,
+  openSettings: (tab) => set({ settingsOpen: true, settingsTab: tab ?? null }),
   closeSettings: () => set({ settingsOpen: false }),
 }));

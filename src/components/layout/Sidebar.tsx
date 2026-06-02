@@ -212,7 +212,7 @@ export function Sidebar() {
           type="button"
           title="Settings"
           aria-label="Settings"
-          onClick={openSettings}
+          onClick={() => openSettings()}
           className={clsx(
             "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white",
             !showExpanded && "justify-center px-2"

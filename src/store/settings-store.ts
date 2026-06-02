@@ -66,6 +66,10 @@ export interface ProfileSettings {
 // The id used for a user-uploaded background image.
 export const CUSTOM_PATTERN_ID = "custom";
 
+// Layout/view override — "desktop" forces the wide layout on phones
+// (like "request desktop site"); "auto" follows the actual device.
+export type ViewMode = "auto" | "desktop" | "mobile";
+
 interface SettingsState {
   theme: Theme;
   backgroundId: string;
@@ -73,6 +77,7 @@ interface SettingsState {
   patternId: string;
   customPatternUrl: string | null;
   customPatternKey: string | null;
+  viewMode: ViewMode;
   profile: ProfileSettings;
   hasHydrated: boolean;
   setTheme: (t: Theme) => void;
@@ -80,6 +85,7 @@ interface SettingsState {
   setSidebarId: (id: string) => void;
   setPatternId: (id: string) => void;
   setCustomPattern: (url: string | null, key: string | null) => void;
+  setViewMode: (m: ViewMode) => void;
   setProfile: (p: Partial<ProfileSettings>) => void;
 }
 
@@ -97,6 +103,7 @@ export const useSettingsStore = create<SettingsState>()(
         patternId: "none",
         customPatternUrl: null,
         customPatternKey: null,
+        viewMode: "auto",
         profile: { name: "", email: "", avatarUrl: "", avatarKey: "" },
         hasHydrated: false,
         setTheme: (theme) => set({ theme }),
@@ -105,6 +112,7 @@ export const useSettingsStore = create<SettingsState>()(
         setPatternId: (patternId) => set({ patternId }),
         setCustomPattern: (customPatternUrl, customPatternKey) =>
           set({ customPatternUrl, customPatternKey }),
+        setViewMode: (viewMode) => set({ viewMode }),
         setProfile: (p) =>
           set((s) => ({ profile: { ...s.profile, ...p } })),
       };
@@ -118,6 +126,7 @@ export const useSettingsStore = create<SettingsState>()(
         patternId: state.patternId,
         customPatternUrl: state.customPatternUrl,
         customPatternKey: state.customPatternKey,
+        viewMode: state.viewMode,
         profile: state.profile,
       }),
       onRehydrateStorage: () => () => {

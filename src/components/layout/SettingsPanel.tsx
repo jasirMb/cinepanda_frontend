@@ -8,6 +8,7 @@ import {
   Moon,
   Palette,
   SlidersHorizontal,
+  Smartphone,
   Sun,
   Trash2,
   User,
@@ -28,6 +29,7 @@ import { compressImageToLimit } from "@/lib/compress-image";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { InstallSection } from "@/components/layout/InstallSection";
 import { useShellStore } from "@/store/shell-store";
 import { useProfile, useUpdateProfile } from "@/hooks/useProfile";
 
@@ -123,7 +125,11 @@ export function SettingsPanel() {
   const avatarFileRef = useRef<HTMLInputElement>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
-  const [tab, setTab] = useState<"profile" | "appearance">("profile");
+  // Open to the tab requested via openSettings(tab) (e.g. the install icon → "app").
+  const requestedTab = useShellStore.getState().settingsTab;
+  const [tab, setTab] = useState<"profile" | "appearance" | "app">(
+    requestedTab ?? "profile"
+  );
 
   async function handleAvatarFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -246,6 +252,12 @@ export function SettingsPanel() {
             onClick={() => setTab("appearance")}
             icon={<Palette className="h-4 w-4" />}
             label="Appearance"
+          />
+          <RailTab
+            active={tab === "app"}
+            onClick={() => setTab("app")}
+            icon={<Smartphone className="h-4 w-4" />}
+            label="App"
           />
         </nav>
       </div>
@@ -573,6 +585,16 @@ export function SettingsPanel() {
         </p>
       </Section>
       </div>
+      )}
+
+      {tab === "app" && (
+        <div className="space-y-4">
+          <TabHeader
+            title="App"
+            subtitle="Install CinePanda on this device."
+          />
+          <InstallSection />
+        </div>
       )}
       </div>
     </div>
