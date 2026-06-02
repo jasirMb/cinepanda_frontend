@@ -6,7 +6,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { Pencil, Tag, Trash2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Pencil,
+  Tag,
+  Trash2,
+} from "lucide-react";
 
 import { productsKeys, useProducts, useCategories } from "@/hooks/useProducts";
 import { ProductsTable } from "@/components/tables/ProductsTable";
@@ -44,7 +51,7 @@ export default function ProductsPage() {
   const productsParams = useMemo(
     () => ({
       page,
-      limit: 20,
+      limit: 12,
       search: filters.search || undefined,
       category: filters.category || undefined,
       subcategory: filters.subcategory || undefined,
@@ -131,91 +138,78 @@ export default function ProductsPage() {
       ? Object.entries(product.specifications)
       : [];
     return (
-      <div className="group flex h-full flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
-        {/* Header */}
-        <div className="flex items-start gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-cine-primary/10 text-cine-primary">
-            {product.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={product.imageUrl}
-                alt={product.name}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <Tag className="h-4 w-4" />
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              {product.category} · {product.subcategory}
-            </p>
+      <div className="group flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
+        {/* Image banner */}
+        <div className="relative flex h-32 w-full items-center justify-center overflow-hidden bg-slate-100 dark:bg-slate-800">
+          {product.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={product.imageUrl}
+              alt={product.name}
+              className="h-full w-full object-cover transition duration-200 group-hover:scale-105"
+            />
+          ) : (
+            <Tag className="h-8 w-8 text-slate-300 dark:text-slate-600" />
+          )}
+          <span className="absolute left-2 top-2 rounded-md bg-white/85 px-2 py-0.5 text-[10px] font-semibold text-slate-700 backdrop-blur dark:bg-slate-900/80 dark:text-slate-200">
+            {product.category}
+          </span>
+        </div>
+
+        <div className="flex flex-1 flex-col gap-2.5 p-4">
+          {/* Title */}
+          <div className="min-w-0">
             <h3 className="truncate text-base font-semibold text-slate-900 dark:text-slate-50">
               {product.name}
             </h3>
+            <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+              {product.subcategory}
+              {(product.brand || product.productModel) &&
+                ` · ${[product.brand, product.productModel].filter(Boolean).join(" ")}`}
+            </p>
           </div>
-        </div>
 
-        {/* Price */}
-        <div className="flex items-baseline justify-between">
-          <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
-            {product.price.toLocaleString("en-IN", {
-              style: "currency",
-              currency: "INR",
-              maximumFractionDigits: 0,
-            })}
-          </p>
-          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-            {product.unit}
-          </span>
-        </div>
-
-        {/* Brand / Model badges */}
-        {(product.brand || product.productModel) && (
-          <div className="flex flex-wrap gap-1.5">
-            {product.brand && (
-              <span className="rounded-md bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">
-                {product.brand}
-              </span>
-            )}
-            {product.productModel && (
-              <span className="rounded-md bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
-                {product.productModel}
-              </span>
-            )}
+          {/* Price */}
+          <div className="flex items-baseline justify-between">
+            <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
+              {product.price.toLocaleString("en-IN", {
+                style: "currency",
+                currency: "INR",
+                maximumFractionDigits: 0,
+              })}
+            </p>
+            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+              {product.unit}
+            </span>
           </div>
-        )}
 
-        {product.description && (
-          <p className="line-clamp-2 text-xs text-slate-600 dark:text-slate-400">
-            {product.description}
-          </p>
-        )}
+          {specs.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {specs.slice(0, 3).map(([key, value]) => (
+                <span
+                  key={key}
+                  className="truncate rounded-md bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                >
+                  {key}: {String(value)}
+                </span>
+              ))}
+              {specs.length > 3 && (
+                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                  +{specs.length - 3}
+                </span>
+              )}
+            </div>
+          )}
 
-        {specs.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {specs.slice(0, 4).map(([key, value]) => (
-              <span
-                key={key}
-                className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-              >
-                {key}: {String(value)}
-              </span>
-            ))}
-            {specs.length > 4 && (
-              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                +{specs.length - 4} more
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="mt-auto flex items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-          <span className="text-[10px] text-slate-500 dark:text-slate-400">
-            Added {new Date(product.createdAt).toLocaleDateString()}
-          </span>
-          <div className="flex gap-1.5">
+          {/* Footer */}
+          <div className="mt-auto flex items-center justify-end gap-1.5 border-t border-slate-100 pt-3 dark:border-slate-800">
+            <Link
+              href={`/products/${product._id}`}
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            >
+              <Eye className="h-3 w-3" />
+              View
+            </Link>
             <Link
               href={`/products/new?edit=${product._id}`}
               className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
@@ -346,26 +340,42 @@ export default function ProductsPage() {
 
       {/* Pagination */}
       {pagination && pagination.totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!pagination.hasPrev}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            Previous
-          </Button>
-          <span className="text-sm text-slate-700 dark:text-slate-300">
-            Page {pagination.page} of {pagination.totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!pagination.hasNext}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Next
-          </Button>
+        <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-200 pt-3 text-sm dark:border-slate-800 sm:flex-row">
+          <p className="text-slate-500 dark:text-slate-400">
+            Showing{" "}
+            <span className="font-medium text-slate-700 dark:text-slate-300">
+              {(pagination.page - 1) * 12 + 1}–
+              {Math.min(pagination.page * 12, pagination.total)}
+            </span>{" "}
+            of{" "}
+            <span className="font-medium text-slate-700 dark:text-slate-300">
+              {pagination.total}
+            </span>{" "}
+            products
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              disabled={!pagination.hasPrev}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              <ChevronLeft className="h-4 w-4" /> Prev
+            </Button>
+            <span className="px-1 text-slate-600 dark:text-slate-300">
+              Page {pagination.page} of {pagination.totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              disabled={!pagination.hasNext}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
 

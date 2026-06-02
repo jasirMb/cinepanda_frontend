@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Package, Pencil, Trash2 } from "lucide-react";
+import { Eye, Package, Pencil, Trash2 } from "lucide-react";
 import { type Product } from "@/lib/api/products";
 
 interface ProductsTableProps {
@@ -57,12 +57,13 @@ export function ProductsTable({ products, onDelete }: ProductsTableProps) {
                       )}
                     </span>
                     <div className="min-w-0">
-                      <p
-                        className="truncate font-medium text-slate-900 dark:text-slate-50"
+                      <Link
+                        href={`/products/${product._id}`}
+                        className="block truncate font-medium text-slate-900 hover:text-cine-primary hover:underline dark:text-slate-50"
                         title={product.name}
                       >
                         {product.name}
-                      </p>
+                      </Link>
                       {product.subcategory && (
                         <p className="truncate text-xs text-slate-400">
                           {product.subcategory}
@@ -116,6 +117,13 @@ export function ProductsTable({ products, onDelete }: ProductsTableProps) {
                 {/* Actions */}
                 <td className="px-4 py-2.5 text-right">
                   <div className="flex items-center justify-end gap-1">
+                    <Link
+                      href={`/products/${product._id}`}
+                      aria-label="View product"
+                      className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-cine-primary dark:hover:bg-slate-800"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                    </Link>
                     <Link
                       href={`/products/new?edit=${product._id}`}
                       aria-label="Edit product"
