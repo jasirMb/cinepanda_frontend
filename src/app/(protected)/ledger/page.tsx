@@ -12,7 +12,6 @@ import {
   Clock,
   Pencil,
   Plus,
-  RefreshCw,
   Scale,
   Trash2,
   Wallet,
@@ -31,7 +30,6 @@ import {
   deleteLedgerEntry,
   approveLedgerEntry,
   rejectLedgerEntry,
-  generateRecurringEntries,
   type LedgerEntryPopulated,
   type LedgerListQuery,
   type EntryType,
@@ -196,15 +194,6 @@ export default function LedgerPage() {
     onError: () => toast.error("Failed to reject entry"),
   });
 
-  const recurringMutation = useMutation({
-    mutationFn: generateRecurringEntries,
-    onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ledgerKeys.all });
-      toast.success(`Generated ${res.count} recurring entries`);
-    },
-    onError: () => toast.error("Failed to generate recurring entries"),
-  });
-
   const hasFilters = Boolean(
     filters.entryType ||
       filters.paymentStatus ||
@@ -233,20 +222,6 @@ export default function LedgerPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            disabled={recurringMutation.isPending}
-            onClick={() => recurringMutation.mutate()}
-          >
-            <RefreshCw
-              className={`h-3.5 w-3.5 ${
-                recurringMutation.isPending ? "animate-spin" : ""
-              }`}
-            />
-            {recurringMutation.isPending ? "Generating..." : "Generate Recurring"}
-          </Button>
           <Link href="/ledger/new">
             <Button className="gap-1.5">
               <Plus className="h-4 w-4" />
