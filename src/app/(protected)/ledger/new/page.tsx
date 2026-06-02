@@ -20,6 +20,7 @@ import {
 } from "@/lib/api/ledger";
 import type { ProjectPopulated } from "@/lib/api/projects";
 import type { Customer } from "@/lib/api/customers";
+import { LedgerLabourSession } from "@/components/labour/LedgerLabourSession";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -406,6 +407,18 @@ export default function NewLedgerEntryPage() {
             </Select>
           </Field>
         </div>
+
+        {/* Labour-expense shortcut: log a work session for the project's labours */}
+        {form.entryType === "EXPENSE" &&
+          form.category === "LABOUR" &&
+          form.projectId && (
+            <LedgerLabourSession
+              projectId={form.projectId}
+              workDate={form.entryDate}
+              amount={form.amount}
+              onLogged={() => router.push("/ledger")}
+            />
+          )}
 
         {/* Recurring toggle */}
         <div className="flex items-center gap-3">
