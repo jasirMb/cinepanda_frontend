@@ -457,7 +457,7 @@ export default function TemplatesPage() {
     const budgetUsed = budgetNum > 0 ? Math.min(100, (grandTotal / budgetNum) * 100) : 0;
 
     return (
-      <div className="space-y-4">
+      <div className="max-w-4xl space-y-4">
         {/* Header */}
         <div>
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
