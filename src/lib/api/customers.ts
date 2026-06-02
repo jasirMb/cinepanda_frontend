@@ -52,3 +52,54 @@ export async function fetchCustomer(id: string): Promise<Customer> {
   );
   return data.data;
 }
+
+/* ────────────────────────────────────────────
+   Customer overview (everything linked to a customer)
+   ──────────────────────────────────────────── */
+
+export interface CustomerOverview {
+  customer: Customer;
+  leads: {
+    _id: string;
+    customerName: string;
+    contactNumber: string;
+    status: string;
+    requirement?: string;
+    leadSource?: string;
+    priorityType?: string;
+    createdAt: string;
+  }[];
+  quotations: {
+    _id: string;
+    status: "DRAFT" | "SENT" | "APPROVED" | "REJECTED";
+    quotationDate: string;
+    projectId?: string;
+    sectionCount: number;
+    value: number;
+  }[];
+  projects: {
+    _id: string;
+    clientName: string;
+    serviceType: string;
+    projectValue: number;
+    status: string;
+    startDate?: string;
+    expectedCompletionDate?: string;
+  }[];
+  totals: {
+    quotedValue: number;
+    projectValue: number;
+    income: number;
+    expense: number;
+    net: number;
+  };
+}
+
+export async function fetchCustomerOverview(
+  id: string
+): Promise<CustomerOverview> {
+  const { data } = await api.get<{ success: boolean; data: CustomerOverview }>(
+    `/customers/${id}/overview`
+  );
+  return data.data;
+}

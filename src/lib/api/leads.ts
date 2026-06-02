@@ -2,6 +2,8 @@ import api from "@/lib/axios-client";
 
 export interface Lead {
   _id: string;
+  // May be unpopulated (id string) or populated ({_id,...}) depending on endpoint.
+  customerId?: string | { _id: string; name?: string } | null;
   customerName: string;
   place: string;
   contactNumber: string;
@@ -16,6 +18,30 @@ export interface Lead {
   statusDescription: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ConvertLeadPayload {
+  place?: string;
+  email?: string;
+  notes?: string;
+}
+
+export interface ConvertLeadResult {
+  customer: { _id: string; name: string; phone: string; place?: string };
+  merged: boolean;
+  lead: Lead;
+}
+
+/** Convert a won lead into a customer (dedupes by name+phone) and links it. */
+export async function convertLeadToCustomer(
+  leadId: string,
+  payload: ConvertLeadPayload
+): Promise<ConvertLeadResult> {
+  const { data } = await api.post<{ success: boolean; data: ConvertLeadResult }>(
+    `/leads/${leadId}/convert-to-customer`,
+    payload
+  );
+  return data.data;
 }
 
 export interface LeadsListQuery {

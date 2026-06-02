@@ -13,11 +13,14 @@ import {
   deleteQuotation,
   type Quotation,
 } from "@/lib/api/quotations";
+import { createProjectFromQuotation } from "@/lib/api/projects";
 import { downloadProposalPdf } from "@/lib/quotation-pdf";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { FolderKanban } from "lucide-react";
 
 /* ────────────────────────────────────────────
    Helpers
@@ -56,6 +59,37 @@ export default function QuotationDetailPage() {
   const [notes, setNotes] = useState("");
   const [termsAndConditions, setTermsAndConditions] = useState("");
   const [validUntil, setValidUntil] = useState("");
+
+  // Create-project-from-quotation form
+  const [showProjectForm, setShowProjectForm] = useState(false);
+  const [projServiceType, setProjServiceType] = useState("");
+  const [projStart, setProjStart] = useState("");
+  const [projEnd, setProjEnd] = useState("");
+
+  const createProjectMutation = useMutation({
+    mutationFn: () =>
+      createProjectFromQuotation(quotationId, {
+        serviceType: projServiceType.trim(),
+        startDate: projStart,
+        expectedCompletionDate: projEnd,
+      }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: quotationsKeys.all });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast.success("Project created from quotation");
+      const pid = res.data?._id;
+      if (pid) router.push(`/projects/${pid}`);
+    },
+    onError: (e: any) =>
+      toast.error(e?.response?.data?.error ?? "Failed to create project"),
+  });
+
+  function handleCreateProject() {
+    if (!projServiceType.trim()) return toast.error("Service type is required");
+    if (!projStart) return toast.error("Start date is required");
+    if (!projEnd) return toast.error("Expected end date is required");
+    createProjectMutation.mutate();
+  }
 
   // Populate editable fields
   useEffect(() => {
@@ -255,6 +289,64 @@ export default function QuotationDetailPage() {
           ))}
         </div>
       )}
+
+      {/* Project from quotation */}
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <FolderKanban className="h-4 w-4 text-slate-400" />
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+              Project
+            </h3>
+          </div>
+          {quotation.projectId ? (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/projects/${quotation.projectId}`}>View project</Link>
+            </Button>
+          ) : quotation.status === "APPROVED" ? (
+            <Button size="sm" onClick={() => setShowProjectForm((v) => !v)}>
+              {showProjectForm ? "Cancel" : "Create project"}
+            </Button>
+          ) : (
+            <span className="text-xs text-slate-400">
+              Mark the quotation as Approved to create a project.
+            </span>
+          )}
+        </div>
+        {showProjectForm && !quotation.projectId && quotation.status === "APPROVED" && (
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              Service type *
+              <Input
+                value={projServiceType}
+                onChange={(e) => setProjServiceType(e.target.value)}
+                placeholder="e.g. Home Cinema"
+                className="mt-1"
+              />
+            </label>
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              Start date *
+              <div className="mt-1">
+                <DatePicker value={projStart} onChange={setProjStart} placeholder="Start" />
+              </div>
+            </label>
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              Expected end *
+              <div className="mt-1">
+                <DatePicker value={projEnd} onChange={setProjEnd} placeholder="Expected end" />
+              </div>
+            </label>
+            <div className="flex justify-end sm:col-span-3">
+              <Button
+                onClick={handleCreateProject}
+                disabled={createProjectMutation.isPending}
+              >
+                {createProjectMutation.isPending ? "Creating…" : "Create project"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Dates & editable fields */}
       <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">

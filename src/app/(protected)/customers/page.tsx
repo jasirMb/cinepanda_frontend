@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, MapPin, Phone, Plus, Search, X } from "lucide-react";
@@ -227,9 +228,12 @@ function CustomerCard({ customer }: { customer: Customer }) {
           {getInitials(customer.name)}
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-base font-semibold text-slate-900 dark:text-slate-50">
+          <Link
+            href={`/customers/${customer._id}`}
+            className="block truncate text-base font-semibold text-slate-900 hover:text-cine-primary hover:underline dark:text-slate-50"
+          >
             {customer.name}
-          </h3>
+          </Link>
           <p className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
             <CalendarDays className="h-3 w-3" />
             Added {new Date(customer.createdAt).toLocaleDateString()}

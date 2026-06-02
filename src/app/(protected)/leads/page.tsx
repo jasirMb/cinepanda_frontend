@@ -15,6 +15,8 @@ import {
   Pencil,
   Phone,
   TrendingUp,
+  UserCheck,
+  UserPlus,
   Users,
   XCircle,
 } from "lucide-react";
@@ -22,7 +24,12 @@ import {
 import { leadsKeys, useFollowupLeads, useLeads } from "@/hooks/useLeads";
 import { LeadsTable } from "@/components/tables/LeadsTable";
 import { Button } from "@/components/ui/button";
-import { type Lead, updateLeadStatus } from "@/lib/api/leads";
+import {
+  type Lead,
+  updateLeadStatus,
+  convertLeadToCustomer,
+} from "@/lib/api/leads";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -350,6 +357,30 @@ export default function LeadsPage() {
       }
     });
 
+    const [convertOpen, setConvertOpen] = useState(false);
+    const [cPlace, setCPlace] = useState(lead.place ?? "");
+    const [cEmail, setCEmail] = useState("");
+    const [cNotes, setCNotes] = useState("");
+    const convertMutation = useMutation({
+      mutationFn: () =>
+        convertLeadToCustomer(lead._id, {
+          place: cPlace.trim() || undefined,
+          email: cEmail.trim() || undefined,
+          notes: cNotes.trim() || undefined,
+        }),
+      onSuccess: (res) => {
+        queryClient.invalidateQueries({ queryKey: leadsKeys.all });
+        setConvertOpen(false);
+        toast.success(
+          res.merged
+            ? `Linked to existing customer "${res.customer.name}"`
+            : `Customer "${res.customer.name}" created`
+        );
+      },
+      onError: (e: any) =>
+        toast.error(e?.response?.data?.error ?? "Failed to convert"),
+    });
+
     return (
       <div className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
         <div
@@ -464,7 +495,101 @@ export default function LeadsPage() {
               Edit
             </Link>
           </div>
+
+          {/* Won lead → customer */}
+          {lead.status === "CLOSED_WON" &&
+            (() => {
+              const customerId =
+                lead.customerId && typeof lead.customerId === "object"
+                  ? lead.customerId._id
+                  : (lead.customerId as string | null | undefined);
+              return customerId ? (
+                <Link
+                  href={`/customers/${customerId}`}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-cine-primary hover:underline"
+                >
+                  <UserCheck className="h-3.5 w-3.5" /> View customer
+                </Link>
+              ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1.5 self-start text-xs"
+                onClick={() => setConvertOpen(true)}
+              >
+                <UserPlus className="h-3.5 w-3.5" /> Convert to customer
+              </Button>
+              );
+            })()}
         </div>
+
+        {/* Convert dialog */}
+        <Dialog
+          open={convertOpen}
+          onClose={() => setConvertOpen(false)}
+          className="w-full max-w-md"
+        >
+          <div className="space-y-3 p-5">
+            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">
+              Convert to customer
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Creates or links a customer for{" "}
+              <span className="font-medium text-slate-700 dark:text-slate-200">
+                {lead.customerName}
+              </span>{" "}
+              · {lead.contactNumber}. An existing customer with the same name &amp;
+              phone is reused (no duplicate).
+            </p>
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+              Place *
+              <Input
+                value={cPlace}
+                onChange={(e) => setCPlace(e.target.value)}
+                placeholder="Customer place"
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+              Email
+              <Input
+                value={cEmail}
+                onChange={(e) => setCEmail(e.target.value)}
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+              Notes
+              <Input
+                value={cNotes}
+                onChange={(e) => setCNotes(e.target.value)}
+                className="mt-1"
+              />
+            </label>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConvertOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                disabled={convertMutation.isPending}
+                onClick={() => {
+                  if (!cPlace.trim()) {
+                    toast.error("Place is required");
+                    return;
+                  }
+                  convertMutation.mutate();
+                }}
+              >
+                {convertMutation.isPending ? "Converting…" : "Convert"}
+              </Button>
+            </div>
+          </div>
+        </Dialog>
       </div>
     );
   }
