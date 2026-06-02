@@ -35,18 +35,23 @@ function avatarColor(seed: string) {
  * action, plus a searchable picker to add more (excludes already-added ones).
  */
 export function LabourRoster({
-  labours,
+  labours: rawLabours,
   onAdd,
   onRemove,
   pending,
   emptyText = "No labours yet. Search to add some.",
 }: {
-  labours: LabourLite[];
+  labours: (LabourLite | null)[];
   onAdd: (labourId: string) => void;
   onRemove: (labourId: string) => void;
   pending?: boolean;
   emptyText?: string;
 }) {
+  // Drop nulls — a deleted labour can leave a dangling roster entry.
+  const labours = useMemo(
+    () => (rawLabours ?? []).filter((l): l is LabourLite => !!l && !!l._id),
+    [rawLabours]
+  );
   const allLabours = useLabours().data?.data ?? [];
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);

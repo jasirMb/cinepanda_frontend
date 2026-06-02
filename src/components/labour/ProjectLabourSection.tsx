@@ -62,7 +62,7 @@ function inr(n: number) {
 
 export function ProjectLabourSection({
   projectId,
-  labours,
+  labours: rawLabours,
   groups = [],
 }: {
   projectId: string;
@@ -73,13 +73,22 @@ export function ProjectLabourSection({
   const allLabours = useLabours().data?.data ?? [];
   const allGroups = useGroups().data?.data ?? [];
 
+  // A deleted labour leaves a dangling entry whose populated labourId is null —
+  // drop those so the roster never crashes on `labourId._id`.
+  const labours = useMemo(
+    () => (rawLabours ?? []).filter((l) => l && l.labourId),
+    [rawLabours]
+  );
+
   // How much each labour has actually earned on THIS project (sum of their
   // work-log amounts → the labour expenses recorded against the project).
   const workLogs = useLabourWorkLogs({ projectId }).data?.data ?? [];
   const earnedByLabour = useMemo(() => {
     const map = new Map<string, number>();
     for (const w of workLogs) {
-      const lid = typeof w.labourId === "string" ? w.labourId : w.labourId._id;
+      const lid =
+        typeof w.labourId === "string" ? w.labourId : w.labourId?._id;
+      if (!lid) continue;
       map.set(lid, (map.get(lid) ?? 0) + (w.amount ?? 0));
     }
     return map;
