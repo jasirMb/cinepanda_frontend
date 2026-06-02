@@ -21,6 +21,9 @@ import {
 } from "lucide-react";
 
 import { laboursKeys, useLabours, useLabourRoles } from "@/hooks/useLabours";
+import { useGroups } from "@/hooks/useGroups";
+import { GroupsManager } from "@/components/groups/GroupsManager";
+import { GroupAvatar } from "@/components/groups/GroupAvatar";
 import { uploadFile, deleteFile } from "@/lib/api/files";
 import { compressImageToLimit } from "@/lib/compress-image";
 import {
@@ -81,6 +84,26 @@ export default function LaboursPage() {
   const queryClient = useQueryClient();
   const laboursQuery = useLabours();
   const labours = laboursQuery.data?.data ?? [];
+
+  const [tab, setTab] = useState<"labours" | "groups">("labours");
+  const allGroups = useGroups().data?.data ?? [];
+  // labourId -> the groups it belongs to (built from each group's labour list).
+  const groupsByLabour = useMemo(() => {
+    const map = new Map<
+      string,
+      { _id: string; name: string; color?: string; avatarUrl?: string }[]
+    >();
+    for (const g of allGroups) {
+      for (const l of (g.labours ?? []) as any[]) {
+        const lid = typeof l === "string" ? l : l?._id;
+        if (!lid) continue;
+        const arr = map.get(lid) ?? [];
+        arr.push({ _id: g._id, name: g.name, color: g.color, avatarUrl: g.avatarUrl });
+        map.set(lid, arr);
+      }
+    }
+    return map;
+  }, [allGroups]);
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -301,18 +324,44 @@ export default function LaboursPage() {
             Manage your labour / crew directory.
           </p>
         </div>
-        <Button onClick={() => (showForm ? resetForm() : startCreate())}>
-          {showForm ? (
-            <>
-              <X className="h-4 w-4" /> Cancel
-            </>
-          ) : (
-            <>
-              <Plus className="h-4 w-4" /> Add Labour
-            </>
-          )}
-        </Button>
+        {tab === "labours" && (
+          <Button onClick={() => (showForm ? resetForm() : startCreate())}>
+            {showForm ? (
+              <>
+                <X className="h-4 w-4" /> Cancel
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4" /> Add Labour
+              </>
+            )}
+          </Button>
+        )}
       </div>
+
+      {/* Tabs: Labours | Groups */}
+      <div className="inline-flex gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        {(["labours", "groups"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className={`rounded-md px-4 py-1.5 text-sm font-medium capitalize transition-colors ${
+              tab === t
+                ? "bg-cine-primary text-white shadow-sm"
+                : "text-slate-600 hover:text-slate-900 dark:text-slate-400"
+            }`}
+          >
+            {t}
+            {t === "groups" && allGroups.length > 0 ? ` (${allGroups.length})` : ""}
+          </button>
+        ))}
+      </div>
+
+      {tab === "groups" ? (
+        <GroupsManager showHeader={false} />
+      ) : (
+        <>
 
       {/* Add / edit form */}
       {showForm && (
@@ -498,6 +547,7 @@ export default function LaboursPage() {
               <LabourCard
                 key={labour._id}
                 labour={labour}
+                groups={groupsByLabour.get(labour._id) ?? []}
                 onEdit={() => startEdit(labour)}
                 onDelete={() => setPendingDelete(labour)}
               />
@@ -556,16 +606,20 @@ export default function LaboursPage() {
         confirmLabel="Delete"
         onConfirm={() => pendingDelete && deleteMutation.mutate(pendingDelete._id)}
       />
+        </>
+      )}
     </div>
   );
 }
 
 function LabourCard({
   labour,
+  groups = [],
   onEdit,
   onDelete,
 }: {
   labour: Labour;
+  groups?: { _id: string; name: string; color?: string; avatarUrl?: string }[];
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -653,6 +707,27 @@ function LabourCard({
           </p>
         )}
       </div>
+
+      {groups.length > 0 && (
+        <div className="mt-auto flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+          {groups.map((g) => (
+            <Link
+              key={g._id}
+              href={`/groups/${g._id}`}
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 py-0.5 pl-1 pr-2 text-[11px] font-medium text-slate-600 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+            >
+              <GroupAvatar
+                name={g.name}
+                color={g.color}
+                avatarUrl={g.avatarUrl}
+                size={16}
+                iconClassName="h-2.5 w-2.5"
+              />
+              {g.name}
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

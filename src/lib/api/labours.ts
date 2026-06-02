@@ -104,7 +104,7 @@ export interface LabourLite {
 
 export interface LabourMemberships {
   vendors: { _id: string; name: string }[];
-  groups: { _id: string; name: string; color?: string }[];
+  groups: { _id: string; name: string; color?: string; avatarUrl?: string }[];
 }
 
 export async function fetchLabourMemberships(

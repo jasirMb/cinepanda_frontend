@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Users } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 import { groupsKeys, useGroup } from "@/hooks/useGroups";
 import { addGroupLabour, removeGroupLabour } from "@/lib/api/groups";
 import { LabourRoster } from "@/components/labour/LabourRoster";
+import { GroupAvatar } from "@/components/groups/GroupAvatar";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function GroupDetailPage({
@@ -58,12 +59,13 @@ export default function GroupDetailPage({
 
       {/* Header */}
       <div className="flex items-start gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-        <div
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-white"
-          style={{ backgroundColor: group.color || "#3076A1" }}
-        >
-          <Users className="h-6 w-6" />
-        </div>
+        <GroupAvatar
+          name={group.name}
+          color={group.color}
+          avatarUrl={group.avatarUrl}
+          size={48}
+          iconClassName="h-6 w-6"
+        />
         <div className="min-w-0 flex-1">
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
             {group.name}

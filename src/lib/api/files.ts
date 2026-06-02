@@ -7,6 +7,7 @@ export type UploadFolder =
   | "logos"
   | "patterns"
   | "avatars"
+  | "groups"
   | "misc";
 
 export interface UploadedFile {

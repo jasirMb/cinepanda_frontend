@@ -51,8 +51,16 @@ export interface ProjectPopulated {
   actualCompletionDate?: string;
   status: ProjectStatus;
   labours?: ProjectLabour[];
+  groups?: ProjectGroupInfo[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProjectGroupInfo {
+  _id: string;
+  name: string;
+  color?: string;
+  avatarUrl?: string;
 }
 
 export interface ProjectLabourInfo {
@@ -196,6 +204,17 @@ export async function addProjectGroup(
   const { data } = await api.post<ProjectDetailResponse>(
     `/projects/${projectId}/groups`,
     { groupId }
+  );
+  return data.data;
+}
+
+/** Unlink a group from the project (its labours stay on the roster). */
+export async function removeProjectGroup(
+  projectId: string,
+  groupId: string
+): Promise<ProjectPopulated> {
+  const { data } = await api.delete<ProjectDetailResponse>(
+    `/projects/${projectId}/groups/${groupId}`
   );
   return data.data;
 }

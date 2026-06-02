@@ -6,6 +6,8 @@ export interface Group {
   name: string;
   description?: string;
   color?: string;
+  avatarUrl?: string;
+  avatarKey?: string;
   isActive: boolean;
   // Populated only on the detail endpoint (group's labour roster).
   labours?: LabourLite[];
@@ -23,6 +25,8 @@ export interface GroupPayload {
   name: string;
   description?: string;
   color?: string;
+  avatarUrl?: string;
+  avatarKey?: string;
 }
 
 export async function fetchGroups(): Promise<GroupsListResponse> {

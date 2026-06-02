@@ -534,7 +534,11 @@ export default function ProjectDetailPage({
       </div>
 
       {/* Labour */}
-      <ProjectLabourSection projectId={id} labours={project.labours ?? []} />
+      <ProjectLabourSection
+        projectId={id}
+        labours={project.labours ?? []}
+        groups={project.groups ?? []}
+      />
 
       {/* Ledger entries */}
       <div className="space-y-3">
