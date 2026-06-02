@@ -215,6 +215,9 @@ export default function PaymentAccountStatementPage({
           accountNumber: account.accountNumber,
           ifsc: account.ifsc,
           upiId: account.upiId,
+          upiApp: account.upiApp,
+          cardNetwork: account.cardNetwork,
+          cardLast4: account.cardLast4,
         },
         rows: pdfRows,
         periodLabel: periodLabelFor(dlgPeriod, r.start, r.end),
@@ -271,7 +274,14 @@ export default function PaymentAccountStatementPage({
             {account.bankName && <span>{account.bankName}</span>}
             {account.accountNumber && <span>A/C: {account.accountNumber}</span>}
             {account.ifsc && <span>IFSC: {account.ifsc}</span>}
+            {account.upiApp && <span>{account.upiApp}</span>}
             {account.upiId && <span>{account.upiId}</span>}
+            {account.cardNetwork && (
+              <span>
+                {account.cardNetwork}
+                {account.cardLast4 ? ` ••${account.cardLast4}` : ""}
+              </span>
+            )}
           </div>
         </div>
       </div>

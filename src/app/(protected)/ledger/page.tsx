@@ -869,6 +869,9 @@ function accountDetail(a: {
   accountHolderName?: string;
   ifsc?: string;
   upiId?: string;
+  upiApp?: string;
+  cardNetwork?: string;
+  cardLast4?: string;
 }): string {
   if (a.type === "BANK")
     return (
@@ -881,7 +884,14 @@ function accountDetail(a: {
         .filter(Boolean)
         .join(" · ") || "Bank account"
     );
-  if (a.type === "UPI") return a.upiId ? `UPI: ${a.upiId}` : "UPI";
+  if (a.type === "UPI")
+    return [a.upiApp, a.upiId].filter(Boolean).join(" · ") || "UPI";
+  if (a.type === "CARD")
+    return (
+      [a.cardNetwork, a.cardLast4 ? `••${a.cardLast4}` : ""]
+        .filter(Boolean)
+        .join(" · ") || "Card"
+    );
   if (a.type === "CASH") return "Cash";
   return "Other";
 }
@@ -890,9 +900,12 @@ function accountDetailShort(a: {
   type: string;
   bankName?: string;
   upiId?: string;
+  upiApp?: string;
+  cardNetwork?: string;
 }): string {
   if (a.type === "BANK") return a.bankName ?? "";
-  if (a.type === "UPI") return a.upiId ?? "";
+  if (a.type === "UPI") return a.upiApp || a.upiId || "";
+  if (a.type === "CARD") return a.cardNetwork ?? "";
   return "";
 }
 

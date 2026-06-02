@@ -6,7 +6,13 @@ import type { ProjectStatus } from "./projects";
    ──────────────────────────────────────────── */
 
 export type EntryType = "INCOME" | "EXPENSE";
-export type PaymentMethod = "CASH" | "BANK_TRANSFER" | "UPI" | "CHEQUE" | "OTHER";
+export type PaymentMethod =
+  | "CASH"
+  | "BANK_TRANSFER"
+  | "UPI"
+  | "CARD"
+  | "CHEQUE"
+  | "OTHER";
 export type PaymentStatus = "PAID" | "PENDING" | "PARTIAL";
 export type ApprovalStatus =
   | "NOT_REQUIRED"
@@ -61,6 +67,9 @@ export interface LedgerEntryPopulated {
     accountHolderName?: string;
     ifsc?: string;
     upiId?: string;
+    upiApp?: string;
+    cardNetwork?: string;
+    cardLast4?: string;
   } | null;
   vendorId?: { _id: string; name: string } | null;
   itemType?: "GOODS" | "SERVICE";

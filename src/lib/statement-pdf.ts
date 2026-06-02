@@ -9,6 +9,9 @@ export interface StatementAccount {
   accountNumber?: string;
   ifsc?: string;
   upiId?: string;
+  upiApp?: string;
+  cardNetwork?: string;
+  cardLast4?: string;
 }
 
 export interface StatementRow {
@@ -74,7 +77,11 @@ export async function downloadStatementPdf(opts: {
     account.bankName ? esc(account.bankName) : "",
     account.accountNumber ? `A/C No: ${esc(account.accountNumber)}` : "",
     account.ifsc ? `IFSC: ${esc(account.ifsc)}` : "",
+    account.upiApp ? esc(account.upiApp) : "",
     account.upiId ? `UPI: ${esc(account.upiId)}` : "",
+    account.cardNetwork
+      ? `${esc(account.cardNetwork)}${account.cardLast4 ? ` ••${esc(account.cardLast4)}` : ""}`
+      : "",
   ]
     .filter(Boolean)
     .join("<br/>");

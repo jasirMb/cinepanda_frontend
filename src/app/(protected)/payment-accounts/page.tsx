@@ -12,6 +12,7 @@ import {
   updatePaymentAccount,
   deletePaymentAccount,
   PAYMENT_ACCOUNT_TYPES,
+  UPI_APPS,
   type PaymentAccount,
   type PaymentAccountPayload,
   type PaymentAccountType,
@@ -30,6 +31,9 @@ const EMPTY = {
   ifsc: "",
   branch: "",
   upiId: "",
+  upiApp: "",
+  cardNetwork: "",
+  cardLast4: "",
   notes: "",
 };
 
@@ -91,6 +95,9 @@ export default function PaymentAccountsPage() {
       ifsc: a.ifsc ?? "",
       branch: a.branch ?? "",
       upiId: a.upiId ?? "",
+      upiApp: a.upiApp ?? "",
+      cardNetwork: a.cardNetwork ?? "",
+      cardLast4: a.cardLast4 ?? "",
       notes: a.notes ?? "",
     });
     setEditingId(a._id);
@@ -112,6 +119,9 @@ export default function PaymentAccountsPage() {
       ifsc: form.ifsc.trim() || undefined,
       branch: form.branch.trim() || undefined,
       upiId: form.upiId.trim() || undefined,
+      upiApp: form.upiApp.trim() || undefined,
+      cardNetwork: form.cardNetwork.trim() || undefined,
+      cardLast4: form.cardLast4.trim() || undefined,
       notes: form.notes.trim() || undefined,
     };
     if (editingId) updateMutation.mutate({ id: editingId, payload });
@@ -243,13 +253,61 @@ export default function PaymentAccountsPage() {
               </>
             )}
             {form.type === "UPI" && (
-              <Field label="UPI ID">
-                <Input
-                  placeholder="name@bank"
-                  value={form.upiId}
-                  onChange={(e) => setForm((f) => ({ ...f, upiId: e.target.value }))}
-                />
-              </Field>
+              <>
+                <Field label="UPI ID">
+                  <Input
+                    placeholder="name@bank"
+                    value={form.upiId}
+                    onChange={(e) => setForm((f) => ({ ...f, upiId: e.target.value }))}
+                  />
+                </Field>
+                <Field label="UPI app">
+                  <select
+                    value={form.upiApp}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, upiApp: e.target.value }))
+                    }
+                    className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                  >
+                    <option value="">Select app…</option>
+                    {UPI_APPS.map((app) => (
+                      <option key={app} value={app}>
+                        {app}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </>
+            )}
+            {form.type === "CARD" && (
+              <>
+                <Field label="Card network">
+                  <select
+                    value={form.cardNetwork}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, cardNetwork: e.target.value }))
+                    }
+                    className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                  >
+                    <option value="">Select…</option>
+                    {["Visa", "Mastercard", "RuPay", "Amex", "Other"].map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Card last 4 digits">
+                  <Input
+                    maxLength={4}
+                    placeholder="1234"
+                    value={form.cardLast4}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, cardLast4: e.target.value }))
+                    }
+                  />
+                </Field>
+              </>
             )}
           </div>
           <Field label="Notes">

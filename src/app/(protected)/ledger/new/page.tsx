@@ -248,6 +248,7 @@ export default function NewLedgerEntryPage() {
                 <SelectItem value="CASH">Cash</SelectItem>
                 <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
                 <SelectItem value="UPI">UPI</SelectItem>
+                <SelectItem value="CARD">Card</SelectItem>
                 <SelectItem value="CHEQUE">Cheque</SelectItem>
                 <SelectItem value="OTHER">Other</SelectItem>
               </SelectContent>
@@ -517,6 +518,8 @@ function methodForType(type: string): PaymentMethod {
       return "CASH";
     case "UPI":
       return "UPI";
+    case "CARD":
+      return "CARD";
     default:
       return "OTHER";
   }
@@ -533,6 +536,8 @@ function accountTypeForMethod(method: string): string | null {
       return "CASH";
     case "UPI":
       return "UPI";
+    case "CARD":
+      return "CARD";
     default:
       return null;
   }
@@ -545,6 +550,9 @@ function accountDetail(a: {
   accountNumber?: string;
   ifsc?: string;
   upiId?: string;
+  upiApp?: string;
+  cardNetwork?: string;
+  cardLast4?: string;
   notes?: string;
 }): string {
   if (a.type === "BANK")
@@ -557,7 +565,14 @@ function accountDetail(a: {
         .filter(Boolean)
         .join(" · ") || "Bank account"
     );
-  if (a.type === "UPI") return a.upiId ? `UPI: ${a.upiId}` : "UPI";
+  if (a.type === "UPI")
+    return [a.upiApp, a.upiId].filter(Boolean).join(" · ") || "UPI";
+  if (a.type === "CARD")
+    return (
+      [a.cardNetwork, a.cardLast4 ? `••${a.cardLast4}` : ""]
+        .filter(Boolean)
+        .join(" · ") || "Card"
+    );
   if (a.type === "CASH") return "Cash";
   return a.notes || "Other";
 }

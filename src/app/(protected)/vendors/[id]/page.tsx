@@ -79,7 +79,17 @@ function accountName(a: LedgerEntryPopulated["paymentAccountId"]): string | null
 function paidViaOf(e: LedgerEntryPopulated): string {
   const a = e.paymentAccountId;
   if (a && typeof a === "object") {
-    if (a.type === "UPI") return a.upiId ? `${a.name} · ${a.upiId}` : a.name;
+    if (a.type === "UPI") {
+      const sub = [a.upiApp, a.upiId].filter(Boolean);
+      return sub.length ? `${a.name} · ${sub.join(" · ")}` : a.name;
+    }
+    if (a.type === "CARD") {
+      const sub = [
+        a.cardNetwork,
+        a.cardLast4 ? `••${a.cardLast4}` : "",
+      ].filter(Boolean);
+      return sub.length ? `${a.name} · ${sub.join(" · ")}` : a.name;
+    }
     if (a.type === "BANK") {
       const sub = [
         a.bankName,

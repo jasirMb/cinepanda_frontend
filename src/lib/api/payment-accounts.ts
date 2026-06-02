@@ -1,7 +1,16 @@
 import api from "@/lib/axios-client";
 
-export const PAYMENT_ACCOUNT_TYPES = ["BANK", "CASH", "UPI", "OTHER"] as const;
+export const PAYMENT_ACCOUNT_TYPES = ["BANK", "CASH", "UPI", "CARD", "OTHER"] as const;
 export type PaymentAccountType = (typeof PAYMENT_ACCOUNT_TYPES)[number];
+
+export const UPI_APPS = [
+  "GPay",
+  "PhonePe",
+  "Paytm",
+  "BHIM",
+  "Amazon Pay",
+  "Other",
+] as const;
 
 export interface PaymentAccount {
   _id: string;
@@ -13,6 +22,9 @@ export interface PaymentAccount {
   ifsc?: string;
   branch?: string;
   upiId?: string;
+  upiApp?: string;
+  cardNetwork?: string;
+  cardLast4?: string;
   notes?: string;
   isActive: boolean;
   createdAt: string;
@@ -34,6 +46,9 @@ export interface PaymentAccountPayload {
   ifsc?: string;
   branch?: string;
   upiId?: string;
+  upiApp?: string;
+  cardNetwork?: string;
+  cardLast4?: string;
   notes?: string;
 }
 
