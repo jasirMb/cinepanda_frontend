@@ -659,86 +659,82 @@ export default function LeadsPage() {
         <LeadsTable leads={allLeads} />
       ) : (
         <div className="space-y-10">
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
-                  Needs attention
-                </h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Overdue and due-today follow-ups are shown first.
-                </p>
+          {attentionLeads.length > 0 && (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                    Needs attention
+                  </h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Overdue and due-today follow-ups are shown first.
+                  </p>
+                </div>
+                <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-200">
+                  {attentionLeads.length} lead{attentionLeads.length === 1 ? "" : "s"}
+                </span>
               </div>
-              <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-200">
-                {attentionLeads.length} lead{attentionLeads.length === 1 ? "" : "s"}
-              </span>
-            </div>
-            {attentionLeads.length === 0 ? (
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Nothing urgent right now. Keep nurturing your leads!
-              </p>
-            ) : (
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {attentionLeads.map((lead) => (
                   <LeadCard key={lead._id} lead={lead} />
                 ))}
               </div>
-            )}
-          </section>
+            </section>
+          )}
 
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
-                  Upcoming follow-ups
-                </h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Ordered by the next call time so you can glide through the day.
-                </p>
+          {grouped.upcoming.length > 0 && (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                    Upcoming follow-ups
+                  </h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Ordered by the next call time so you can glide through the day.
+                  </p>
+                </div>
+                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100">
+                  {grouped.upcoming.length} scheduled
+                </span>
               </div>
-              <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100">
-                {grouped.upcoming.length} scheduled
-              </span>
-            </div>
-            {grouped.upcoming.length === 0 ? (
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                No upcoming follow-ups scheduled.
-              </p>
-            ) : (
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {grouped.upcoming.map((lead) => (
                   <LeadCard key={lead._id} lead={lead} />
                 ))}
               </div>
-            )}
-          </section>
+            </section>
+          )}
 
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
-                  Unscheduled
-                </h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Leads without a next call time, sorted by priority.
-                </p>
+          {grouped.unscheduled.length > 0 && (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                    Unscheduled
+                  </h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Leads without a next call time, sorted by priority.
+                  </p>
+                </div>
+                <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-800 dark:bg-slate-800/70 dark:text-slate-100">
+                  {grouped.unscheduled.length} waiting
+                </span>
               </div>
-              <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-800 dark:bg-slate-800/70 dark:text-slate-100">
-                {grouped.unscheduled.length} waiting
-              </span>
-            </div>
-            {grouped.unscheduled.length === 0 ? (
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                All leads have a follow-up plan. Nicely done.
-              </p>
-            ) : (
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {grouped.unscheduled.map((lead) => (
                   <LeadCard key={lead._id} lead={lead} />
                 ))}
               </div>
+            </section>
+          )}
+
+          {attentionLeads.length === 0 &&
+            grouped.upcoming.length === 0 &&
+            grouped.unscheduled.length === 0 && (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
+                No leads to show. Add a lead or adjust your filters.
+              </div>
             )}
-          </section>
         </div>
       )}
 
