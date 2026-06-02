@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import {
@@ -19,7 +19,7 @@ import { productsKeys, useProducts, useCategories } from "@/hooks/useProducts";
 import { ProductsTable } from "@/components/tables/ProductsTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { deleteProduct, type Product } from "@/lib/api/products";
+import { deleteProduct, fetchProductBrands, type Product } from "@/lib/api/products";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,6 +38,27 @@ export default function ProductsPage() {
     subcategory: "",
     brand: ""
   });
+
+  // Debounced text inputs — type freely, the query updates after a short pause.
+  const [searchInput, setSearchInput] = useState("");
+  const [brandInput, setBrandInput] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setFilters((prev) =>
+        prev.search === searchInput && prev.brand === brandInput
+          ? prev
+          : { ...prev, search: searchInput, brand: brandInput }
+      );
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput, brandInput]);
+
+  const brandsQuery = useQuery({
+    queryKey: ["products", "brands"],
+    queryFn: fetchProductBrands,
+    staleTime: 5 * 60_000,
+  });
+  const brandSuggestions = brandsQuery.data ?? [];
 
   const categoriesQuery = useCategories();
   const categories = categoriesQuery.data?.data ?? [];
@@ -140,7 +161,7 @@ export default function ProductsPage() {
     return (
       <div className="group flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
         {/* Image banner */}
-        <div className="relative flex h-32 w-full items-center justify-center overflow-hidden bg-slate-100 dark:bg-slate-800">
+        <div className="relative flex h-24 w-full items-center justify-center overflow-hidden bg-slate-100 dark:bg-slate-800">
           {product.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -156,10 +177,10 @@ export default function ProductsPage() {
           </span>
         </div>
 
-        <div className="flex flex-1 flex-col gap-2.5 p-4">
+        <div className="flex flex-1 flex-col gap-2 p-3">
           {/* Title */}
           <div className="min-w-0">
-            <h3 className="truncate text-base font-semibold text-slate-900 dark:text-slate-50">
+            <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
               {product.name}
             </h3>
             <p className="truncate text-xs text-slate-500 dark:text-slate-400">
@@ -171,7 +192,7 @@ export default function ProductsPage() {
 
           {/* Price */}
           <div className="flex items-baseline justify-between">
-            <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
+            <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
               {product.price.toLocaleString("en-IN", {
                 style: "currency",
                 currency: "INR",
@@ -268,8 +289,8 @@ export default function ProductsPage() {
       <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 sm:grid-cols-2 lg:grid-cols-5">
         <Input
           placeholder="Search products..."
-          value={filters.search}
-          onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
         />
         <Select value={filters.category || "__all__"} onValueChange={(v) => setFilters((prev) => ({ ...prev, category: v === "__all__" ? "" : v }))}>
           <SelectTrigger>
@@ -293,17 +314,27 @@ export default function ProductsPage() {
             ))}
           </SelectContent>
         </Select>
-        <Input
-          placeholder="Filter by brand..."
-          value={filters.brand}
-          onChange={(e) => setFilters((prev) => ({ ...prev, brand: e.target.value }))}
-        />
+        <div>
+          <Input
+            list="product-brand-suggestions"
+            placeholder="Filter by brand..."
+            value={brandInput}
+            onChange={(e) => setBrandInput(e.target.value)}
+          />
+          <datalist id="product-brand-suggestions">
+            {brandSuggestions.map((b) => (
+              <option key={b} value={b} />
+            ))}
+          </datalist>
+        </div>
         <Button
           variant="outline"
           size="sm"
-          onClick={() =>
-            setFilters({ search: "", category: "", subcategory: "", brand: "" })
-          }
+          onClick={() => {
+            setSearchInput("");
+            setBrandInput("");
+            setFilters({ search: "", category: "", subcategory: "", brand: "" });
+          }}
         >
           Reset filters
         </Button>
@@ -329,7 +360,7 @@ export default function ProductsPage() {
               No products found. Try adjusting your filters or add a new product.
             </p>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {products.map((product) => (
                 <ProductCard key={product._id} product={product} />
               ))}

@@ -151,6 +151,14 @@ export async function fetchCategories(): Promise<CategoriesResponse> {
   return data;
 }
 
+/** Distinct brand values across products (for the brand filter autocomplete). */
+export async function fetchProductBrands(): Promise<string[]> {
+  const { data } = await api.get<{ success: boolean; data: string[] }>(
+    "/products/brands"
+  );
+  return data.data;
+}
+
 export async function fetchSubcategories(categoryName: string): Promise<string[]> {
   const { data } = await api.get<{ success: boolean; data: string[] }>(
     `/product-categories/${encodeURIComponent(categoryName)}/subcategories`
