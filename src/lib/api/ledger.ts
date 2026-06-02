@@ -52,6 +52,14 @@ export interface LedgerEntryPopulated {
   description: string;
   entryDate: string;
   paymentMethod?: PaymentMethod;
+  paymentAccountId?: {
+    _id: string;
+    name: string;
+    type: string;
+    bankName?: string;
+  } | null;
+  vendorId?: { _id: string; name: string } | null;
+  itemType?: "GOODS" | "SERVICE";
   paymentStatus: PaymentStatus;
   invoiceRef?: string;
   approvalStatus: ApprovalStatus;
@@ -95,6 +103,9 @@ export interface CreateLedgerPayload {
   description: string;
   entryDate: string;
   paymentMethod?: PaymentMethod;
+  paymentAccountId?: string;
+  vendorId?: string;
+  itemType?: "GOODS" | "SERVICE";
   paymentStatus?: PaymentStatus;
   projectId?: string;
   customerId?: string;

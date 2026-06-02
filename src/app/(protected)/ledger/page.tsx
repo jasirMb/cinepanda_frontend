@@ -732,6 +732,29 @@ function EntriesTable({
                             {entry.description}
                           </p>
                         ) : null}
+                        {(entry.vendorId ||
+                          entry.paymentAccountId ||
+                          entry.itemType) && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {entry.vendorId &&
+                              typeof entry.vendorId === "object" && (
+                                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                  {entry.vendorId.name}
+                                </span>
+                              )}
+                            {entry.paymentAccountId &&
+                              typeof entry.paymentAccountId === "object" && (
+                                <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                                  {entry.paymentAccountId.name}
+                                </span>
+                              )}
+                            {entry.itemType && (
+                              <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">
+                                {entry.itemType}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>

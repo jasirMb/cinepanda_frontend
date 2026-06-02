@@ -8,6 +8,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ledgerKeys, useLedgerCategories, useLedgerEntry } from "@/hooks/useLedger";
 import { useProjects } from "@/hooks/useProjects";
 import { useCustomers } from "@/hooks/useCustomers";
+import { usePaymentAccounts } from "@/hooks/usePaymentAccounts";
+import { useVendors } from "@/hooks/useVendors";
 import {
   updateLedgerEntry,
   type CreateLedgerPayload,
@@ -43,6 +45,8 @@ export default function EditLedgerEntryPage({
   const projects = projectsQuery.data?.data ?? [];
   const customersQuery = useCustomers();
   const customers = customersQuery.data?.data ?? [];
+  const accounts = usePaymentAccounts().data?.data ?? [];
+  const vendors = useVendors().data?.data ?? [];
 
   const [form, setForm] = useState({
     entryType: "EXPENSE" as EntryType,
@@ -51,6 +55,9 @@ export default function EditLedgerEntryPage({
     description: "",
     entryDate: "",
     paymentMethod: "" as PaymentMethod | "",
+    paymentAccountId: "",
+    vendorId: "",
+    itemType: "" as "GOODS" | "SERVICE" | "",
     paymentStatus: "PAID" as PaymentStatus,
     projectId: "",
     customerId: "",
@@ -69,6 +76,13 @@ export default function EditLedgerEntryPage({
         description: e.description,
         entryDate: e.entryDate ? e.entryDate.slice(0, 10) : "",
         paymentMethod: e.paymentMethod ?? "",
+        paymentAccountId:
+          typeof e.paymentAccountId === "object" && e.paymentAccountId
+            ? e.paymentAccountId._id
+            : "",
+        vendorId:
+          typeof e.vendorId === "object" && e.vendorId ? e.vendorId._id : "",
+        itemType: e.itemType ?? "",
         paymentStatus: e.paymentStatus,
         projectId:
           typeof e.projectId === "object" && e.projectId
@@ -86,9 +100,13 @@ export default function EditLedgerEntryPage({
 
   const mutation = useMutation({
     mutationFn: (payload: typeof form) => {
+      const isExpense = payload.entryType === "EXPENSE";
       const cleaned: Partial<CreateLedgerPayload> = {
         ...payload,
         paymentMethod: payload.paymentMethod || undefined,
+        paymentAccountId: payload.paymentAccountId || undefined,
+        vendorId: isExpense ? payload.vendorId || undefined : undefined,
+        itemType: isExpense ? payload.itemType || undefined : undefined,
         projectId: payload.projectId || undefined,
         customerId: payload.customerId || undefined,
         invoiceRef: payload.invoiceRef || undefined,
@@ -263,6 +281,84 @@ export default function EditLedgerEntryPage({
           </Field>
         </div>
 
+        {/* Paid through + goods/service */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Paid through (account)">
+            <Select
+              value={form.paymentAccountId || "NONE"}
+              onValueChange={(v) => {
+                if (v === "NONE") {
+                  setForm((f) => ({ ...f, paymentAccountId: "" }));
+                  return;
+                }
+                const acc = accounts.find((a) => a._id === v);
+                setForm((f) => ({
+                  ...f,
+                  paymentAccountId: v,
+                  paymentMethod: acc ? methodForType(acc.type) : f.paymentMethod,
+                }));
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select account" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NONE">Not specified</SelectItem>
+                {accounts.map((a) => (
+                  <SelectItem key={a._id} value={a._id}>
+                    {a.name} — {a.type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          {form.entryType === "EXPENSE" && (
+            <Field label="Goods or Service">
+              <Select
+                value={form.itemType || "NONE"}
+                onValueChange={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    itemType: v === "NONE" ? "" : (v as "GOODS" | "SERVICE"),
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NONE">Not specified</SelectItem>
+                  <SelectItem value="GOODS">Goods</SelectItem>
+                  <SelectItem value="SERVICE">Service</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
+        </div>
+
+        {form.entryType === "EXPENSE" && (
+          <Field label="Vendor (optional)">
+            <Select
+              value={form.vendorId || "NONE"}
+              onValueChange={(v) =>
+                setForm((f) => ({ ...f, vendorId: v === "NONE" ? "" : v }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select vendor (e.g. KSEB)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NONE">No vendor</SelectItem>
+                {vendors.map((vd) => (
+                  <SelectItem key={vd._id} value={vd._id}>
+                    {vd.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        )}
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Project (optional)">
             <Select
@@ -329,6 +425,19 @@ export default function EditLedgerEntryPage({
       </form>
     </div>
   );
+}
+
+function methodForType(type: string): PaymentMethod {
+  switch (type) {
+    case "BANK":
+      return "BANK_TRANSFER";
+    case "CASH":
+      return "CASH";
+    case "UPI":
+      return "UPI";
+    default:
+      return "OTHER";
+  }
 }
 
 function Field({

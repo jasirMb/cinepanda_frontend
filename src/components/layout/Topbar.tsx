@@ -101,6 +101,15 @@ const ROUTE_META: { match: (p: string) => boolean; meta: PageMeta }[] = [
   },
 
   {
+    match: (p) => p.startsWith("/vendors"),
+    meta: { title: "Vendors", subtitle: "Suppliers & payees" },
+  },
+  {
+    match: (p) => p.startsWith("/payment-accounts"),
+    meta: { title: "Payment Accounts", subtitle: "Banks, cash & UPI" },
+  },
+
+  {
     match: (p) => p === "/projects/new",
     meta: { title: "New Project", subtitle: "Start a new project" },
   },

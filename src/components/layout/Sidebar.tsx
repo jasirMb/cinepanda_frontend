@@ -6,7 +6,9 @@ import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import clsx from "clsx";
 import {
+  Building2,
   ChevronsLeft,
+  CreditCard,
   FileText,
   FolderKanban,
   HardHat,
@@ -39,6 +41,8 @@ const navItems: {
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/labours", label: "Labours", icon: HardHat },
   { href: "/projects", label: "Projects", icon: FolderKanban },
+  { href: "/vendors", label: "Vendors", icon: Building2 },
+  { href: "/payment-accounts", label: "Payment Accounts", icon: CreditCard },
   { href: "/ledger", label: "Ledger", icon: Wallet },
 ];
 
