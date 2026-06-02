@@ -5,8 +5,10 @@ import {
   fetchLabours,
   fetchLabour,
   fetchLabourRoles,
+  fetchLabourMemberships,
   type LaboursListResponse,
   type Labour,
+  type LabourMemberships,
 } from "@/lib/api/labours";
 
 export const laboursKeys = {
@@ -14,6 +16,7 @@ export const laboursKeys = {
   list: () => [...laboursKeys.all, "list"] as const,
   detail: (id: string) => [...laboursKeys.all, id] as const,
   roles: () => [...laboursKeys.all, "roles"] as const,
+  memberships: (id: string) => [...laboursKeys.all, id, "memberships"] as const,
 };
 
 export function useLabours() {
@@ -37,6 +40,15 @@ export function useLabourRoles() {
   return useQuery<string[]>({
     queryKey: laboursKeys.roles(),
     queryFn: fetchLabourRoles,
+    staleTime: 60_000,
+  });
+}
+
+export function useLabourMemberships(id: string) {
+  return useQuery<LabourMemberships>({
+    queryKey: laboursKeys.memberships(id),
+    queryFn: () => fetchLabourMemberships(id),
+    enabled: !!id,
     staleTime: 60_000,
   });
 }

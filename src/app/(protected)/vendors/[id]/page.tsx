@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Banknote,
@@ -14,9 +15,12 @@ import {
   FolderKanban,
   Phone,
   Receipt,
+  Users,
 } from "lucide-react";
 
-import { useVendor } from "@/hooks/useVendors";
+import { useVendor, vendorsKeys } from "@/hooks/useVendors";
+import { addVendorLabour, removeVendorLabour } from "@/lib/api/vendors";
+import { LabourRoster } from "@/components/labour/LabourRoster";
 import { useLedger } from "@/hooks/useLedger";
 import type { LedgerEntryPopulated } from "@/lib/api/ledger";
 import {
@@ -110,8 +114,22 @@ export default function VendorDetailPage({
   params: { id: string };
 }) {
   const { id } = params;
+  const queryClient = useQueryClient();
   const vendorQuery = useVendor(id);
   const vendor = vendorQuery.data;
+
+  const labourMutation = useMutation({
+    mutationFn: ({ action, labourId }: { action: "add" | "remove"; labourId: string }) =>
+      action === "add"
+        ? addVendorLabour(id, labourId)
+        : removeVendorLabour(id, labourId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: vendorsKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: ["labours"] });
+    },
+    onError: (e: any) =>
+      toast.error(e?.response?.data?.error ?? "Could not update labours"),
+  });
 
   const ledgerQuery = useLedger({ vendorId: id });
   const entries = ledgerQuery.data?.data ?? [];
@@ -323,6 +341,28 @@ export default function VendorDetailPage({
         >
           <Download className="h-4 w-4" /> Statement
         </Button>
+      </div>
+
+      {/* Labours */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="mb-3 flex items-center gap-2">
+          <Users className="h-4 w-4 text-cine-primary" />
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+            Labours
+          </h3>
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            {vendor.labours?.length ?? 0}
+          </span>
+        </div>
+        <LabourRoster
+          labours={vendor.labours ?? []}
+          pending={labourMutation.isPending}
+          onAdd={(labourId) => labourMutation.mutate({ action: "add", labourId })}
+          onRemove={(labourId) =>
+            labourMutation.mutate({ action: "remove", labourId })
+          }
+          emptyText="No labours linked to this vendor yet. Search to add some."
+        />
       </div>
 
       {/* Filters */}

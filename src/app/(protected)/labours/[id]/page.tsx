@@ -20,7 +20,7 @@ import {
   X,
 } from "lucide-react";
 
-import { useLabour } from "@/hooks/useLabours";
+import { useLabour, useLabourMemberships } from "@/hooks/useLabours";
 import { useProjects } from "@/hooks/useProjects";
 import { useLabourWorkLogs, workLogKeys } from "@/hooks/useLabourWorkLogs";
 import {
@@ -71,6 +71,7 @@ export default function LabourDetailPage({
 
   const labourQuery = useLabour(id);
   const labour = labourQuery.data;
+  const memberships = useLabourMemberships(id).data;
 
   // Only projects this labour is added to — a session can only be logged there.
   const projectsQuery = useProjects({ labourId: id });
@@ -350,6 +351,56 @@ export default function LabourDetailPage({
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* Member of: vendors & groups */}
+      {((memberships?.vendors.length ?? 0) > 0 ||
+        (memberships?.groups.length ?? 0) > 0) && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <h3 className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-50">
+            Member of
+          </h3>
+          {(memberships?.vendors.length ?? 0) > 0 && (
+            <div className="mb-3">
+              <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+                Vendors
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {memberships!.vendors.map((v) => (
+                  <Link
+                    key={v._id}
+                    href={`/vendors/${v._id}`}
+                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    {v.name}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+          {(memberships?.groups.length ?? 0) > 0 && (
+            <div>
+              <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+                Groups
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {memberships!.groups.map((g) => (
+                  <Link
+                    key={g._id}
+                    href={`/groups/${g._id}`}
+                    className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: g.color || "#3076A1" }}
+                    />
+                    {g.name}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

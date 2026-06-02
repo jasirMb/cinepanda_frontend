@@ -85,3 +85,33 @@ export async function updateLabour(
 export async function deleteLabour(id: string): Promise<void> {
   await api.delete(`/labours/${id}`);
 }
+
+/* ────────────────────────────────────────────
+   Memberships (which vendors & groups a labour belongs to)
+   ──────────────────────────────────────────── */
+
+/** Subset of a labour returned when populated inside a vendor/group roster. */
+export interface LabourLite {
+  _id: string;
+  name: string;
+  role?: string;
+  phone?: string;
+  dailyWage?: number;
+  region?: LabourRegion;
+  state?: string;
+  avatarUrl?: string;
+}
+
+export interface LabourMemberships {
+  vendors: { _id: string; name: string }[];
+  groups: { _id: string; name: string; color?: string }[];
+}
+
+export async function fetchLabourMemberships(
+  id: string
+): Promise<LabourMemberships> {
+  const { data } = await api.get<{ success: boolean; data: LabourMemberships }>(
+    `/labours/${id}/memberships`
+  );
+  return data.data;
+}

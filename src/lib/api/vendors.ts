@@ -1,4 +1,5 @@
 import api from "@/lib/axios-client";
+import type { LabourLite } from "@/lib/api/labours";
 
 export interface Vendor {
   _id: string;
@@ -14,6 +15,8 @@ export interface Vendor {
   ifsc?: string;
   notes?: string;
   isActive: boolean;
+  // Populated only on the detail endpoint (vendor's labour roster).
+  labours?: LabourLite[];
   createdAt: string;
   updatedAt: string;
 }
@@ -71,4 +74,25 @@ export async function updateVendor(
 
 export async function deleteVendor(id: string): Promise<void> {
   await api.delete(`/vendors/${id}`);
+}
+
+export async function addVendorLabour(
+  id: string,
+  labourId: string
+): Promise<Vendor> {
+  const { data } = await api.post<{ success: boolean; data: Vendor }>(
+    `/vendors/${id}/labours`,
+    { labourId }
+  );
+  return data.data;
+}
+
+export async function removeVendorLabour(
+  id: string,
+  labourId: string
+): Promise<Vendor> {
+  const { data } = await api.delete<{ success: boolean; data: Vendor }>(
+    `/vendors/${id}/labours/${labourId}`
+  );
+  return data.data;
 }
