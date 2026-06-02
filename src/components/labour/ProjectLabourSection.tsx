@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -78,6 +78,9 @@ export function ProjectLabourSection({
 
   const [adding, setAdding] = useState(false);
   const [selectId, setSelectId] = useState("");
+  const [labourSearch, setLabourSearch] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
   const [newCharge, setNewCharge] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editCharge, setEditCharge] = useState("");
@@ -87,6 +90,32 @@ export function ProjectLabourSection({
   const involvedIds = new Set(labours.map((l) => l.labourId._id));
   const available = allLabours.filter((l) => !involvedIds.has(l._id));
   const totalCharge = labours.reduce((s, l) => s + (l.charge ?? 0), 0);
+
+  const filteredAvailable = useMemo(() => {
+    const q = labourSearch.trim().toLowerCase();
+    if (!q) return available;
+    return available.filter(
+      (l) =>
+        l.name.toLowerCase().includes(q) ||
+        (l.role ?? "").toLowerCase().includes(q)
+    );
+  }, [available, labourSearch]);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  function pickLabour(labourId: string, name: string) {
+    onSelectLabour(labourId);
+    setLabourSearch(name);
+    setPickerOpen(false);
+  }
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -108,6 +137,8 @@ export function ProjectLabourSection({
     onSuccess: () => {
       invalidate();
       setSelectId("");
+      setLabourSearch("");
+      setPickerOpen(false);
       setNewCharge("");
       setAdding(false);
       setEditingId(null);
@@ -125,6 +156,7 @@ export function ProjectLabourSection({
     },
     onError: () => toast.error("Failed to remove labour"),
   });
+
 
   function onSelectLabour(labourId: string) {
     setSelectId(labourId);
@@ -176,7 +208,16 @@ export function ProjectLabourSection({
             </span>
           )}
         </div>
-        <Button size="sm" onClick={() => setAdding((v) => !v)}>
+        <Button
+          size="sm"
+          onClick={() => {
+            setAdding((v) => !v);
+            setLabourSearch("");
+            setSelectId("");
+            setNewCharge("");
+            setPickerOpen(false);
+          }}
+        >
           {adding ? (
             <>
               <X className="h-4 w-4" /> Cancel
@@ -211,19 +252,49 @@ export function ProjectLabourSection({
             </p>
           ) : (
             <div className="flex flex-col gap-2 sm:flex-row">
-              <select
-                value={selectId}
-                onChange={(e) => onSelectLabour(e.target.value)}
-                className="h-9 flex-1 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-              >
-                <option value="">Select a labour…</option>
-                {available.map((l) => (
-                  <option key={l._id} value={l._id}>
-                    {l.name}
-                    {l.role ? ` — ${l.role}` : ""}
-                  </option>
-                ))}
-              </select>
+              <div ref={pickerRef} className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input
+                  value={labourSearch}
+                  onChange={(e) => {
+                    setLabourSearch(e.target.value);
+                    setSelectId("");
+                    setPickerOpen(true);
+                  }}
+                  onFocus={() => setPickerOpen(true)}
+                  placeholder="Search & select a labour…"
+                  className="pl-9"
+                  autoComplete="off"
+                />
+                {pickerOpen && filteredAvailable.length > 0 && (
+                  <ul className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                    {filteredAvailable.map((l) => (
+                      <li key={l._id}>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            pickLabour(l._id, l.name);
+                          }}
+                          className="block w-full px-3 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                          {l.name}
+                          {l.role ? (
+                            <span className="text-slate-400"> — {l.role}</span>
+                          ) : null}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {pickerOpen &&
+                  labourSearch.trim() &&
+                  filteredAvailable.length === 0 && (
+                    <div className="absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+                      No matching labour.
+                    </div>
+                  )}
+              </div>
               <Input
                 type="number"
                 min={0}
