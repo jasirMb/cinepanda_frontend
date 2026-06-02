@@ -70,7 +70,8 @@ export default function LabourDetailPage({
   const labourQuery = useLabour(id);
   const labour = labourQuery.data;
 
-  const projectsQuery = useProjects();
+  // Only projects this labour is added to — a session can only be logged there.
+  const projectsQuery = useProjects({ labourId: id });
   const projects = projectsQuery.data?.data ?? [];
 
   const logsQuery = useLabourWorkLogs({ labourId: id });
@@ -166,7 +167,10 @@ export default function LabourDetailPage({
       setForm({ ...EMPTY, rate: labour?.dailyWage != null ? String(labour.dailyWage) : "" });
       toast.success("Work session added & expense recorded");
     },
-    onError: () => toast.error("Failed to add work session"),
+    onError: (err: any) =>
+      toast.error(
+        err?.response?.data?.error ?? "Failed to add work session"
+      ),
   });
 
   const deleteMutation = useMutation({
@@ -353,6 +357,13 @@ export default function LabourDetailPage({
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-50">
           <Plus className="h-4 w-4" /> Log a work session
         </div>
+        {projects.length === 0 && (
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+            This labour isn&apos;t added to any project yet. Add them to a
+            project&apos;s &ldquo;Involved Labours&rdquo; list first, then you can
+            log sessions here.
+          </p>
+        )}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Project *">
             <select

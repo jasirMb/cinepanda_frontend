@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -10,11 +10,13 @@ import {
   HardHat,
   Pencil,
   Plus,
+  Search,
   Trash2,
   X,
 } from "lucide-react";
 
 import { useLabours } from "@/hooks/useLabours";
+import { useLabourWorkLogs } from "@/hooks/useLabourWorkLogs";
 import { projectsKeys } from "@/hooks/useProjects";
 import {
   addProjectLabour,
@@ -62,16 +64,39 @@ export function ProjectLabourSection({
   const queryClient = useQueryClient();
   const allLabours = useLabours().data?.data ?? [];
 
+  // How much each labour has actually earned on THIS project (sum of their
+  // work-log amounts → the labour expenses recorded against the project).
+  const workLogs = useLabourWorkLogs({ projectId }).data?.data ?? [];
+  const earnedByLabour = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const w of workLogs) {
+      const lid = typeof w.labourId === "string" ? w.labourId : w.labourId._id;
+      map.set(lid, (map.get(lid) ?? 0) + (w.amount ?? 0));
+    }
+    return map;
+  }, [workLogs]);
+
   const [adding, setAdding] = useState(false);
   const [selectId, setSelectId] = useState("");
   const [newCharge, setNewCharge] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editCharge, setEditCharge] = useState("");
   const [pendingRemove, setPendingRemove] = useState<ProjectLabour | null>(null);
+  const [search, setSearch] = useState("");
 
   const involvedIds = new Set(labours.map((l) => l.labourId._id));
   const available = allLabours.filter((l) => !involvedIds.has(l._id));
   const totalCharge = labours.reduce((s, l) => s + (l.charge ?? 0), 0);
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return labours;
+    return labours.filter(
+      (e) =>
+        e.labourId.name.toLowerCase().includes(q) ||
+        (e.labourId.role ?? "").toLowerCase().includes(q)
+    );
+  }, [labours, search]);
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: projectsKeys.detail(projectId) });
@@ -218,16 +243,34 @@ export function ProjectLabourSection({
         </div>
       )}
 
+      {/* Search */}
+      {labours.length > 0 && (
+        <div className="relative max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search involved labours by name or role"
+            className="pl-9"
+          />
+        </div>
+      )}
+
       {/* Roster */}
       {labours.length === 0 ? (
         <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
           No labours added to this project yet.
         </div>
+      ) : visible.length === 0 ? (
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          No involved labours match your search.
+        </p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          {labours.map((entry) => {
+          {visible.map((entry) => {
             const labour = entry.labourId;
             const isEditing = editingId === labour._id;
+            const earned = earnedByLabour.get(labour._id) ?? 0;
             return (
               <div
                 key={labour._id}
@@ -262,7 +305,7 @@ export function ProjectLabourSection({
                       {labour.role}
                     </span>
                   )}
-                  {/* Charge: display or inline-edit */}
+                  {/* Price (charge) + earned on this project */}
                   {isEditing ? (
                     <div className="mt-1 flex items-center gap-1">
                       <Input
@@ -291,15 +334,23 @@ export function ProjectLabourSection({
                       </button>
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => startEdit(entry)}
-                      className="mt-0.5 inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline dark:text-emerald-300"
-                      title="Edit charge"
-                    >
-                      {inr(entry.charge)}
-                      <Pencil className="h-3 w-3 text-slate-400" />
-                    </button>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(entry)}
+                        className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:underline dark:text-emerald-300"
+                        title="Edit price"
+                      >
+                        Price: {inr(entry.charge)}
+                        <Pencil className="h-3 w-3 text-slate-400" />
+                      </button>
+                      <span className="text-slate-500 dark:text-slate-400">
+                        Earned:{" "}
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">
+                          {inr(earned)}
+                        </span>
+                      </span>
+                    </div>
                   )}
                 </div>
                 <button

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -8,6 +8,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   FileText,
   IndianRupee,
@@ -21,6 +23,7 @@ import {
   User,
   UserPlus,
   Wallet,
+  X,
 } from "lucide-react";
 
 import { projectsKeys, useProject } from "@/hooks/useProjects";
@@ -121,30 +124,64 @@ export default function ProjectDetailPage({
   const ledgerQuery = useLedger({ projectId: id });
   const ledgerEntries = ledgerQuery.data?.data ?? [];
 
-  const [ledgerFilter, setLedgerFilter] = useState<
-    "all" | "income" | "expense" | "labour"
-  >("all");
-  const ledgerCounts = useMemo(
-    () => ({
-      all: ledgerEntries.length,
-      income: ledgerEntries.filter((e) => e.entryType === "INCOME").length,
-      expense: ledgerEntries.filter((e) => e.entryType === "EXPENSE").length,
-      labour: ledgerEntries.filter((e) => e.category === "LABOUR").length,
-    }),
+  // Ledger filters: type, category and date range (all combine).
+  const [ledgerType, setLedgerType] = useState<"all" | "INCOME" | "EXPENSE">(
+    "all"
+  );
+  const [ledgerCategory, setLedgerCategory] = useState("");
+  const [ledgerFrom, setLedgerFrom] = useState("");
+  const [ledgerTo, setLedgerTo] = useState("");
+
+  const ledgerCategoryOptions = useMemo(
+    () =>
+      Array.from(new Set(ledgerEntries.map((e) => e.category)))
+        .filter(Boolean)
+        .sort(),
     [ledgerEntries]
   );
+  const ledgerFiltersActive =
+    ledgerType !== "all" || !!ledgerCategory || !!ledgerFrom || !!ledgerTo;
+
   const filteredLedger = useMemo(() => {
-    switch (ledgerFilter) {
-      case "income":
-        return ledgerEntries.filter((e) => e.entryType === "INCOME");
-      case "expense":
-        return ledgerEntries.filter((e) => e.entryType === "EXPENSE");
-      case "labour":
-        return ledgerEntries.filter((e) => e.category === "LABOUR");
-      default:
-        return ledgerEntries;
-    }
-  }, [ledgerEntries, ledgerFilter]);
+    const fromTs = ledgerFrom ? new Date(ledgerFrom).getTime() : null;
+    const toTs = ledgerTo ? new Date(`${ledgerTo}T23:59:59`).getTime() : null;
+    return ledgerEntries.filter((e) => {
+      if (ledgerType !== "all" && e.entryType !== ledgerType) return false;
+      if (ledgerCategory && e.category !== ledgerCategory) return false;
+      const ts = new Date(e.entryDate).getTime();
+      if (fromTs != null && ts < fromTs) return false;
+      if (toTs != null && ts > toTs) return false;
+      return true;
+    });
+  }, [ledgerEntries, ledgerType, ledgerCategory, ledgerFrom, ledgerTo]);
+
+  function clearLedgerFilters() {
+    setLedgerType("all");
+    setLedgerCategory("");
+    setLedgerFrom("");
+    setLedgerTo("");
+  }
+
+  const LEDGER_PER_PAGE = 10;
+  const [ledgerPage, setLedgerPage] = useState(1);
+  const ledgerPageCount = Math.max(
+    1,
+    Math.ceil(filteredLedger.length / LEDGER_PER_PAGE)
+  );
+  const pagedLedger = useMemo(
+    () =>
+      filteredLedger.slice(
+        (ledgerPage - 1) * LEDGER_PER_PAGE,
+        ledgerPage * LEDGER_PER_PAGE
+      ),
+    [filteredLedger, ledgerPage]
+  );
+  useEffect(() => {
+    setLedgerPage(1);
+  }, [ledgerType, ledgerCategory, ledgerFrom, ledgerTo]);
+  useEffect(() => {
+    if (ledgerPage > ledgerPageCount) setLedgerPage(ledgerPageCount);
+  }, [ledgerPage, ledgerPageCount]);
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -525,40 +562,62 @@ export default function ProjectDetailPage({
         </div>
 
         {ledgerEntries.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {(
-              [
-                ["all", "All"],
-                ["income", "Income"],
-                ["expense", "Expense"],
-                ["labour", "Labour"],
-              ] as const
-            ).map(([key, label]) => {
-              const active = ledgerFilter === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setLedgerFilter(key)}
-                  className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition ${
-                    active
-                      ? "border-cine-primary bg-cine-primary/10 text-cine-primary"
-                      : "border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                  }`}
-                >
-                  {label}
-                  <span
-                    className={`rounded px-1 text-[10px] font-semibold ${
-                      active
-                        ? "bg-cine-primary/20"
-                        : "bg-slate-100 dark:bg-slate-800"
-                    }`}
-                  >
-                    {ledgerCounts[key]}
-                  </span>
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+            <FilterField label="Type">
+              <select
+                value={ledgerType}
+                onChange={(e) =>
+                  setLedgerType(e.target.value as "all" | "INCOME" | "EXPENSE")
+                }
+                className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+              >
+                <option value="all">All</option>
+                <option value="INCOME">Income</option>
+                <option value="EXPENSE">Expense</option>
+              </select>
+            </FilterField>
+            <FilterField label="Category">
+              <select
+                value={ledgerCategory}
+                onChange={(e) => setLedgerCategory(e.target.value)}
+                className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+              >
+                <option value="">All categories</option>
+                {ledgerCategoryOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c.replace(/_/g, " ")}
+                  </option>
+                ))}
+              </select>
+            </FilterField>
+            <FilterField label="From">
+              <input
+                type="date"
+                value={ledgerFrom}
+                onChange={(e) => setLedgerFrom(e.target.value)}
+                className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+              />
+            </FilterField>
+            <FilterField label="To">
+              <input
+                type="date"
+                value={ledgerTo}
+                onChange={(e) => setLedgerTo(e.target.value)}
+                className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+              />
+            </FilterField>
+            {ledgerFiltersActive && (
+              <button
+                type="button"
+                onClick={clearLedgerFilters}
+                className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium text-slate-500 hover:text-cine-primary dark:text-slate-400"
+              >
+                <X className="h-3.5 w-3.5" /> Clear
+              </button>
+            )}
+            <span className="ml-auto self-center text-xs text-slate-500 dark:text-slate-400">
+              {filteredLedger.length} of {ledgerEntries.length}
+            </span>
           </div>
         )}
 
@@ -568,9 +627,10 @@ export default function ProjectDetailPage({
           </div>
         ) : filteredLedger.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
-            No {ledgerFilter} entries for this project.
+            No entries match the selected filters.
           </div>
         ) : (
+          <>
           <div className="w-full overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
             <table className="w-full min-w-[760px] table-fixed text-sm">
               <colgroup>
@@ -592,7 +652,7 @@ export default function ProjectDetailPage({
                 </tr>
               </thead>
               <tbody>
-                {filteredLedger.map((entry: LedgerEntryPopulated) => (
+                {pagedLedger.map((entry: LedgerEntryPopulated) => (
                   <tr
                     key={entry._id}
                     className="border-b border-slate-100 last:border-0 dark:border-slate-800/50"
@@ -656,6 +716,37 @@ export default function ProjectDetailPage({
               </tbody>
             </table>
           </div>
+          {filteredLedger.length > LEDGER_PER_PAGE && (
+            <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+              <span>
+                Page {ledgerPage} of {ledgerPageCount} · {filteredLedger.length}{" "}
+                entries
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setLedgerPage((p) => Math.max(1, p - 1))}
+                  disabled={ledgerPage <= 1}
+                  aria-label="Previous page"
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:border-slate-400 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setLedgerPage((p) => Math.min(ledgerPageCount, p + 1))
+                  }
+                  disabled={ledgerPage >= ledgerPageCount}
+                  aria-label="Next page"
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:border-slate-400 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+          </>
         )}
       </div>
 
@@ -672,6 +763,23 @@ export default function ProjectDetailPage({
 }
 
 /* ── Sub-components ── */
+
+function FilterField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
 
 type StatTone = "slate" | "emerald" | "red" | "amber";
 

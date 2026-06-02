@@ -87,6 +87,7 @@ export interface ProjectsListQuery {
   leadId?: string;
   startDate?: string;
   endDate?: string;
+  labourId?: string;
 }
 
 export interface CreateProjectPayload {
