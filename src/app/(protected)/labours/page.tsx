@@ -7,6 +7,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Banknote,
   Briefcase,
+  ChevronLeft,
+  ChevronRight,
   ImagePlus,
   Loader2,
   MapPin,
@@ -248,6 +250,20 @@ export default function LaboursPage() {
     );
   }, [labours, search]);
 
+  // Pagination for the labour grid (9 keeps the 3-column grid full).
+  const PER_PAGE = 9;
+  const [page, setPage] = useState(1);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const safePage = Math.min(page, pageCount);
+  const pagedLabours = useMemo(
+    () => filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE),
+    [filtered, safePage]
+  );
+  // Jump back to page 1 whenever the search changes.
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
   if (laboursQuery.isLoading) {
     return (
       <div className="space-y-4">
@@ -476,16 +492,60 @@ export default function LaboursPage() {
           No labours match your search.
         </p>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((labour: Labour) => (
-            <LabourCard
-              key={labour._id}
-              labour={labour}
-              onEdit={() => startEdit(labour)}
-              onDelete={() => setPendingDelete(labour)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {pagedLabours.map((labour: Labour) => (
+              <LabourCard
+                key={labour._id}
+                labour={labour}
+                onEdit={() => startEdit(labour)}
+                onDelete={() => setPendingDelete(labour)}
+              />
+            ))}
+          </div>
+
+          {filtered.length > PER_PAGE && (
+            <div className="mt-4 flex flex-col items-center justify-between gap-3 text-sm sm:flex-row">
+              <p className="text-slate-500 dark:text-slate-400">
+                Showing{" "}
+                <span className="font-medium text-slate-700 dark:text-slate-300">
+                  {(safePage - 1) * PER_PAGE + 1}–
+                  {Math.min(safePage * PER_PAGE, filtered.length)}
+                </span>{" "}
+                of{" "}
+                <span className="font-medium text-slate-700 dark:text-slate-300">
+                  {filtered.length}
+                </span>{" "}
+                labours
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Prev
+                </Button>
+                <span className="px-1 text-slate-600 dark:text-slate-300">
+                  Page {safePage} of {pageCount}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                  disabled={safePage >= pageCount}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <ConfirmDialog
