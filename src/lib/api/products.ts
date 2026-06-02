@@ -14,6 +14,8 @@ export interface Product {
   productModel?: string;
   price: number;
   unit: string;
+  imageUrl?: string;
+  imageKey?: string;
   specifications: Record<string, any>;
   isActive: boolean;
   createdAt: string;
@@ -92,6 +94,8 @@ export interface CreateProductPayload {
   productModel?: string;
   price: number;
   unit: string;
+  imageUrl?: string;
+  imageKey?: string;
   specifications?: Record<string, any>;
 }
 

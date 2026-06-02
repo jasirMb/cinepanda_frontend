@@ -44,8 +44,17 @@ export function ProductsTable({ products, onDelete }: ProductsTableProps) {
                 {/* Product */}
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-cine-primary/10 text-cine-primary">
-                      <Package className="h-4 w-4" />
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-cine-primary/10 text-cine-primary">
+                      {product.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={product.imageUrl}
+                          alt={product.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <Package className="h-4 w-4" />
+                      )}
                     </span>
                     <div className="min-w-0">
                       <p
