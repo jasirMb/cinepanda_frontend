@@ -50,8 +50,24 @@ export interface ProjectPopulated {
   expectedCompletionDate: string;
   actualCompletionDate?: string;
   status: ProjectStatus;
+  labours?: ProjectLabour[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProjectLabourInfo {
+  _id: string;
+  name: string;
+  role?: string;
+  dailyWage?: number;
+  avatarUrl?: string;
+  region?: string;
+  state?: string;
+}
+
+export interface ProjectLabour {
+  labourId: ProjectLabourInfo;
+  charge: number;
 }
 
 export interface ProjectsListResponse {
@@ -145,4 +161,28 @@ export async function updateProject(
 export async function deleteProject(id: string): Promise<MutationResponse> {
   const { data } = await api.delete<MutationResponse>(`/projects/${id}`);
   return data;
+}
+
+/** Add a labour (with its per-project charge) to a project, or update the charge. */
+export async function addProjectLabour(
+  projectId: string,
+  labourId: string,
+  charge: number
+): Promise<ProjectPopulated> {
+  const { data } = await api.post<ProjectDetailResponse>(
+    `/projects/${projectId}/labours`,
+    { labourId, charge }
+  );
+  return data.data;
+}
+
+/** Remove a labour from a project's involved-labours roster. */
+export async function removeProjectLabour(
+  projectId: string,
+  labourId: string
+): Promise<ProjectPopulated> {
+  const { data } = await api.delete<ProjectDetailResponse>(
+    `/projects/${projectId}/labours/${labourId}`
+  );
+  return data.data;
 }

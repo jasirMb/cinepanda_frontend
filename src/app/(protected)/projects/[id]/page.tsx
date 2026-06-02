@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -34,6 +34,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ProjectLabourSection } from "@/components/labour/ProjectLabourSection";
 import type { LedgerEntryPopulated } from "@/lib/api/ledger";
 
 const STATUS_BADGE: Record<ProjectStatus, string> = {
@@ -119,6 +120,31 @@ export default function ProjectDetailPage({
 
   const ledgerQuery = useLedger({ projectId: id });
   const ledgerEntries = ledgerQuery.data?.data ?? [];
+
+  const [ledgerFilter, setLedgerFilter] = useState<
+    "all" | "income" | "expense" | "labour"
+  >("all");
+  const ledgerCounts = useMemo(
+    () => ({
+      all: ledgerEntries.length,
+      income: ledgerEntries.filter((e) => e.entryType === "INCOME").length,
+      expense: ledgerEntries.filter((e) => e.entryType === "EXPENSE").length,
+      labour: ledgerEntries.filter((e) => e.category === "LABOUR").length,
+    }),
+    [ledgerEntries]
+  );
+  const filteredLedger = useMemo(() => {
+    switch (ledgerFilter) {
+      case "income":
+        return ledgerEntries.filter((e) => e.entryType === "INCOME");
+      case "expense":
+        return ledgerEntries.filter((e) => e.entryType === "EXPENSE");
+      case "labour":
+        return ledgerEntries.filter((e) => e.category === "LABOUR");
+      default:
+        return ledgerEntries;
+    }
+  }, [ledgerEntries, ledgerFilter]);
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -470,6 +496,9 @@ export default function ProjectDetailPage({
         )}
       </div>
 
+      {/* Labour */}
+      <ProjectLabourSection projectId={id} labours={project.labours ?? []} />
+
       {/* Ledger entries */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -495,9 +524,51 @@ export default function ProjectDetailPage({
           </Button>
         </div>
 
+        {ledgerEntries.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {(
+              [
+                ["all", "All"],
+                ["income", "Income"],
+                ["expense", "Expense"],
+                ["labour", "Labour"],
+              ] as const
+            ).map(([key, label]) => {
+              const active = ledgerFilter === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setLedgerFilter(key)}
+                  className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition ${
+                    active
+                      ? "border-cine-primary bg-cine-primary/10 text-cine-primary"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  {label}
+                  <span
+                    className={`rounded px-1 text-[10px] font-semibold ${
+                      active
+                        ? "bg-cine-primary/20"
+                        : "bg-slate-100 dark:bg-slate-800"
+                    }`}
+                  >
+                    {ledgerCounts[key]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {ledgerEntries.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
             No ledger entries linked to this project yet.
+          </div>
+        ) : filteredLedger.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
+            No {ledgerFilter} entries for this project.
           </div>
         ) : (
           <div className="w-full overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
@@ -521,7 +592,7 @@ export default function ProjectDetailPage({
                 </tr>
               </thead>
               <tbody>
-                {ledgerEntries.map((entry: LedgerEntryPopulated) => (
+                {filteredLedger.map((entry: LedgerEntryPopulated) => (
                   <tr
                     key={entry._id}
                     className="border-b border-slate-100 last:border-0 dark:border-slate-800/50"

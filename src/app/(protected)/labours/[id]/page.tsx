@@ -502,32 +502,38 @@ export default function LabourDetailPage({
             {pagedLogs.map((log) => (
               <li
                 key={log._id}
-                className="flex items-center justify-between gap-3 px-4 py-3"
+                className="group flex items-center gap-3 px-4 py-3 transition hover:bg-slate-50 dark:hover:bg-slate-800/40"
               >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-50">
-                    {projectLabel(log.projectId)}
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cine-primary/10 text-cine-primary">
+                  <FolderKanban className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
+                      {projectLabel(log.projectId)}
+                    </p>
                     {log.sessionLabel && (
-                      <span className="ml-1.5 text-xs font-normal text-slate-500 dark:text-slate-400">
-                        · {log.sessionLabel}
+                      <span className="rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                        {log.sessionLabel}
                       </span>
                     )}
-                  </p>
-                  <p className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                  </div>
+                  <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                     <CalendarDays className="h-3 w-3" />
-                    {new Date(log.workDate).toLocaleDateString()} · {log.days} day(s) ×{" "}
-                    {inr(log.rate)}
+                    {new Date(log.workDate).toLocaleDateString()}
+                    <span className="text-slate-300 dark:text-slate-600">•</span>
+                    {log.days} day(s) × {inr(log.rate)}
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
                     {inr(log.amount)}
                   </span>
                   <button
                     type="button"
                     onClick={() => setPendingDelete(log)}
                     aria-label="Remove session"
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:hover:bg-red-950/40"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
