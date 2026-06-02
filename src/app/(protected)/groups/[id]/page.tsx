@@ -54,7 +54,7 @@ export default function GroupDetailPage({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="max-w-5xl space-y-4">
       <BackLink />
 
       {/* Header */}

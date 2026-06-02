@@ -19,7 +19,6 @@ import {
   Settings,
   UserPlus,
   Users,
-  UsersRound,
   Wallet,
   X,
 } from "lucide-react";
@@ -41,7 +40,6 @@ const navItems: {
   { href: "/quotations", label: "Quotations", icon: Receipt },
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/labours", label: "Labours", icon: HardHat },
-  { href: "/groups", label: "Groups", icon: UsersRound },
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/vendors", label: "Vendors", icon: Building2 },
   { href: "/payment-accounts", label: "Payment Accounts", icon: CreditCard },

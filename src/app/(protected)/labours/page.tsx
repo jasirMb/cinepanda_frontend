@@ -5,13 +5,10 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Banknote,
-  Briefcase,
   ChevronLeft,
   ChevronRight,
   ImagePlus,
   Loader2,
-  MapPin,
   Pencil,
   Phone,
   Plus,
@@ -623,11 +620,16 @@ function LabourCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const meta = [
+    labour.dailyWage != null ? `₹${labour.dailyWage.toLocaleString("en-IN")}/day` : null,
+    ...Array.from(new Set([labour.region, labour.state].filter(Boolean))),
+  ].filter(Boolean) as string[];
+
   return (
-    <div className="group flex h-full flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
-      <div className="flex items-start gap-3">
+    <div className="group flex h-full flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
+      <div className="flex items-center gap-3">
         <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-semibold ${avatarColor(
+          className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-semibold ${avatarColor(
             labour.name
           )}`}
         >
@@ -645,18 +647,24 @@ function LabourCard({
         <div className="min-w-0 flex-1">
           <Link
             href={`/labours/${labour._id}`}
-            className="block truncate text-base font-semibold text-slate-900 hover:text-cine-primary hover:underline dark:text-slate-50"
+            className="block truncate text-sm font-semibold text-slate-900 hover:text-cine-primary hover:underline dark:text-slate-50"
           >
             {labour.name}
           </Link>
-          {labour.role && (
-            <p className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-              <Briefcase className="h-3 w-3" />
-              {labour.role}
-            </p>
-          )}
+          <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+            {[labour.role, ...meta].filter(Boolean).join(" · ") || "—"}
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
+          {labour.phone && (
+            <a
+              href={`tel:${labour.phone}`}
+              aria-label="Call"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            >
+              <Phone className="h-3.5 w-3.5" />
+            </a>
+          )}
           <button
             type="button"
             onClick={onEdit}
@@ -676,40 +684,8 @@ function LabourCard({
         </div>
       </div>
 
-      <div className="space-y-1.5 text-sm text-slate-700 dark:text-slate-300">
-        {labour.phone && (
-          <p className="flex items-center gap-2">
-            <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-            <a href={`tel:${labour.phone}`} className="hover:text-cine-primary">
-              {labour.phone}
-            </a>
-          </p>
-        )}
-        {labour.dailyWage != null && (
-          <p className="flex items-center gap-2">
-            <Banknote className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-            <span>₹{labour.dailyWage.toLocaleString("en-IN")} / day</span>
-          </p>
-        )}
-        {(labour.region || labour.state) && (
-          <p className="flex items-center gap-2">
-            <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-            <span className="truncate">
-              {Array.from(
-                new Set([labour.region, labour.state].filter(Boolean))
-              ).join(" · ")}
-            </span>
-          </p>
-        )}
-        {labour.details && (
-          <p className="line-clamp-2 text-xs text-slate-500 dark:text-slate-400">
-            {labour.details}
-          </p>
-        )}
-      </div>
-
       {groups.length > 0 && (
-        <div className="mt-auto flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+        <div className="mt-auto flex flex-wrap items-center gap-1.5">
           {groups.map((g) => (
             <Link
               key={g._id}

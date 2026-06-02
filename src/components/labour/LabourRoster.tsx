@@ -132,18 +132,18 @@ export function LabourRoster({
         )}
       </div>
 
-      {/* Current roster — compact rows */}
+      {/* Current roster — cards */}
       {labours.length === 0 ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">{emptyText}</p>
       ) : (
-        <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+        <div className="grid gap-3 sm:grid-cols-2">
           {labours.map((l) => (
             <div
               key={l._id}
-              className="flex items-center gap-3 bg-white px-3 py-2 dark:bg-slate-900/60"
+              className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
             >
               <span
-                className={`flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full text-[11px] font-semibold ${avatarColor(
+                className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-semibold ${avatarColor(
                   l.name
                 )}`}
               >
@@ -158,25 +158,27 @@ export function LabourRoster({
                   getInitials(l.name)
                 )}
               </span>
-              <Link
-                href={`/labours/${l._id}`}
-                className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900 hover:text-cine-primary hover:underline dark:text-slate-100"
-              >
-                {l.name}
-              </Link>
-              {l.role && (
-                <span className="hidden shrink-0 truncate text-xs text-slate-500 dark:text-slate-400 sm:block">
-                  {l.role}
-                </span>
-              )}
-              <span className="w-20 shrink-0 text-right text-xs tabular-nums text-slate-600 dark:text-slate-300">
-                {l.dailyWage ? `₹${l.dailyWage.toLocaleString("en-IN")}` : "—"}
-              </span>
+              <div className="min-w-0 flex-1">
+                <Link
+                  href={`/labours/${l._id}`}
+                  className="block truncate text-sm font-semibold text-slate-900 hover:text-cine-primary hover:underline dark:text-slate-100"
+                >
+                  {l.name}
+                </Link>
+                <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                  {[
+                    l.role,
+                    l.dailyWage ? `₹${l.dailyWage.toLocaleString("en-IN")}/day` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "—"}
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => onRemove(l._id)}
                 disabled={pending}
-                className="rounded-md p-1 text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-900/30"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-900/30"
                 aria-label={`Remove ${l.name}`}
               >
                 <X className="h-4 w-4" />

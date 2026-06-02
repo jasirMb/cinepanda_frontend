@@ -530,7 +530,7 @@ export function ProjectLabourSection({
           No involved labours match your search.
         </p>
       ) : (
-        <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+        <div className="grid gap-3 sm:grid-cols-2">
           {visible.map((entry) => {
             const labour = entry.labourId;
             const isEditing = editingId === labour._id;
@@ -538,10 +538,10 @@ export function ProjectLabourSection({
             return (
               <div
                 key={labour._id}
-                className="flex items-center gap-3 bg-white px-3 py-2 dark:bg-slate-900/60"
+                className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
               >
                 <div
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full text-[11px] font-semibold ${avatarColor(
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-semibold ${avatarColor(
                     labour.name
                   )}`}
                 >
@@ -556,74 +556,71 @@ export function ProjectLabourSection({
                     initials(labour.name)
                   )}
                 </div>
-                <div className="flex min-w-0 flex-1 items-center gap-2">
+                <div className="min-w-0 flex-1">
                   <Link
                     href={`/labours/${labour._id}`}
-                    className="truncate text-sm font-medium text-slate-900 hover:text-cine-primary hover:underline dark:text-slate-50"
+                    className="block truncate text-sm font-semibold text-slate-900 hover:text-cine-primary hover:underline dark:text-slate-50"
                   >
                     {labour.name}
                   </Link>
                   {labour.role && (
-                    <span className="hidden shrink-0 items-center gap-1 text-xs text-slate-400 sm:flex">
+                    <span className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                       <Briefcase className="h-3 w-3" />
                       {labour.role}
                     </span>
                   )}
+                  {isEditing ? (
+                    <div className="mt-1 flex items-center gap-1">
+                      <Input
+                        type="number"
+                        min={0}
+                        value={editCharge}
+                        onChange={(e) => setEditCharge(e.target.value)}
+                        className="h-7 w-28 text-xs"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => saveEdit(labour._id)}
+                        aria-label="Save charge"
+                        className="flex h-7 w-7 items-center justify-center rounded-md text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                      >
+                        <Check className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(null)}
+                        aria-label="Cancel"
+                        className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(entry)}
+                        className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:underline dark:text-emerald-300"
+                        title="Edit price"
+                      >
+                        Price: {inr(entry.charge)}
+                        <Pencil className="h-3 w-3 text-slate-400" />
+                      </button>
+                      <span className="text-slate-500 dark:text-slate-400">
+                        Earned:{" "}
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">
+                          {inr(earned)}
+                        </span>
+                      </span>
+                    </div>
+                  )}
                 </div>
-
-                {/* Price (editable) */}
-                {isEditing ? (
-                  <div className="flex shrink-0 items-center gap-1">
-                    <Input
-                      type="number"
-                      min={0}
-                      value={editCharge}
-                      onChange={(e) => setEditCharge(e.target.value)}
-                      className="h-7 w-24 text-xs"
-                      autoFocus
-                    />
-                    <button
-                      type="button"
-                      onClick={() => saveEdit(labour._id)}
-                      aria-label="Save charge"
-                      className="flex h-7 w-7 items-center justify-center rounded-md text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
-                    >
-                      <Check className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingId(null)}
-                      aria-label="Cancel"
-                      className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => startEdit(entry)}
-                    className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline dark:text-emerald-300"
-                    title="Edit price"
-                  >
-                    {inr(entry.charge)}
-                    <Pencil className="h-3 w-3 text-slate-400" />
-                  </button>
-                )}
-
-                {/* Earned */}
-                <span className="hidden w-24 shrink-0 text-right text-xs text-slate-500 dark:text-slate-400 sm:block">
-                  Earned{" "}
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">
-                    {inr(earned)}
-                  </span>
-                </span>
-
                 <button
                   type="button"
                   onClick={() => setPendingRemove(entry)}
                   aria-label="Remove labour"
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center self-start rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
