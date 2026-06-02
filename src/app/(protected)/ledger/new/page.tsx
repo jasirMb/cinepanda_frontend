@@ -226,6 +226,9 @@ export default function NewLedgerEntryPage() {
             <Select
               value={form.paymentMethod || "NONE"}
               onValueChange={(v) => {
+                // Ignore Radix's spurious onValueChange("") when the value has
+                // no matching item yet (async lists), so it can't clear a choice.
+                if (!v) return;
                 const method =
                   v === "NONE" ? ("" as PaymentMethod | "") : (v as PaymentMethod);
                 setForm((f) => {
@@ -259,7 +262,7 @@ export default function NewLedgerEntryPage() {
             <Select
               value={form.paymentStatus}
               onValueChange={(v) =>
-                setForm((f) => ({ ...f, paymentStatus: v as PaymentStatus }))
+                v && setForm((f) => ({ ...f, paymentStatus: v as PaymentStatus }))
               }
             >
               <SelectTrigger>
@@ -280,6 +283,7 @@ export default function NewLedgerEntryPage() {
             <Select
               value={form.paymentAccountId || "NONE"}
               onValueChange={(v) => {
+                if (!v) return;
                 if (v === "NONE") {
                   setForm((f) => ({ ...f, paymentAccountId: "" }));
                   return;
@@ -347,7 +351,7 @@ export default function NewLedgerEntryPage() {
             <Select
               value={form.vendorId || "NONE"}
               onValueChange={(v) =>
-                setForm((f) => ({ ...f, vendorId: v === "NONE" ? "" : v }))
+                v && setForm((f) => ({ ...f, vendorId: v === "NONE" ? "" : v }))
               }
             >
               <SelectTrigger>
@@ -370,7 +374,7 @@ export default function NewLedgerEntryPage() {
             <Select
               value={form.projectId || "NONE"}
               onValueChange={(v) =>
-                setForm((f) => ({ ...f, projectId: v === "NONE" ? "" : v }))
+                v && setForm((f) => ({ ...f, projectId: v === "NONE" ? "" : v }))
               }
             >
               <SelectTrigger>
@@ -390,7 +394,7 @@ export default function NewLedgerEntryPage() {
             <Select
               value={form.customerId || "NONE"}
               onValueChange={(v) =>
-                setForm((f) => ({ ...f, customerId: v === "NONE" ? "" : v }))
+                v && setForm((f) => ({ ...f, customerId: v === "NONE" ? "" : v }))
               }
             >
               <SelectTrigger>
@@ -445,6 +449,7 @@ export default function NewLedgerEntryPage() {
                 <Select
                   value={form.frequency}
                   onValueChange={(v) =>
+                    v &&
                     setForm((f) => ({
                       ...f,
                       frequency: v as RecurrenceFrequency,
@@ -626,7 +631,7 @@ function CategorySelect({
 
   return (
     <div className="space-y-1">
-      <Select value={value || undefined} onValueChange={onChange}>
+      <Select value={value || undefined} onValueChange={(v) => v && onChange(v)}>
         <SelectTrigger>
           <SelectValue
             placeholder={
