@@ -12,14 +12,17 @@ import {
   Plus,
   Search,
   Trash2,
+  UsersRound,
   X,
 } from "lucide-react";
 
 import { useLabours } from "@/hooks/useLabours";
+import { useGroups } from "@/hooks/useGroups";
 import { useLabourWorkLogs } from "@/hooks/useLabourWorkLogs";
 import { projectsKeys } from "@/hooks/useProjects";
 import {
   addProjectLabour,
+  addProjectGroup,
   removeProjectLabour,
   type ProjectLabour,
 } from "@/lib/api/projects";
@@ -63,6 +66,7 @@ export function ProjectLabourSection({
 }) {
   const queryClient = useQueryClient();
   const allLabours = useLabours().data?.data ?? [];
+  const allGroups = useGroups().data?.data ?? [];
 
   // How much each labour has actually earned on THIS project (sum of their
   // work-log amounts → the labour expenses recorded against the project).
@@ -86,6 +90,10 @@ export function ProjectLabourSection({
   const [editCharge, setEditCharge] = useState("");
   const [pendingRemove, setPendingRemove] = useState<ProjectLabour | null>(null);
   const [search, setSearch] = useState("");
+  const [addingGroup, setAddingGroup] = useState(false);
+  const [groupSearch, setGroupSearch] = useState("");
+  const [groupPickerOpen, setGroupPickerOpen] = useState(false);
+  const groupPickerRef = useRef<HTMLDivElement>(null);
 
   const involvedIds = new Set(labours.map((l) => l.labourId._id));
   const available = allLabours.filter((l) => !involvedIds.has(l._id));
@@ -157,6 +165,48 @@ export function ProjectLabourSection({
     onError: () => toast.error("Failed to remove labour"),
   });
 
+  const groupMutation = useMutation({
+    mutationFn: (groupId: string) => addProjectGroup(projectId, groupId),
+    onSuccess: (updated, groupId) => {
+      invalidate();
+      setAddingGroup(false);
+      setGroupSearch("");
+      setGroupPickerOpen(false);
+      const g = allGroups.find((x) => x._id === groupId);
+      const count = updated.labours?.length ?? 0;
+      toast.success(
+        `Added ${g?.name ?? "group"}'s labours${
+          count ? ` · ${count} on project` : ""
+        }`
+      );
+    },
+    onError: (e: any) =>
+      toast.error(e?.response?.data?.error ?? "Failed to add group"),
+  });
+
+  const filteredGroups = useMemo(() => {
+    const q = groupSearch.trim().toLowerCase();
+    if (!q) return allGroups;
+    return allGroups.filter(
+      (g) =>
+        g.name.toLowerCase().includes(q) ||
+        (g.description ?? "").toLowerCase().includes(q)
+    );
+  }, [allGroups, groupSearch]);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (
+        groupPickerRef.current &&
+        !groupPickerRef.current.contains(e.target as Node)
+      ) {
+        setGroupPickerOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
 
   function onSelectLabour(labourId: string) {
     setSelectId(labourId);
@@ -208,27 +258,120 @@ export function ProjectLabourSection({
             </span>
           )}
         </div>
-        <Button
-          size="sm"
-          onClick={() => {
-            setAdding((v) => !v);
-            setLabourSearch("");
-            setSelectId("");
-            setNewCharge("");
-            setPickerOpen(false);
-          }}
-        >
-          {adding ? (
-            <>
-              <X className="h-4 w-4" /> Cancel
-            </>
-          ) : (
-            <>
-              <Plus className="h-4 w-4" /> Add Labour
-            </>
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setAddingGroup((v) => !v);
+              setGroupSearch("");
+              setGroupPickerOpen(false);
+            }}
+          >
+            {addingGroup ? (
+              <>
+                <X className="h-4 w-4" /> Cancel
+              </>
+            ) : (
+              <>
+                <UsersRound className="h-4 w-4" /> Add Group
+              </>
+            )}
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              setAdding((v) => !v);
+              setLabourSearch("");
+              setSelectId("");
+              setNewCharge("");
+              setPickerOpen(false);
+            }}
+          >
+            {adding ? (
+              <>
+                <X className="h-4 w-4" /> Cancel
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4" /> Add Labour
+              </>
+            )}
+          </Button>
+        </div>
       </div>
+
+      {/* Add from group */}
+      {addingGroup && (
+        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+            Pick a group to add all its labours to this project. Labours already
+            here are skipped — no duplicates.
+          </p>
+          {allGroups.length === 0 ? (
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              No groups yet.{" "}
+              <Link
+                href="/groups"
+                className="font-medium text-cine-primary hover:underline"
+              >
+                Create a group first
+              </Link>
+              .
+            </p>
+          ) : (
+            <div ref={groupPickerRef} className="relative max-w-md">
+              <UsersRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                value={groupSearch}
+                onChange={(e) => {
+                  setGroupSearch(e.target.value);
+                  setGroupPickerOpen(true);
+                }}
+                onFocus={() => setGroupPickerOpen(true)}
+                placeholder="Search groups…"
+                className="pl-9"
+                autoComplete="off"
+                disabled={groupMutation.isPending}
+              />
+              {groupPickerOpen && filteredGroups.length > 0 && (
+                <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                  {filteredGroups.map((g) => (
+                    <li key={g._id}>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => groupMutation.mutate(g._id)}
+                        disabled={groupMutation.isPending}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-100 disabled:opacity-50 dark:hover:bg-slate-800"
+                      >
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: g.color || "#3076A1" }}
+                        />
+                        <span className="min-w-0 flex-1 truncate text-slate-700 dark:text-slate-200">
+                          {g.name}
+                        </span>
+                        <span className="shrink-0 text-xs text-slate-400">
+                          {(g.labours?.length ?? 0)} labour
+                          {(g.labours?.length ?? 0) === 1 ? "" : "s"}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {groupPickerOpen &&
+                groupSearch.trim() &&
+                filteredGroups.length === 0 && (
+                  <div className="absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+                    No matching group.
+                  </div>
+                )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Add control */}
       {adding && (

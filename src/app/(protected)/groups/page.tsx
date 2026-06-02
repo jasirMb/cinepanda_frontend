@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus, Search, Trash2, Users, X } from "lucide-react";
+import { Eye, Pencil, Plus, Search, Trash2, Users, X } from "lucide-react";
 
 import { groupsKeys, useGroups } from "@/hooks/useGroups";
 import {
@@ -218,53 +218,69 @@ export default function GroupsPage() {
           No groups yet. Create a crew and add labours to it.
         </div>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((g) => (
-            <div
-              key={g._id}
-              className="group flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
-            >
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((g) => {
+            const color = g.color || "#3076A1";
+            const count = g.labours?.length ?? 0;
+            return (
               <div
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white"
-                style={{ backgroundColor: g.color || "#3076A1" }}
+                key={g._id}
+                className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700"
               >
-                <Users className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <Link
-                  href={`/groups/${g._id}`}
-                  className="block truncate text-sm font-semibold text-slate-900 hover:text-cine-primary hover:underline dark:text-slate-50"
-                >
-                  {g.name}
-                </Link>
-                <div className="space-y-0.5 text-xs text-slate-500 dark:text-slate-400">
-                  <p>
-                    {(g.labours?.length ?? 0)} labour
-                    {(g.labours?.length ?? 0) === 1 ? "" : "s"}
-                  </p>
-                  {g.description && <p className="truncate">{g.description}</p>}
+                <div
+                  aria-hidden
+                  className="absolute left-0 top-0 h-full w-1"
+                  style={{ backgroundColor: color }}
+                />
+                <div className="flex flex-1 flex-col gap-3 p-4 pl-5">
+                  {/* Header */}
+                  <div className="flex items-start gap-3">
+                    <div
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white"
+                      style={{ backgroundColor: color }}
+                    >
+                      <Users className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-base font-semibold text-slate-900 dark:text-slate-50">
+                        {g.name}
+                      </h3>
+                      <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                        {g.description || "Crew / team"}
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      {count} labour{count === 1 ? "" : "s"}
+                    </span>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="mt-auto flex items-center justify-end gap-1.5 border-t border-slate-100 pt-3 dark:border-slate-800">
+                    <Link
+                      href={`/groups/${g._id}`}
+                      className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                    >
+                      <Eye className="h-3 w-3" /> View
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => startEdit(g)}
+                      className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                    >
+                      <Pencil className="h-3 w-3" /> Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPendingDelete(g)}
+                      className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
+                    >
+                      <Trash2 className="h-3 w-3" /> Delete
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
-                <button
-                  type="button"
-                  onClick={() => startEdit(g)}
-                  aria-label="Edit"
-                  className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPendingDelete(g)}
-                  aria-label="Delete"
-                  className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

@@ -187,3 +187,15 @@ export async function removeProjectLabour(
   );
   return data.data;
 }
+
+/** Add all labours from a group to the project (deduped server-side). */
+export async function addProjectGroup(
+  projectId: string,
+  groupId: string
+): Promise<ProjectPopulated> {
+  const { data } = await api.post<ProjectDetailResponse>(
+    `/projects/${projectId}/groups`,
+    { groupId }
+  );
+  return data.data;
+}
