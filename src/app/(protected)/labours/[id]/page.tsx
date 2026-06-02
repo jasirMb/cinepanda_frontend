@@ -17,6 +17,7 @@ import {
   Search,
   Trash2,
   Trophy,
+  X,
 } from "lucide-react";
 
 import { useLabour } from "@/hooks/useLabours";
@@ -78,6 +79,7 @@ export default function LabourDetailPage({
   const logs = logsQuery.data?.data ?? [];
 
   const [form, setForm] = useState(EMPTY);
+  const [showSessionForm, setShowSessionForm] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<LabourWorkLog | null>(null);
 
   // Default the rate to the labour's daily wage once it loads.
@@ -165,6 +167,7 @@ export default function LabourDetailPage({
       queryClient.invalidateQueries({ queryKey: workLogKeys.all });
       queryClient.invalidateQueries({ queryKey: ["ledger"] });
       setForm({ ...EMPTY, rate: labour?.dailyWage != null ? String(labour.dailyWage) : "" });
+      setShowSessionForm(false);
       toast.success("Work session added & expense recorded");
     },
     onError: (err: any) =>
@@ -349,114 +352,127 @@ export default function LabourDetailPage({
         </div>
       )}
 
-      {/* Add work session */}
-      <form
-        onSubmit={handleSubmit}
-        className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
-      >
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-50">
-          <Plus className="h-4 w-4" /> Log a work session
-        </div>
-        {projects.length === 0 && (
-          <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
-            This labour isn&apos;t added to any project yet. Add them to a
-            project&apos;s &ldquo;Involved Labours&rdquo; list first, then you can
-            log sessions here.
-          </p>
-        )}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Project *">
-            <select
-              value={form.projectId}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, projectId: e.target.value }))
-              }
-              className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              required
-            >
-              <option value="">Select a project…</option>
-              {projects.map((p) => (
-                <option key={p._id} value={p._id}>
-                  {p.clientName} — {p.serviceType}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Date (session) *">
-            <Input
-              type="date"
-              value={form.workDate}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, workDate: e.target.value }))
-              }
-              required
-            />
-          </Field>
-          <Field label="Session label">
-            <Input
-              placeholder="e.g. Day 1, Morning shoot"
-              value={form.sessionLabel}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, sessionLabel: e.target.value }))
-              }
-            />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Days *">
-              <Input
-                type="number"
-                min={0}
-                step="0.5"
-                value={form.days}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, days: e.target.value }))
-                }
-                required
-              />
-            </Field>
-            <Field label="Rate / day (₹) *">
-              <Input
-                type="number"
-                min={0}
-                value={form.rate}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, rate: e.target.value }))
-                }
-                required
-              />
-            </Field>
-          </div>
-        </div>
-        <Field label="Notes">
-          <Input
-            placeholder="Optional"
-            value={form.notes}
-            onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-          />
-        </Field>
-        <div className="flex items-center justify-between gap-3 pt-1">
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            Expense:{" "}
-            <span className="font-semibold text-slate-900 dark:text-slate-50">
-              {inr(amountPreview)}
+      {/* Work sessions */}
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+              Work sessions
+            </h3>
+            <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+              {inr(totalPaid)}
             </span>
-          </p>
-          <Button type="submit" disabled={createMutation.isPending}>
-            {createMutation.isPending ? "Saving..." : "Add session"}
+          </div>
+          <Button size="sm" onClick={() => setShowSessionForm((v) => !v)}>
+            {showSessionForm ? (
+              <>
+                <X className="h-4 w-4" /> Cancel
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4" /> Log session
+              </>
+            )}
           </Button>
         </div>
-      </form>
 
-      {/* Work session list */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-            Work sessions
-          </h3>
-          <span className="text-xs text-slate-500 dark:text-slate-400">
-            Total: <span className="font-semibold">{inr(totalPaid)}</span>
-          </span>
-        </div>
+        {showSessionForm && (
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-4 border-b border-slate-100 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-950/30"
+          >
+            {projects.length === 0 && (
+              <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                This labour isn&apos;t added to any project yet. Add them to a
+                project&apos;s &ldquo;Involved Labours&rdquo; list first, then you
+                can log sessions here.
+              </p>
+            )}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="Project *">
+                <select
+                  value={form.projectId}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, projectId: e.target.value }))
+                  }
+                  className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  required
+                >
+                  <option value="">Select a project…</option>
+                  {projects.map((p) => (
+                    <option key={p._id} value={p._id}>
+                      {p.clientName} — {p.serviceType}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Date (session) *">
+                <Input
+                  type="date"
+                  value={form.workDate}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, workDate: e.target.value }))
+                  }
+                  required
+                />
+              </Field>
+              <Field label="Session label">
+                <Input
+                  placeholder="e.g. Day 1, Morning shoot"
+                  value={form.sessionLabel}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, sessionLabel: e.target.value }))
+                  }
+                />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Days *">
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.5"
+                    value={form.days}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, days: e.target.value }))
+                    }
+                    required
+                  />
+                </Field>
+                <Field label="Rate / day (₹) *">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.rate}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, rate: e.target.value }))
+                    }
+                    required
+                  />
+                </Field>
+              </div>
+            </div>
+            <Field label="Notes">
+              <Input
+                placeholder="Optional"
+                value={form.notes}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, notes: e.target.value }))
+                }
+              />
+            </Field>
+            <div className="flex items-center justify-between gap-3 pt-1">
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                Expense:{" "}
+                <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                  {inr(amountPreview)}
+                </span>
+              </p>
+              <Button type="submit" disabled={createMutation.isPending}>
+                {createMutation.isPending ? "Saving..." : "Add session"}
+              </Button>
+            </div>
+          </form>
+        )}
 
         {logs.length > 0 && (
           <div className="space-y-2 border-b border-slate-100 p-3 dark:border-slate-800">
@@ -658,12 +674,11 @@ function StatCard({
 
 function BackLink() {
   return (
-    <Link
-      href="/labours"
-      className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-cine-primary dark:text-slate-300"
-    >
-      <ArrowLeft className="h-4 w-4" /> Back to labours
-    </Link>
+    <Button variant="outline" size="sm" asChild>
+      <Link href="/labours">
+        <ArrowLeft className="h-4 w-4" /> Back to labours
+      </Link>
+    </Button>
   );
 }
 
