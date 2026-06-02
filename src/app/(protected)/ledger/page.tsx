@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -9,6 +9,8 @@ import {
   ArrowUpRight,
   Briefcase,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Pencil,
   Plus,
@@ -158,8 +160,31 @@ export default function LedgerPage() {
     return p;
   }, [filters]);
 
-  const ledgerQuery = useLedger(params);
+  // Server-side pagination: only one page of rows is fetched at a time.
+  const PAGE_SIZE = 15;
+  const [page, setPage] = useState(1);
+  // Reset to the first page whenever the filters change.
+  useEffect(() => {
+    setPage(1);
+  }, [params]);
+
+  const listParams = useMemo(
+    () => ({ ...params, page, limit: PAGE_SIZE }),
+    [params, page]
+  );
+  const ledgerQuery = useLedger(listParams);
   const entries = ledgerQuery.data?.data ?? [];
+  const total = ledgerQuery.data?.total ?? entries.length;
+  const totalPages = ledgerQuery.data?.totalPages ?? 1;
+
+  // Pending-approval count for the KPI — independent of the visible page.
+  const pendingQuery = useLedger({
+    ...params,
+    approvalStatus: "PENDING_APPROVAL",
+    page: 1,
+    limit: 1,
+  });
+  const pendingCount = pendingQuery.data?.total ?? 0;
 
   const summaryQuery = useLedgerSummary(params);
   const summary = summaryQuery.data?.data;
@@ -205,9 +230,6 @@ export default function LedgerPage() {
   const totalIncome = summary?.profitLoss?.totalIncome ?? 0;
   const totalExpense = summary?.profitLoss?.totalExpense ?? 0;
   const netProfitLoss = summary?.profitLoss?.netProfitLoss ?? 0;
-  const pendingCount = entries.filter(
-    (e) => e.approvalStatus === "PENDING_APPROVAL"
-  ).length;
 
   return (
     <div className="space-y-5">
@@ -269,7 +291,7 @@ export default function LedgerPage() {
           label="Entries"
           active={tab === "entries"}
           onClick={() => setTab("entries")}
-          count={entries.length}
+          count={total}
         />
         <TabButton
           label="Summary"
@@ -291,6 +313,11 @@ export default function LedgerPage() {
           loading={ledgerQuery.isLoading}
           error={ledgerQuery.isError}
           entries={entries}
+          totalCount={total}
+          page={page}
+          totalPages={totalPages}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
           onApprove={(id) => approveMutation.mutate(id)}
           approving={approveMutation.isPending}
           onReject={(id) => setRejectTarget(id)}
@@ -601,6 +628,11 @@ function EntriesTable({
   loading,
   error,
   entries,
+  totalCount,
+  page,
+  totalPages,
+  pageSize,
+  onPageChange,
   onApprove,
   approving,
   onReject,
@@ -609,6 +641,11 @@ function EntriesTable({
   loading: boolean;
   error: boolean;
   entries: LedgerEntryPopulated[];
+  totalCount: number;
+  page: number;
+  totalPages: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
   onApprove: (id: string) => void;
   approving: boolean;
   onReject: (id: string) => void;
@@ -823,6 +860,46 @@ function EntriesTable({
           </tbody>
         </table>
       </div>
+      {totalCount > pageSize && (
+        <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-sm dark:border-slate-800 sm:flex-row">
+          <p className="text-slate-500 dark:text-slate-400">
+            Showing{" "}
+            <span className="font-medium text-slate-700 dark:text-slate-300">
+              {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalCount)}
+            </span>{" "}
+            of{" "}
+            <span className="font-medium text-slate-700 dark:text-slate-300">
+              {totalCount}
+            </span>{" "}
+            entries
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              onClick={() => onPageChange(page - 1)}
+              disabled={page <= 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Prev
+            </Button>
+            <span className="px-1 text-slate-600 dark:text-slate-300">
+              Page {page} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              onClick={() => onPageChange(page + 1)}
+              disabled={page >= totalPages}
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

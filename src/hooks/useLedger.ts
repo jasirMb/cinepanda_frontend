@@ -29,6 +29,8 @@ export function useLedger(params?: LedgerListQuery) {
     queryKey: ledgerKeys.list(params),
     queryFn: () => fetchLedgerEntries(params),
     staleTime: 60_000,
+    // Keep the current page's rows visible while the next page loads.
+    placeholderData: (previous) => previous,
   });
 }
 

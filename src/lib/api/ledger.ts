@@ -91,6 +91,14 @@ export interface LedgerListResponse {
   success: boolean;
   data: LedgerEntryPopulated[];
   count: number;
+  /** Total matching entries (across all pages). Present on every response. */
+  total?: number;
+  /** Current page (1-based) when pagination is active. */
+  page?: number;
+  /** Page size requested; 0 means "all entries returned". */
+  limit?: number;
+  /** Total number of pages when pagination is active. */
+  totalPages?: number;
 }
 
 export interface LedgerDetailResponse {
@@ -109,6 +117,10 @@ export interface LedgerListQuery {
   approvalStatus?: ApprovalStatus;
   vendorId?: string;
   paymentAccountId?: string;
+  /** 1-based page number. Omit (with limit) to fetch all entries. */
+  page?: number;
+  /** Page size. Omit to fetch all matching entries (statements, dashboards). */
+  limit?: number;
 }
 
 export interface CreateLedgerPayload {
