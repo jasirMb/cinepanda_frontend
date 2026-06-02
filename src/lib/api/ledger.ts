@@ -57,6 +57,10 @@ export interface LedgerEntryPopulated {
     name: string;
     type: string;
     bankName?: string;
+    accountNumber?: string;
+    accountHolderName?: string;
+    ifsc?: string;
+    upiId?: string;
   } | null;
   vendorId?: { _id: string; name: string } | null;
   itemType?: "GOODS" | "SERVICE";

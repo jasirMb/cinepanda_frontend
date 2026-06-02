@@ -125,6 +125,7 @@ export default function EditLedgerEntryPage({
   const visibleAccounts = accountType
     ? accounts.filter((a) => a.type === accountType)
     : accounts;
+  const selectedAccount = accounts.find((a) => a._id === form.paymentAccountId);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -328,6 +329,11 @@ export default function EditLedgerEntryPage({
                 )}
               </SelectContent>
             </Select>
+            {selectedAccount && (
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                {accountDetail(selectedAccount)}
+              </p>
+            )}
           </Field>
           {form.entryType === "EXPENSE" && (
             <Field label="Goods or Service">
@@ -472,6 +478,29 @@ function accountTypeForMethod(method: string): string | null {
     default:
       return null;
   }
+}
+
+function accountDetail(a: {
+  type: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifsc?: string;
+  upiId?: string;
+  notes?: string;
+}): string {
+  if (a.type === "BANK")
+    return (
+      [
+        a.bankName,
+        a.accountNumber ? `A/C ${a.accountNumber}` : "",
+        a.ifsc ? `IFSC ${a.ifsc}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ") || "Bank account"
+    );
+  if (a.type === "UPI") return a.upiId ? `UPI: ${a.upiId}` : "UPI";
+  if (a.type === "CASH") return "Cash";
+  return a.notes || "Other";
 }
 
 function Field({

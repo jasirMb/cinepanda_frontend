@@ -212,3 +212,145 @@ export async function downloadStatementPdf(opts: {
     `Statement - ${account.name}.pdf`.replace(/[\\/:*?"<>|]/g, "") || "Statement.pdf";
   await downloadHtmlToPdf(html, filename);
 }
+
+/* ── Vendor statement of payments ─────────────────────────────────────── */
+
+export interface VendorStatementVendor {
+  name: string;
+  gstNumber?: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  upiId?: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifsc?: string;
+}
+
+export interface VendorStatementRow {
+  date: string;
+  project: string;
+  description: string;
+  paidVia: string;
+  amount: number;
+}
+
+export async function downloadVendorStatementPdf(opts: {
+  vendor: VendorStatementVendor;
+  rows: VendorStatementRow[];
+  periodLabel: string;
+  projectLabel?: string;
+  generatedOn: string;
+}): Promise<void> {
+  const { vendor, rows, periodLabel, projectLabel, generatedOn } = opts;
+  const total = rows.reduce((s, r) => s + r.amount, 0);
+  const logo = await getLogoDataUrl();
+
+  const payTo = [
+    vendor.bankName ? `${esc(vendor.bankName)}` : "",
+    vendor.accountNumber ? `A/C: ${esc(vendor.accountNumber)}` : "",
+    vendor.ifsc ? `IFSC: ${esc(vendor.ifsc)}` : "",
+    vendor.upiId ? `UPI: ${esc(vendor.upiId)}` : "",
+  ]
+    .filter(Boolean)
+    .join("<br/>");
+
+  const contact = [
+    vendor.contactPerson ? esc(vendor.contactPerson) : "",
+    vendor.phone ? esc(vendor.phone) : "",
+    vendor.gstNumber ? `GST: ${esc(vendor.gstNumber)}` : "",
+    vendor.address ? esc(vendor.address) : "",
+  ]
+    .filter(Boolean)
+    .join("<br/>");
+
+  const rowsHtml = rows.length
+    ? rows
+        .map(
+          (r, i) => `
+        <tr class="${i % 2 ? "alt" : ""}">
+          <td class="dt">${esc(r.date)}</td>
+          <td>${esc(r.project)}</td>
+          <td class="desc">${esc(r.description)}</td>
+          <td>${esc(r.paidVia)}</td>
+          <td class="num">${inr(r.amount)}</td>
+        </tr>`
+        )
+        .join("")
+    : `<tr><td colspan="5" class="empty">No payments for the selected period.</td></tr>`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8" />
+<style>
+  @page { size: A4; margin: 14mm 13mm; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; font-size: 11px; margin: 0; }
+  .topbar { display: flex; justify-content: space-between; align-items: center;
+    background: linear-gradient(135deg, #0B1220 0%, #1B3A57 100%); color: #fff; border-radius: 10px; padding: 16px 20px; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand img { width: 42px; height: 42px; object-fit: contain; background: rgba(255,255,255,.1); border-radius: 8px; padding: 4px; }
+  .brand .co { font-size: 16px; font-weight: 700; }
+  .brand .tag { font-size: 9.5px; color: #cbd5e1; letter-spacing: .12em; text-transform: uppercase; }
+  .title { text-align: right; }
+  .title .h { font-size: 15px; font-weight: 700; letter-spacing: .05em; }
+  .title .s { font-size: 9.5px; color: #cbd5e1; margin-top: 2px; }
+  .infogrid { display: flex; gap: 12px; margin: 14px 0 12px; }
+  .infobox { flex: 1; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; }
+  .infobox .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; margin-bottom: 4px; }
+  .infobox .name { font-size: 13px; font-weight: 700; }
+  .infobox .lines { color: #475569; line-height: 1.6; font-size: 10.5px; }
+  .infobox .kv { display: flex; justify-content: space-between; padding: 2px 0; }
+  .infobox .kv span:last-child { font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; margin-top: 2px; }
+  th, td { padding: 7px 9px; text-align: left; vertical-align: top; }
+  thead th { background: #0f172a; color: #fff; font-size: 9px; text-transform: uppercase; letter-spacing: .05em; }
+  tbody td { border-bottom: 1px solid #eef2f7; }
+  tbody tr.alt td { background: #f8fafc; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .dt { white-space: nowrap; color: #475569; }
+  tfoot td { border-top: 2px solid #0f172a; font-weight: 700; background: #f1f5f9; font-size: 12px; }
+  .empty { text-align: center; color: #94a3b8; padding: 26px; }
+  .foot { margin-top: 16px; font-size: 9px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 8px; }
+</style></head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      ${logo ? `<img src="${logo}" alt="" />` : ""}
+      <div><div class="co">CinePanda Entertainments</div><div class="tag">Admin Console</div></div>
+    </div>
+    <div class="title"><div class="h">VENDOR STATEMENT</div><div class="s">${esc(periodLabel)}</div></div>
+  </div>
+
+  <div class="infogrid">
+    <div class="infobox">
+      <div class="lbl">Statement to</div>
+      <div class="name">${esc(vendor.name)}</div>
+      <div class="lines">${contact || "—"}</div>
+      ${payTo ? `<div class="lines" style="margin-top:6px"><span style="color:#94a3b8;font-size:9px;text-transform:uppercase;letter-spacing:.08em">Pay to</span><br/>${payTo}</div>` : ""}
+    </div>
+    <div class="infobox">
+      <div class="lbl">Statement details</div>
+      <div class="lines">
+        <div class="kv"><span>Period</span><span>${esc(periodLabel)}</span></div>
+        <div class="kv"><span>Project</span><span>${projectLabel ? esc(projectLabel) : "All"}</span></div>
+        <div class="kv"><span>Payments</span><span>${rows.length}</span></div>
+        <div class="kv"><span>Generated</span><span>${esc(generatedOn)}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>Date</th><th>Project</th><th>Description</th><th>Paid via</th><th class="num">Amount</th></tr></thead>
+    <tbody>${rowsHtml}</tbody>
+    <tfoot><tr><td colspan="4">Total paid</td><td class="num">${inr(total)}</td></tr></tfoot>
+  </table>
+
+  <p class="foot">System-generated vendor statement from CinePanda Entertainments.</p>
+</body></html>`;
+
+  const filename =
+    `Vendor Statement - ${vendor.name}.pdf`.replace(/[\\/:*?"<>|]/g, "") ||
+    "Vendor Statement.pdf";
+  await downloadHtmlToPdf(html, filename);
+}

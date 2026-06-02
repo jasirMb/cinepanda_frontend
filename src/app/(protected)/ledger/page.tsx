@@ -744,8 +744,17 @@ function EntriesTable({
                               )}
                             {entry.paymentAccountId &&
                               typeof entry.paymentAccountId === "object" && (
-                                <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                                <span
+                                  title={accountDetail(entry.paymentAccountId)}
+                                  className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-950/50 dark:text-sky-300"
+                                >
                                   {entry.paymentAccountId.name}
+                                  {accountDetailShort(entry.paymentAccountId) && (
+                                    <span className="font-normal opacity-75">
+                                      {" "}
+                                      · {accountDetailShort(entry.paymentAccountId)}
+                                    </span>
+                                  )}
                                 </span>
                               )}
                             {entry.itemType && (
@@ -852,6 +861,40 @@ const ICON_BUTTON_HOVER: Record<Tone, string> = {
     "hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400",
   neutral: "hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-50",
 };
+
+function accountDetail(a: {
+  type: string;
+  bankName?: string;
+  accountNumber?: string;
+  accountHolderName?: string;
+  ifsc?: string;
+  upiId?: string;
+}): string {
+  if (a.type === "BANK")
+    return (
+      [
+        a.bankName,
+        a.accountNumber ? `A/C ${a.accountNumber}` : "",
+        a.ifsc ? `IFSC ${a.ifsc}` : "",
+        a.accountHolderName,
+      ]
+        .filter(Boolean)
+        .join(" · ") || "Bank account"
+    );
+  if (a.type === "UPI") return a.upiId ? `UPI: ${a.upiId}` : "UPI";
+  if (a.type === "CASH") return "Cash";
+  return "Other";
+}
+
+function accountDetailShort(a: {
+  type: string;
+  bankName?: string;
+  upiId?: string;
+}): string {
+  if (a.type === "BANK") return a.bankName ?? "";
+  if (a.type === "UPI") return a.upiId ?? "";
+  return "";
+}
 
 function IconButton({
   children,

@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   Banknote,
   Building2,
   CalendarDays,
+  Download,
   FolderKanban,
   Phone,
   Receipt,
@@ -15,8 +17,53 @@ import {
 import { useVendor } from "@/hooks/useVendors";
 import { useLedger } from "@/hooks/useLedger";
 import type { LedgerEntryPopulated } from "@/lib/api/ledger";
+import {
+  downloadVendorStatementPdf,
+  type VendorStatementRow,
+} from "@/lib/statement-pdf";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog } from "@/components/ui/dialog";
+
+type Period = "all" | "week" | "month" | "year" | "custom";
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function periodRange(period: Period, from: string, to: string) {
+  if (period === "all") return { start: null as Date | null, end: null as Date | null };
+  if (period === "custom") {
+    return {
+      start: from ? new Date(from) : null,
+      end: to ? new Date(`${to}T23:59:59`) : null,
+    };
+  }
+  const now = new Date();
+  let start: Date;
+  if (period === "week") {
+    start = new Date(now);
+    const day = (start.getDay() + 6) % 7;
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - day);
+  } else if (period === "month") {
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else {
+    start = new Date(now.getFullYear(), 0, 1);
+  }
+  return { start, end: now };
+}
+
+function periodLabelFor(period: Period, start: Date | null, end: Date | null): string {
+  if (period === "all") return "All time";
+  if (start && end)
+    return `${fmtDate(start.toISOString())} – ${fmtDate(end.toISOString())}`;
+  return "Custom";
+}
 
 function inr(n: number) {
   return `₹${(n ?? 0).toLocaleString("en-IN")}`;
@@ -26,6 +73,22 @@ function projectName(p: LedgerEntryPopulated["projectId"]): string {
 }
 function accountName(a: LedgerEntryPopulated["paymentAccountId"]): string | null {
   return a && typeof a === "object" ? a.name : null;
+}
+function paidViaOf(e: LedgerEntryPopulated): string {
+  const a = e.paymentAccountId;
+  if (a && typeof a === "object") {
+    if (a.type === "UPI") return a.upiId ? `${a.name} · ${a.upiId}` : a.name;
+    if (a.type === "BANK") {
+      const sub = [
+        a.bankName,
+        a.accountNumber ? `A/C ••${a.accountNumber.slice(-4)}` : "",
+        a.accountHolderName,
+      ].filter(Boolean);
+      return sub.length ? `${a.name} · ${sub.join(" · ")}` : a.name;
+    }
+    return a.name;
+  }
+  return e.paymentMethod ? e.paymentMethod.replace(/_/g, " ") : "—";
 }
 
 export default function VendorDetailPage({
@@ -58,6 +121,79 @@ export default function VendorDetailPage({
     }
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
   }, [entries]);
+
+  // Distinct projects (id+name) for the download filter.
+  const projectList = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const e of entries) {
+      const p = e.projectId;
+      if (p && typeof p === "object" && !map.has(p._id))
+        map.set(p._id, p.clientName);
+    }
+    return Array.from(map, ([_id, name]) => ({ _id, name }));
+  }, [entries]);
+
+  const [showDownload, setShowDownload] = useState(false);
+  const [dlgPeriod, setDlgPeriod] = useState<Period>("all");
+  const [dlgFrom, setDlgFrom] = useState("");
+  const [dlgTo, setDlgTo] = useState("");
+  const [dlgProject, setDlgProject] = useState("");
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownload() {
+    if (!vendor) return;
+    setDownloading(true);
+    try {
+      const { start, end } = periodRange(dlgPeriod, dlgFrom, dlgTo);
+      const pdfRows: VendorStatementRow[] = entries
+        .filter((e) => {
+          const ts = new Date(e.entryDate).getTime();
+          if (start && ts < start.getTime()) return false;
+          if (end && ts > end.getTime()) return false;
+          if (dlgProject) {
+            const p = e.projectId;
+            if (!(p && typeof p === "object" && p._id === dlgProject)) return false;
+          }
+          return true;
+        })
+        .sort(
+          (a, b) =>
+            new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime()
+        )
+        .map((e) => ({
+          date: fmtDate(e.entryDate),
+          project: projectName(e.projectId),
+          description: e.category?.replace(/_/g, " ") || "Uncategorised",
+          paidVia: paidViaOf(e),
+          amount: e.amount ?? 0,
+        }));
+      await downloadVendorStatementPdf({
+        vendor: {
+          name: vendor.name,
+          gstNumber: vendor.gstNumber,
+          contactPerson: vendor.contactPerson,
+          phone: vendor.phone,
+          email: vendor.email,
+          address: vendor.address,
+          upiId: vendor.upiId,
+          bankName: vendor.bankName,
+          accountNumber: vendor.accountNumber,
+          ifsc: vendor.ifsc,
+        },
+        rows: pdfRows,
+        periodLabel: periodLabelFor(dlgPeriod, start, end),
+        projectLabel: dlgProject
+          ? projectList.find((p) => p._id === dlgProject)?.name
+          : undefined,
+        generatedOn: new Date().toLocaleString("en-GB"),
+      });
+      setShowDownload(false);
+    } catch {
+      toast.error("Failed to generate statement PDF");
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   if (vendorQuery.isLoading) {
     return (
@@ -106,6 +242,14 @@ export default function VendorDetailPage({
             )}
           </div>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowDownload(true)}
+          className="shrink-0"
+        >
+          <Download className="h-4 w-4" /> Statement
+        </Button>
       </div>
 
       {/* Stats */}
@@ -188,6 +332,105 @@ export default function VendorDetailPage({
           </ul>
         )}
       </div>
+
+      {/* Download statement dialog */}
+      <Dialog
+        open={showDownload}
+        onClose={() => setShowDownload(false)}
+        className="max-w-md"
+      >
+        <div className="space-y-4 p-5">
+          <div>
+            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">
+              Vendor statement
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Generate a PDF of payments to {vendor.name}.
+            </p>
+          </div>
+
+          <DialogField label="Period">
+            <select
+              value={dlgPeriod}
+              onChange={(e) => setDlgPeriod(e.target.value as Period)}
+              className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+            >
+              <option value="all">All time</option>
+              <option value="week">This week</option>
+              <option value="month">This month</option>
+              <option value="year">This year</option>
+              <option value="custom">Custom range</option>
+            </select>
+          </DialogField>
+
+          {dlgPeriod === "custom" && (
+            <div className="grid grid-cols-2 gap-3">
+              <DialogField label="From">
+                <input
+                  type="date"
+                  value={dlgFrom}
+                  onChange={(e) => setDlgFrom(e.target.value)}
+                  className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                />
+              </DialogField>
+              <DialogField label="To">
+                <input
+                  type="date"
+                  value={dlgTo}
+                  onChange={(e) => setDlgTo(e.target.value)}
+                  className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                />
+              </DialogField>
+            </div>
+          )}
+
+          <DialogField label="Project">
+            <select
+              value={dlgProject}
+              onChange={(e) => setDlgProject(e.target.value)}
+              className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+            >
+              <option value="">All projects</option>
+              {projectList.map((p) => (
+                <option key={p._id} value={p._id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </DialogField>
+
+          <div className="flex justify-end gap-2 pt-1">
+            <Button
+              variant="outline"
+              onClick={() => setShowDownload(false)}
+              disabled={downloading}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleDownload} disabled={downloading}>
+              <Download className="h-4 w-4" />
+              {downloading ? "Preparing…" : "Download PDF"}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+    </div>
+  );
+}
+
+function DialogField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-slate-700 dark:text-slate-300">
+        {label}
+      </label>
+      {children}
     </div>
   );
 }
