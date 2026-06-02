@@ -497,6 +497,46 @@ function TabButton({
   );
 }
 
+type LedgerPeriod =
+  | "all"
+  | "week"
+  | "month"
+  | "6months"
+  | "year"
+  | "custom";
+
+const PERIOD_OPTIONS: { value: LedgerPeriod; label: string }[] = [
+  { value: "all", label: "All time" },
+  { value: "week", label: "Last 7 days" },
+  { value: "month", label: "Last 30 days" },
+  { value: "6months", label: "Last 6 months" },
+  { value: "year", label: "Last 1 year" },
+  { value: "custom", label: "Custom range" },
+];
+
+/** Local YYYY-MM-DD (matches the DatePicker / backend date filter format). */
+function toISODate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Rolling window ending today for a preset; {} means no date filter. */
+function periodDates(period: LedgerPeriod): {
+  startDate?: string;
+  endDate?: string;
+} {
+  if (period === "all" || period === "custom") return {};
+  const now = new Date();
+  const start = new Date(now);
+  if (period === "week") start.setDate(now.getDate() - 7);
+  else if (period === "month") start.setDate(now.getDate() - 30);
+  else if (period === "6months") start.setMonth(now.getMonth() - 6);
+  else start.setFullYear(now.getFullYear() - 1); // year
+  return { startDate: toISODate(start), endDate: toISODate(now) };
+}
+
 function FilterBar({
   filters,
   setFilters,
@@ -506,6 +546,15 @@ function FilterBar({
   setFilters: React.Dispatch<React.SetStateAction<LedgerListQuery>>;
   hasFilters: boolean;
 }) {
+  const [period, setPeriod] = useState<LedgerPeriod>("all");
+
+  function handlePeriodChange(value: LedgerPeriod) {
+    setPeriod(value);
+    if (value === "custom") return; // keep current dates; user edits From/To
+    const { startDate, endDate } = periodDates(value);
+    setFilters((f) => ({ ...f, startDate, endDate }));
+  }
+
   return (
     <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
       <FilterField label="Type" width="140px">
@@ -575,28 +624,57 @@ function FilterBar({
         </Select>
       </FilterField>
 
-      <FilterField label="From" width="150px">
-        <DatePicker
-          value={filters.startDate ?? ""}
-          onChange={(v) =>
-            setFilters((f) => ({ ...f, startDate: v || undefined }))
-          }
-          placeholder="Start date"
-        />
+      <FilterField label="Period" width="160px">
+        <Select
+          value={period}
+          onValueChange={(v) => handlePeriodChange(v as LedgerPeriod)}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PERIOD_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </FilterField>
 
-      <FilterField label="To" width="150px">
-        <DatePicker
-          value={filters.endDate ?? ""}
-          onChange={(v) =>
-            setFilters((f) => ({ ...f, endDate: v || undefined }))
-          }
-          placeholder="End date"
-        />
-      </FilterField>
+      {period === "custom" && (
+        <>
+          <FilterField label="From" width="150px">
+            <DatePicker
+              value={filters.startDate ?? ""}
+              onChange={(v) =>
+                setFilters((f) => ({ ...f, startDate: v || undefined }))
+              }
+              placeholder="Start date"
+            />
+          </FilterField>
+
+          <FilterField label="To" width="150px">
+            <DatePicker
+              value={filters.endDate ?? ""}
+              onChange={(v) =>
+                setFilters((f) => ({ ...f, endDate: v || undefined }))
+              }
+              placeholder="End date"
+            />
+          </FilterField>
+        </>
+      )}
 
       {hasFilters && (
-        <Button variant="ghost" size="sm" onClick={() => setFilters({})}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setFilters({});
+            setPeriod("all");
+          }}
+        >
           <X className="mr-1 h-3.5 w-3.5" />
           Clear filters
         </Button>
