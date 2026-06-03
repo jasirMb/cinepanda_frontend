@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import {
   fetchProducts,
   fetchCategories,
@@ -25,7 +25,8 @@ export function useProducts(params?: ProductsListQuery) {
   return useQuery<ProductsListResponse>({
     queryKey: productsKeys.list(params),
     queryFn: () => fetchProducts(params),
-    staleTime: 60_000
+    staleTime: 60_000,
+    placeholderData: keepPreviousData
   });
 }
 

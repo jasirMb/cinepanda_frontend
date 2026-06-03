@@ -197,6 +197,15 @@ export default function LeadsPage() {
       | "nextCallTime_asc"
   });
 
+  // Debounced search — type freely, the query only updates after a short pause.
+  const [searchInput, setSearchInput] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setFilters((prev) => (prev.search === searchInput ? prev : { ...prev, search: searchInput }));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
   const statusOptions = [
     { label: "All statuses", value: "" },
     { label: "Open", value: "OPEN" },
@@ -706,8 +715,8 @@ export default function LeadsPage() {
         <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 md:grid-cols-3 lg:grid-cols-6">
           <Input
             placeholder="Search name, place, contact"
-            value={filters.search}
-            onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
           <Select value={filters.status || "__all__"} onValueChange={(v) => setFilters((prev) => ({ ...prev, status: v === "__all__" ? "" : v }))}>
             <SelectTrigger>

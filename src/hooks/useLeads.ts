@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import {
   fetchLeads,
   fetchFollowupLeads,
@@ -25,7 +25,8 @@ export function useLeads(params?: LeadsListQuery) {
   return useQuery<LeadsListResponse>({
     queryKey: leadsKeys.list(params),
     queryFn: () => fetchLeads(params),
-    staleTime: 60_000
+    staleTime: 60_000,
+    placeholderData: keepPreviousData
   });
 }
 
