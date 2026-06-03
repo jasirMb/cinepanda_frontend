@@ -92,10 +92,26 @@ export interface Template {
   lockReason?: "project" | "quotation" | null;
 }
 
+export interface TemplatesListQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  /** "locked" → only locked templates; "available" → only editable/deletable ones. */
+  lock?: "locked" | "available";
+}
+
 export interface TemplatesListResponse {
   success: boolean;
   data: Template[];
   count: number;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
 }
 
 export interface TemplateResponse {
@@ -150,8 +166,10 @@ export interface CreateTemplatePayload {
    Templates API
    ──────────────────────────────────────────── */
 
-export async function fetchTemplates(): Promise<TemplatesListResponse> {
-  const { data } = await api.get<TemplatesListResponse>("/templates");
+export async function fetchTemplates(
+  params: TemplatesListQuery = {}
+): Promise<TemplatesListResponse> {
+  const { data } = await api.get<TemplatesListResponse>("/templates", { params });
   return data;
 }
 

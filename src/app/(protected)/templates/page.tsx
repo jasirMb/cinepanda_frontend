@@ -1,11 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { Check, Sparkles, Package, ArrowLeftRight, Lock } from "lucide-react";
+import {
+  Check,
+  Sparkles,
+  Package,
+  ArrowLeftRight,
+  Lock,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 
 import { templatesKeys, useTemplates } from "@/hooks/useTemplates";
 import { useCategories } from "@/hooks/useProducts";
@@ -79,10 +88,39 @@ const PRIORITY_COLORS: Record<number, string> = {
 
 export default function TemplatesPage() {
   const queryClient = useQueryClient();
-  const templatesQuery = useTemplates();
+
+  // ── list controls: search / lock filter / pagination ──
+  const [listPage, setListPage] = useState(1);
+  const [lockFilter, setLockFilter] = useState<"all" | "available" | "locked">(
+    "all"
+  );
+  const [searchInput, setSearchInput] = useState("");
+  const [listSearch, setListSearch] = useState("");
+  // Debounce the search box so typing doesn't refetch on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setListSearch(searchInput), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+  // Reset to page 1 whenever the search or filter changes.
+  useEffect(() => {
+    setListPage(1);
+  }, [listSearch, lockFilter]);
+
+  const templatesParams = useMemo(
+    () => ({
+      page: listPage,
+      limit: 9,
+      search: listSearch || undefined,
+      lock: lockFilter === "all" ? undefined : lockFilter,
+    }),
+    [listPage, listSearch, lockFilter]
+  );
+
+  const templatesQuery = useTemplates(templatesParams);
   const categoriesQuery = useCategories();
 
   const templates = templatesQuery.data?.data ?? [];
+  const pagination = templatesQuery.data?.pagination;
   const categories = categoriesQuery.data?.data ?? [];
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -819,11 +857,48 @@ export default function TemplatesPage() {
         <Button onClick={() => setStep("budget")}>Create New Template</Button>
       </div>
 
+      {/* Search + lock filter toolbar */}
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="relative min-w-[200px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            placeholder="Search templates…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="inline-flex overflow-hidden rounded-md border border-slate-200 dark:border-slate-700">
+          {(
+            [
+              { key: "all", label: "All" },
+              { key: "available", label: "Available" },
+              { key: "locked", label: "Locked" },
+            ] as const
+          ).map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => setLockFilter(opt.key)}
+              className={`px-3 py-1.5 text-xs font-medium transition ${
+                lockFilter === opt.key
+                  ? "bg-cine-primary text-white"
+                  : "bg-white text-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Templates grid */}
       {templates.length === 0 ? (
         <div className="rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            No templates yet. Create your first template to get started.
+            {listSearch || lockFilter !== "all"
+              ? "No templates match your search or filter."
+              : "No templates yet. Create your first template to get started."}
           </p>
         </div>
       ) : (
@@ -835,6 +910,38 @@ export default function TemplatesPage() {
               onDelete={handleDeleteTemplate}
             />
           ))}
+        </div>
+      )}
+
+      {/* Pagination footer */}
+      {pagination && pagination.total > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Showing {templates.length} of {pagination.total} template
+            {pagination.total !== 1 ? "s" : ""}
+            {pagination.totalPages > 1 &&
+              ` · page ${pagination.page} of ${pagination.totalPages}`}
+          </p>
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!pagination.hasPrev}
+                onClick={() => setListPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="h-4 w-4" /> Prev
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!pagination.hasNext}
+                onClick={() => setListPage((p) => p + 1)}
+              >
+                Next <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
