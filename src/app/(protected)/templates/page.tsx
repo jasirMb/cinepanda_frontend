@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { Check, Sparkles, Package, ArrowLeftRight, Search } from "lucide-react";
+import { Check, Sparkles, Package, ArrowLeftRight } from "lucide-react";
 
 import { templatesKeys, useTemplates } from "@/hooks/useTemplates";
 import { useCategories } from "@/hooks/useProducts";
@@ -17,13 +17,13 @@ import {
   type SuggestResponse,
   type Template,
 } from "@/lib/api/templates";
-import { fetchProducts, type Product } from "@/lib/api/products";
+import { type Product } from "@/lib/api/products";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Dialog } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CategoryProductPicker } from "@/components/products/category-product-picker";
 
 /* ────────────────────────────────────────────
    Types
@@ -778,10 +778,14 @@ export default function TemplatesPage() {
 
         {/* Browse-all product picker */}
         <CategoryProductPicker
+          open={!!replaceTarget}
           category={replaceTarget}
           selectedId={replaceTarget ? categorySelection[replaceTarget] : undefined}
+          title="Replace product"
           onClose={() => setReplaceTarget(null)}
-          onPick={handlePickProduct}
+          onPick={(product) =>
+            replaceTarget && handlePickProduct(replaceTarget, product)
+          }
         />
       </div>
     );
@@ -977,148 +981,6 @@ function WizardField({
       </label>
       {children}
     </div>
-  );
-}
-
-/* ────────────────────────────────────────────
-   Browse-all product picker — swap the selected product for any product in
-   the same category (with image + live search), not just the suggested few.
-   ──────────────────────────────────────────── */
-
-function CategoryProductPicker({
-  category,
-  selectedId,
-  onClose,
-  onPick,
-}: {
-  category: string | null;
-  selectedId?: string;
-  onClose: () => void;
-  onPick: (category: string, product: Product) => void;
-}) {
-  const [search, setSearch] = useState("");
-  const [debounced, setDebounced] = useState("");
-
-  // Debounce the search box.
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
-
-  // Reset the search when the picker opens for a different category.
-  useEffect(() => {
-    setSearch("");
-    setDebounced("");
-  }, [category]);
-
-  const productsQuery = useQuery({
-    queryKey: ["template-picker", category, debounced],
-    queryFn: () =>
-      fetchProducts({
-        category: category ?? undefined,
-        search: debounced || undefined,
-        limit: 50,
-      }),
-    enabled: !!category,
-    staleTime: 60_000,
-  });
-
-  const products = productsQuery.data?.data ?? [];
-
-  return (
-    <Dialog open={!!category} onClose={onClose} className="max-w-2xl">
-      <div className="flex max-h-[80vh] flex-col">
-        {/* Header */}
-        <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">
-            Replace product
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            {category ? `Browse all products in “${category}”` : ""}
-          </p>
-          <div className="relative mt-3">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input
-              autoFocus
-              placeholder="Search products…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-        </div>
-
-        {/* List */}
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {productsQuery.isLoading ? (
-            <div className="space-y-2 p-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-14 w-full rounded-lg" />
-              ))}
-            </div>
-          ) : products.length === 0 ? (
-            <p className="p-8 text-center text-sm text-slate-500 dark:text-slate-400">
-              No products found{debounced ? ` for “${debounced}”` : ""}.
-            </p>
-          ) : (
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {products.map((product) => {
-                const isCurrent = product._id === selectedId;
-                return (
-                  <button
-                    key={product._id}
-                    type="button"
-                    onClick={() => category && onPick(category, product)}
-                    className={`flex w-full items-center gap-3 px-5 py-3 text-left transition ${
-                      isCurrent
-                        ? "bg-cine-primary/5 dark:bg-cine-primary/10"
-                        : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                    }`}
-                  >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
-                      {product.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={product.imageUrl}
-                          alt={product.name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <Package className="h-4 w-4 text-slate-400" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
-                        {product.name}
-                      </p>
-                      <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                        {[product.brand, product.subcategory]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-3">
-                      <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
-                        {INR(product.price)}
-                      </span>
-                      {isCurrent ? (
-                        <span className="rounded-md bg-cine-primary/10 px-2 py-0.5 text-[11px] font-semibold text-cine-primary">
-                          Current
-                        </span>
-                      ) : (
-                        <span className="rounded-md border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                          Select
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    </Dialog>
   );
 }
 
