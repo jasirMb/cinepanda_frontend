@@ -73,6 +73,7 @@ export interface SuggestResponse {
     productModel?: string;
     price: number;
     unit: string;
+    imageUrl?: string;
   }[];
 }
 
