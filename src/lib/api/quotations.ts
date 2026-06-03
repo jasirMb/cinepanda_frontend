@@ -6,10 +6,15 @@ import { API_BASE_URL } from "@/lib/api-base";
    ──────────────────────────────────────────── */
 
 export interface QuotationProductItem {
-  /** Populated to {_id, name, imageUrl} on the detail endpoint; id string otherwise. */
+  /** Populated to {_id, name, imageUrl, specifications} on the detail endpoint; id string otherwise. */
   productId?:
     | string
-    | { _id: string; name?: string; imageUrl?: string }
+    | {
+        _id: string;
+        name?: string;
+        imageUrl?: string;
+        specifications?: Record<string, unknown>;
+      }
     | null;
   productName: string;
   category: string;

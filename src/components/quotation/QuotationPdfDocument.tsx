@@ -70,12 +70,33 @@ type ExtendedProductItem = QuotationProductItem & {
   unit?: string;
 };
 
+/** The populated product (from the detail endpoint), if productId was populated. */
+function populatedProduct(item: ExtendedProductItem) {
+  return item.productId && typeof item.productId === "object"
+    ? item.productId
+    : undefined;
+}
+
 function getImage(item: ExtendedProductItem): string {
-  return item.image || item.imageUrl || PRODUCT_IMAGE_PLACEHOLDER;
+  return (
+    item.image ||
+    item.imageUrl ||
+    populatedProduct(item)?.imageUrl ||
+    PRODUCT_IMAGE_PLACEHOLDER
+  );
 }
 
 function getSpecifications(item: ExtendedProductItem): string {
-  return item.specifications || item.description || "";
+  if (item.specifications) return item.specifications;
+  const specs = populatedProduct(item)?.specifications;
+  if (specs && typeof specs === "object") {
+    const text = Object.entries(specs)
+      .filter(([, v]) => v != null && v !== "")
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(", ");
+    if (text) return text;
+  }
+  return item.description || "";
 }
 
 function getUnit(item: ExtendedProductItem, bucket: LayoutBucket): string {
