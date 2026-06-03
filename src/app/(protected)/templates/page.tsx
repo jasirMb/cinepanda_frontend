@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { Check, Sparkles, Package, ArrowLeftRight } from "lucide-react";
+import { Check, Sparkles, Package, ArrowLeftRight, Lock } from "lucide-react";
 
 import { templatesKeys, useTemplates } from "@/hooks/useTemplates";
 import { useCategories } from "@/hooks/useProducts";
@@ -171,8 +171,9 @@ export default function TemplatesPage() {
       queryClient.invalidateQueries({ queryKey: templatesKeys.all });
       toast.success("Template deleted");
     },
-    onError: () => {
-      toast.error("Failed to delete template");
+    onError: (err) => {
+      const e = err as { response?: { data?: { error?: string } } };
+      toast.error(e?.response?.data?.error ?? "Failed to delete template");
     },
   });
 
@@ -1053,16 +1054,29 @@ function TemplateCard({
           >
             View
           </Link>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              onDelete(template._id);
-            }}
-            className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
-          >
-            Delete
-          </button>
+          {template.locked ? (
+            <span
+              title={
+                template.lockReason === "project"
+                  ? "Part of a project — can't be deleted"
+                  : "Used by an approved quotation — can't be deleted"
+              }
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 text-xs font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
+            >
+              <Lock className="h-3 w-3" /> Locked
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                onDelete(template._id);
+              }}
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
+            >
+              Delete
+            </button>
+          )}
         </div>
       </div>
     </div>

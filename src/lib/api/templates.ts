@@ -87,6 +87,9 @@ export interface Template {
   updatedAt: string;
   /** Present on the detail endpoint only. */
   quotationUsage?: TemplateQuotationUsage;
+  /** Present on the list endpoint — edit/delete blocked when true. */
+  locked?: boolean;
+  lockReason?: "project" | "quotation" | null;
 }
 
 export interface TemplatesListResponse {
