@@ -198,36 +198,61 @@ const watermarkDataUri = `url("data:image/svg+xml,${encodeURIComponent(
   watermarkSvg.replace(/\n/g, "")
 )}")`;
 
-const watermarkStyle: React.CSSProperties = {
-  position: "absolute",
-  bottom: "40px",
-  right: "-40px",
-  width: "450px",
-  height: "550px",
-  backgroundImage: watermarkDataUri,
-  backgroundRepeat: "no-repeat",
-  backgroundSize: "contain",
-  pointerEvents: "none",
-  zIndex: 0,
-};
+// Watermark removed for a cleaner, more professional look.
+const watermarkStyle: React.CSSProperties = { display: "none" };
+void watermarkDataUri;
 
 const contentStyle: React.CSSProperties = { position: "relative", zIndex: 1 };
 
+// ── Premium navy + gold palette ──
+const BRAND = "#1f3a5f"; // navy
+const BRAND_DARK = "#13243c"; // deep navy
+const GOLD = "#b0883c"; // gold accent
+const BRAND_TINT = "#f2f5f9";
+const ROW_ALT = "#f8fafc";
+const BORDER = "#dde3ec";
+
 const tableHeaderStyle: React.CSSProperties = {
-  background: "#dce6f1",
+  background: BRAND,
+  color: "#fff",
   fontWeight: "bold",
-  padding: "8px 10px",
-  border: "1px solid #000",
+  padding: "9px 10px",
+  border: `1px solid ${BRAND}`,
   textAlign: "center",
-  fontSize: "14px",
+  fontSize: "12px",
+  letterSpacing: "0.03em",
+  textTransform: "uppercase",
 };
 
 const tdStyle: React.CSSProperties = {
   padding: "8px 10px",
-  border: "1px solid #000",
+  border: `1px solid ${BORDER}`,
   textAlign: "center",
   verticalAlign: "middle",
   fontSize: "13px",
+};
+
+/** Zebra-stripe background for item rows. */
+function rowStyle(i: number): React.CSSProperties {
+  return { background: i % 2 === 1 ? ROW_ALT : "#fff" };
+}
+
+/** A branded total row (light-brand label cell + dark-brand amount cell). */
+const totalLabelStyle: React.CSSProperties = {
+  ...tdStyle,
+  background: BRAND_TINT,
+  fontWeight: "bold",
+  textAlign: "right",
+  textTransform: "uppercase",
+  letterSpacing: "0.03em",
+  color: BRAND_DARK,
+};
+const totalAmountStyle: React.CSSProperties = {
+  ...tdStyle,
+  background: BRAND,
+  color: "#fff",
+  fontWeight: "bold",
+  textAlign: "right",
 };
 
 /* ────────────────────────────────────────────
@@ -408,7 +433,7 @@ function EquipmentTable({ items }: { items: ExtendedProductItem[] }) {
         {items.map((item, i) => {
           const specs = getSpecifications(item);
           return (
-            <tr key={i}>
+            <tr key={i} style={rowStyle(i)}>
               <td style={tdStyle}>{i + 1}</td>
               <td
                 style={{
@@ -445,19 +470,11 @@ function EquipmentTable({ items }: { items: ExtendedProductItem[] }) {
         <tr>
           <td
             colSpan={4}
-            style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}
+            style={totalLabelStyle}
           >
             TOTAL
           </td>
-          <td
-            colSpan={2}
-            style={{
-              ...tdStyle,
-              fontWeight: "bold",
-              textAlign: "right",
-              fontSize: "16px",
-            }}
-          >
+          <td colSpan={2} style={{ ...totalAmountStyle, fontSize: "16px" }}>
             {fmtAmount(subtotal)}
           </td>
         </tr>
@@ -491,7 +508,7 @@ function SqftTable({ items }: { items: ExtendedProductItem[] }) {
         {items.map((item, i) => {
           const desc = getSpecifications(item);
           return (
-            <tr key={i}>
+            <tr key={i} style={rowStyle(i)}>
               <td style={tdStyle}>{i + 1}</td>
               <td style={{ ...tdStyle, textAlign: "left" }}>
                 <span style={{ fontWeight: "bold" }}>{item.productName}</span>
@@ -517,19 +534,11 @@ function SqftTable({ items }: { items: ExtendedProductItem[] }) {
         <tr>
           <td
             colSpan={4}
-            style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}
+            style={totalLabelStyle}
           >
             Total
           </td>
-          <td
-            style={{
-              ...tdStyle,
-              fontWeight: "bold",
-              textAlign: "right",
-            }}
-          >
-            {fmtAmount(total)}
-          </td>
+          <td style={totalAmountStyle}>{fmtAmount(total)}</td>
         </tr>
       </tbody>
     </table>
@@ -572,19 +581,11 @@ function InstallationTable({ items }: { items: ExtendedProductItem[] }) {
         <tr>
           <td
             colSpan={3}
-            style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}
+            style={totalLabelStyle}
           >
             TOTAL
           </td>
-          <td
-            style={{
-              ...tdStyle,
-              fontWeight: "bold",
-              textAlign: "right",
-            }}
-          >
-            {fmtAmount(total)}
-          </td>
+          <td style={totalAmountStyle}>{fmtAmount(total)}</td>
         </tr>
       </tbody>
     </table>
@@ -661,24 +662,29 @@ function SectionPage({
     <div style={pageStyle}>
       <div style={watermarkStyle} />
       <div style={contentStyle}>
+        <div style={{ textAlign: "right", marginBottom: "8px" }}>
+          <LogoSmall />
+        </div>
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "flex-start",
+            alignItems: "center",
+            background: `linear-gradient(120deg, ${BRAND} 0%, ${BRAND_DARK} 100%)`,
+            color: "#fff",
+            padding: "12px 18px",
+            borderLeft: `4px solid ${GOLD}`,
+            borderRadius: "3px",
           }}
         >
-          <h2 style={{ fontSize: "18px", fontWeight: "bold", margin: 0 }}>
-            ➤{" "}
-            <span style={{ fontWeight: "bold" }}>
-              {total > 1
-                ? `AV Package ${index + 1}, ${section.sectionName}.`
-                : section.sectionName}
-            </span>
-          </h2>
-          <div style={{ marginLeft: "20px", flexShrink: 0 }}>
-            <LogoSmall />
-          </div>
+          <span style={{ fontSize: "15px", fontWeight: "bold", letterSpacing: "0.02em" }}>
+            {total > 1
+              ? `OPTION ${index + 1}  ·  ${section.sectionName}`
+              : section.sectionName}
+          </span>
+          <span style={{ fontSize: "16px", fontWeight: "bold", color: "#f0e2c4" }}>
+            {fmtAmount(section.grandTotal)}
+          </span>
         </div>
 
         {section.description && (
@@ -695,9 +701,10 @@ function SectionPage({
           <>
             <h3
               style={{
-                fontSize: "16px",
+                fontSize: "15px",
                 fontWeight: "bold",
-                margin: "30px 0 0",
+                margin: "24px 0 0",
+                color: BRAND_DARK,
               }}
             >
               ➤{" "}
@@ -714,9 +721,10 @@ function SectionPage({
           <>
             <h3
               style={{
-                fontSize: "16px",
+                fontSize: "15px",
                 fontWeight: "bold",
-                margin: "30px 0 0",
+                margin: "24px 0 0",
+                color: BRAND_DARK,
               }}
             >
               ➤ &nbsp;
@@ -740,70 +748,214 @@ function SectionPage({
    Page 1: Cover
    ──────────────────────────────────────────── */
 
+function MetaCell({
+  label,
+  value,
+  border,
+}: {
+  label: string;
+  value: string;
+  border?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        flex: 1,
+        padding: "11px 16px",
+        borderLeft: border ? `1px solid ${BORDER}` : "none",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "9px",
+          color: "#8a93a3",
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: "14px",
+          fontWeight: "bold",
+          color: BRAND_DARK,
+          marginTop: "3px",
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        fontSize: "13px",
+        fontWeight: "bold",
+        color: BRAND_DARK,
+        borderLeft: `4px solid ${GOLD}`,
+        paddingLeft: "10px",
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 function CoverPage({ quotation }: { quotation: Quotation }) {
   const customer = quotation.customerId;
   return (
     <div style={pageStyle}>
       <div style={watermarkStyle} />
       <div style={contentStyle}>
-        <LogoHeader />
+        {/* Brand header band (full bleed) */}
+        <div
+          style={{
+            margin: "-20mm -20mm 0",
+            background: `linear-gradient(120deg, ${BRAND} 0%, ${BRAND_DARK} 100%)`,
+            color: "#fff",
+            padding: "32px 20mm 34px",
+            borderBottom: `3px solid ${GOLD}`,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: "36px",
+                fontWeight: "bold",
+                letterSpacing: "0.12em",
+                lineHeight: 1,
+              }}
+            >
+              QUOTATION
+            </div>
+            <div
+              style={{
+                fontSize: "11px",
+                letterSpacing: "0.26em",
+                marginTop: "10px",
+                color: GOLD,
+                fontWeight: "bold",
+              }}
+            >
+              PREMIUM AV PROPOSAL
+            </div>
+          </div>
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: "10px",
+              padding: "8px 12px",
+            }}
+          >
+            <img
+              src={CINEPANDA_LOGO_DATA_URI}
+              alt="CinePanda"
+              style={{ height: "54px", objectFit: "contain", display: "block" }}
+            />
+          </div>
+        </div>
 
+        {/* Meta strip */}
         <div
           style={{
             display: "flex",
-            justifyContent: "space-between",
-            margin: "50px 0 30px",
+            marginTop: "26px",
+            border: `1px solid ${BORDER}`,
+            borderRadius: "8px",
+            overflow: "hidden",
+            background: "#fff",
           }}
         >
-          <span style={{ fontWeight: "bold", fontSize: "14px" }}>
-            {quotationNumber(quotation)}
-          </span>
-          <span style={{ fontWeight: "bold", fontSize: "14px" }}>
-            {fmtDate(quotation.quotationDate)}
-          </span>
+          <MetaCell
+            label="Quotation No."
+            value={quotation._id.slice(-8).toUpperCase()}
+          />
+          <MetaCell label="Date" value={fmtDate(quotation.quotationDate)} border />
+          {quotation.validUntil && (
+            <MetaCell
+              label="Valid Until"
+              value={fmtDate(quotation.validUntil)}
+              border
+            />
+          )}
         </div>
 
-        <div style={{ margin: "20px 0 10px", fontSize: "14px" }}>
-          <div style={{ fontWeight: "bold" }}>To,</div>
-          <div style={{ fontWeight: "bold" }}>{customer.name}</div>
-          {customer.place && <div>{customer.place}</div>}
-          {customer.phone && <div>Mob: {customer.phone}</div>}
+        {/* Prepared for */}
+        <div style={{ marginTop: "28px" }}>
+          <div
+            style={{
+              fontSize: "11px",
+              fontWeight: "bold",
+              color: BRAND,
+              letterSpacing: "0.14em",
+              marginBottom: "8px",
+            }}
+          >
+            PREPARED FOR
+          </div>
+          <div style={{ borderLeft: `3px solid ${BRAND}`, paddingLeft: "14px" }}>
+            <div style={{ fontSize: "19px", fontWeight: "bold", color: "#111" }}>
+              {customer.name}
+            </div>
+            {customer.place && (
+              <div style={{ fontSize: "13px", color: "#555", marginTop: "2px" }}>
+                {customer.place}
+              </div>
+            )}
+            {customer.phone && (
+              <div style={{ fontSize: "13px", color: "#555" }}>
+                Mob: {customer.phone}
+              </div>
+            )}
+          </div>
         </div>
 
+        {/* Intro */}
         <p
           style={{
-            margin: "30px 0 30px",
-            fontSize: "14px",
-            textIndent: "40px",
+            margin: "26px 0 30px",
+            fontSize: "13.5px",
+            lineHeight: 1.75,
+            color: "#222",
+            textAlign: "justify",
           }}
         >
-          <span style={{ fontSize: "22px", fontWeight: "bold" }}>W</span>
+          <span style={{ fontWeight: "bold" }}>W</span>
           {INTRO_PARAGRAPH}
         </p>
 
-        <h2
-          style={{
-            textAlign: "center",
-            textDecoration: "underline",
-            margin: "40px 0 30px",
-            fontSize: "20px",
-            fontWeight: "bold",
-          }}
-        >
+        {/* Speaker config */}
+        <SectionHeading>
           Speaker Configuration
-        </h2>
-
-        <div style={{ margin: "20px 0", textAlign: "center" }}>
-          {CONFIG_DIAGRAM_PLACEHOLDER_URL ? (
+          {quotation.speakerConfig?.name
+            ? `  —  ${quotation.speakerConfig.name}`
+            : ""}
+        </SectionHeading>
+        <div style={{ marginTop: "16px", textAlign: "center" }}>
+          {quotation.speakerConfig?.imageUrl ? (
             <img
-              src={CONFIG_DIAGRAM_PLACEHOLDER_URL}
-              alt="Speaker Configuration"
-              style={{ width: "100%", height: "auto", display: "block" }}
+              src={quotation.speakerConfig.imageUrl}
+              alt={quotation.speakerConfig.name}
+              style={{
+                maxWidth: "100%",
+                maxHeight: "330px",
+                height: "auto",
+                display: "inline-block",
+              }}
             />
           ) : (
             <PlaceholderImage
               width={500}
-              height={300}
+              height={280}
               label="Speaker configuration diagram (to be added)"
             />
           )}
@@ -831,106 +983,117 @@ function SummaryPage({ quotation }: { quotation: Quotation }) {
     <div style={lastPageStyle}>
       <div style={watermarkStyle} />
       <div style={contentStyle}>
-        <LogoHeader />
+        <div style={{ textAlign: "right", marginBottom: "18px" }}>
+          <LogoSmall />
+        </div>
 
-        <hr
-          style={{
-            border: "none",
-            borderTop: "2px solid #1a3c6e",
-            margin: "20px 0 30px",
-          }}
-        />
+        <SectionHeading>Investment Summary</SectionHeading>
 
-        {sections.map((section, i) => {
-          const estimated = sectionEstimated(section);
-          const offer = sectionOffer(section);
-          const hasDiscount = Math.round(estimated) !== Math.round(offer);
-          const optionLabel =
-            sections.length > 1 ? `AV Option ${i + 1}` : section.sectionName;
+        <div style={{ marginTop: "16px" }}>
+          {sections.map((section, i) => {
+            const estimated = sectionEstimated(section);
+            const offer = sectionOffer(section);
+            const hasDiscount = Math.round(estimated) !== Math.round(offer);
+            const optionLabel =
+              sections.length > 1 ? `AV Option ${i + 1}` : section.sectionName;
 
-          return (
-            <div key={i} style={{ marginBottom: "30px" }}>
-              <h2
+            return (
+              <div
+                key={i}
                 style={{
-                  fontSize: i === 0 ? "20px" : "18px",
-                  fontWeight: "bold",
-                  color: "#1a3c6e",
-                  margin: "10px 0 10px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  border: `1px solid ${BORDER}`,
+                  borderLeft: `4px solid ${BRAND}`,
+                  borderRadius: "8px",
+                  padding: "14px 18px",
+                  marginBottom: "12px",
+                  background: "#fff",
                 }}
               >
-                Total estimated project cost for {optionLabel} with Accessories
-                and Installation is Rupees ₹{" "}
-                {hasDiscount ? (
-                  <span style={{ textDecoration: "line-through" }}>
-                    {fmtAmount(estimated)}/-
-                  </span>
-                ) : (
-                  <span>{fmtAmount(estimated)}/-</span>
-                )}
-              </h2>
+                <div style={{ paddingRight: "16px" }}>
+                  <div
+                    style={{
+                      fontSize: "15px",
+                      fontWeight: "bold",
+                      color: BRAND_DARK,
+                    }}
+                  >
+                    {optionLabel}
+                  </div>
+                  <div
+                    style={{ fontSize: "12px", color: "#666", marginTop: "3px" }}
+                  >
+                    Includes equipment, accessories &amp; installation
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  {hasDiscount && (
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        color: "#9aa3b2",
+                        textDecoration: "line-through",
+                      }}
+                    >
+                      ₹{fmtAmount(estimated)}/-
+                    </div>
+                  )}
+                  <div
+                    style={{
+                      fontSize: "23px",
+                      fontWeight: "bold",
+                      color: BRAND_DARK,
+                      lineHeight: 1.1,
+                    }}
+                  >
+                    ₹{fmtAmount(offer)}/-
+                  </div>
+                  {hasDiscount && (
+                    <div
+                      style={{
+                        fontSize: "9px",
+                        fontWeight: "bold",
+                        color: GOLD,
+                        letterSpacing: "0.12em",
+                      }}
+                    >
+                      OFFER PRICE
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
-              {hasDiscount && (
-                <h2
-                  style={{
-                    fontSize: "20px",
-                    fontWeight: "bold",
-                    color: "#d4183d",
-                    margin: "5px 0 20px",
-                  }}
-                >
-                  Offer Price for the Package is {fmtAmount(offer)}/-
-                </h2>
-              )}
-            </div>
-          );
-        })}
-
-        <hr
-          style={{
-            border: "none",
-            borderTop: "2px solid #1a3c6e",
-            margin: "10px 0",
-          }}
-        />
-        <hr
-          style={{
-            border: "none",
-            borderTop: "2px solid #1a3c6e",
-            margin: "5px 0 30px",
-          }}
-        />
-
-        <h3
-          style={{
-            fontWeight: "bold",
-            textDecoration: "underline",
-            margin: "20px 0 10px",
-            fontSize: "16px",
-          }}
-        >
-          Terms &amp; Conditions
-        </h3>
-        <ol
-          style={{
-            paddingLeft: "30px",
-            margin: "0 0 25px",
-            fontSize: "14px",
-          }}
-        >
-          {termsLines.map((t, i) => (
-            <li key={i} style={{ marginBottom: "5px" }}>
-              {t}
-            </li>
-          ))}
-        </ol>
+        <div style={{ marginTop: "26px" }}>
+          <SectionHeading>Terms &amp; Conditions</SectionHeading>
+          <ol
+            style={{
+              paddingLeft: "22px",
+              margin: "12px 0 0",
+              fontSize: "12.5px",
+              color: "#333",
+              lineHeight: 1.7,
+            }}
+          >
+            {termsLines.map((t, i) => (
+              <li key={i} style={{ marginBottom: "4px" }}>
+                {t}
+              </li>
+            ))}
+          </ol>
+        </div>
 
         {quotation.notes && (
           <p
             style={{
-              fontSize: "13px",
+              fontSize: "12.5px",
               fontStyle: "italic",
-              color: "#333",
-              margin: "10px 0 20px",
+              color: "#555",
+              margin: "16px 0 0",
               whiteSpace: "pre-line",
             }}
           >
@@ -941,33 +1104,53 @@ function SummaryPage({ quotation }: { quotation: Quotation }) {
         <p
           style={{
             fontStyle: "italic",
-            fontWeight: "bold",
             textAlign: "center",
-            margin: "20px 0",
-            fontSize: "14px",
+            margin: "26px 0 0",
+            fontSize: "13px",
+            color: "#444",
           }}
         >
-          Please feel free to call us for any further clarification and we look
+          Please feel free to call us for any further clarification. We look
           forward to your valued order and an opportunity to serve.
         </p>
 
-        <div style={{ margin: "30px 0 0" }}>
-          <p style={{ marginBottom: "5px" }}>With Warm Regards.</p>
-          <p
-            style={{
-              fontWeight: "bold",
-              fontSize: "18px",
-              margin: "5px 0 2px",
-            }}
-          >
-            {SIGNATURE.name}
-          </p>
-          <p style={{ margin: "2px 0", fontSize: "13px" }}>
-            {SIGNATURE.title}
-          </p>
-          <p style={{ margin: "2px 0", fontSize: "13px" }}>
-            Mobile: {SIGNATURE.mobile}
-          </p>
+        {/* Signature */}
+        <div
+          style={{
+            marginTop: "36px",
+            display: "flex",
+            justifyContent: "flex-end",
+          }}
+        >
+          <div style={{ minWidth: "230px" }}>
+            <p
+              style={{
+                fontSize: "13px",
+                color: "#444",
+                marginBottom: "34px",
+              }}
+            >
+              With Warm Regards,
+            </p>
+            <div style={{ borderTop: `1.5px solid ${BRAND}`, paddingTop: "7px" }}>
+              <p
+                style={{
+                  fontWeight: "bold",
+                  fontSize: "16px",
+                  color: BRAND_DARK,
+                  margin: 0,
+                }}
+              >
+                {SIGNATURE.name}
+              </p>
+              <p style={{ margin: "2px 0", fontSize: "12px", color: "#666" }}>
+                {SIGNATURE.title}
+              </p>
+              <p style={{ margin: 0, fontSize: "12px", color: "#666" }}>
+                Mobile: {SIGNATURE.mobile}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
       <Footer />

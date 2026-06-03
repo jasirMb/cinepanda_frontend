@@ -84,6 +84,11 @@ export interface Quotation {
   validUntil?: string;
   status: "DRAFT" | "SENT" | "APPROVED" | "REJECTED";
   projectId?: string | QuotationProjectRef | null;
+  speakerConfig?: {
+    name: string;
+    imageUrl?: string;
+    imageKey?: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -123,6 +128,14 @@ export interface CreateQuotationPayload {
   termsAndConditions?: string;
   quotationDate?: string;
   validUntil?: string;
+  speakerConfig?: { name: string; imageUrl?: string; imageKey?: string } | null;
+}
+
+export interface UpdateQuotationPayload {
+  notes?: string;
+  termsAndConditions?: string;
+  validUntil?: string;
+  speakerConfig?: { name: string; imageUrl?: string; imageKey?: string } | null;
 }
 
 /* ────────────────────────────────────────────
@@ -153,7 +166,7 @@ export async function createQuotation(
 
 export async function updateQuotation(
   id: string,
-  payload: Partial<Pick<Quotation, "notes" | "termsAndConditions" | "validUntil">>
+  payload: UpdateQuotationPayload
 ): Promise<QuotationResponse> {
   const { data } = await api.put<QuotationResponse>(
     `/quotations/${id}`,

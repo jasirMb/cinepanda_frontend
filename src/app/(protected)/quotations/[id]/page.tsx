@@ -16,6 +16,8 @@ import {
   type Quotation,
 } from "@/lib/api/quotations";
 import { createProjectFromQuotation } from "@/lib/api/projects";
+import { type SpeakerConfigSnapshot } from "@/lib/api/speaker-configs";
+import { SpeakerConfigPicker } from "@/components/quotation/SpeakerConfigPicker";
 import { downloadProposalPdf } from "@/lib/quotation-pdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +63,8 @@ export default function QuotationDetailPage() {
   const [notes, setNotes] = useState("");
   const [termsAndConditions, setTermsAndConditions] = useState("");
   const [validUntil, setValidUntil] = useState("");
+  const [speakerConfig, setSpeakerConfig] =
+    useState<SpeakerConfigSnapshot | null>(null);
 
   // Create-project-from-quotation form
   const [showProjectForm, setShowProjectForm] = useState(false);
@@ -106,8 +110,25 @@ export default function QuotationDetailPage() {
           ? new Date(quotation.validUntil).toISOString().split("T")[0]
           : ""
       );
+      setSpeakerConfig(quotation.speakerConfig ?? null);
     }
   }, [quotation]);
+
+  const speakerConfigMutation = useMutation({
+    mutationFn: (cfg: SpeakerConfigSnapshot | null) =>
+      updateQuotation(quotationId, { speakerConfig: cfg }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: quotationsKeys.all });
+      queryClient.invalidateQueries({
+        queryKey: quotationsKeys.detail(quotationId),
+      });
+      toast.success("Speaker configuration saved");
+    },
+    onError: (err) => {
+      const e = err as { response?: { data?: { error?: string } } };
+      toast.error(e?.response?.data?.error ?? "Failed to save configuration");
+    },
+  });
 
   // ── mutations ─────────────────────────────
   const updateMutation = useMutation({
@@ -477,6 +498,51 @@ export default function QuotationDetailPage() {
             </p>
           )}
         </div>
+      </div>
+
+      {/* Speaker configuration */}
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+              Speaker Configuration
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Its diagram is shown in the quotation PDF.
+            </p>
+          </div>
+          {!locked && (
+            <Button
+              size="sm"
+              disabled={
+                speakerConfigMutation.isPending ||
+                JSON.stringify(speakerConfig) ===
+                  JSON.stringify(quotation.speakerConfig ?? null)
+              }
+              onClick={() => speakerConfigMutation.mutate(speakerConfig)}
+            >
+              {speakerConfigMutation.isPending ? "Saving…" : "Save"}
+            </Button>
+          )}
+        </div>
+        {locked ? (
+          <div className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300">
+            {speakerConfig?.imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={speakerConfig.imageUrl}
+                alt={speakerConfig.name}
+                className="h-16 w-24 rounded border border-slate-200 object-contain dark:border-slate-700"
+              />
+            )}
+            <span>{speakerConfig?.name ?? "None selected"}</span>
+          </div>
+        ) : (
+          <SpeakerConfigPicker
+            value={speakerConfig}
+            onChange={setSpeakerConfig}
+          />
+        )}
       </div>
 
       {/* Sections (template options) — document style */}

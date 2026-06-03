@@ -22,6 +22,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { quotationsKeys, useQuotations } from "@/hooks/useQuotations";
 import { useTemplates } from "@/hooks/useTemplates";
 import { productItemImage, type Template } from "@/lib/api/templates";
+import { type SpeakerConfigSnapshot } from "@/lib/api/speaker-configs";
+import { SpeakerConfigPicker } from "@/components/quotation/SpeakerConfigPicker";
 import { useCustomers } from "@/hooks/useCustomers";
 import {
   createQuotation,
@@ -235,6 +237,8 @@ export default function QuotationsPage() {
     new Date().toISOString().split("T")[0]
   );
   const [validUntil, setValidUntil] = useState("");
+  const [speakerConfig, setSpeakerConfig] =
+    useState<SpeakerConfigSnapshot | null>(null);
 
   // Derived
   const selectedTemplates = useMemo(
@@ -313,6 +317,7 @@ export default function QuotationsPage() {
     setTermsAndConditions("50% advance required. Balance before delivery.");
     setQuotationDate(new Date().toISOString().split("T")[0]);
     setValidUntil("");
+    setSpeakerConfig(null);
   }
 
   function toggleTemplate(tpl: Template) {
@@ -339,6 +344,7 @@ export default function QuotationsPage() {
       termsAndConditions: termsAndConditions.trim() || undefined,
       quotationDate,
       validUntil: validUntil || undefined,
+      speakerConfig: speakerConfig ?? undefined,
     };
     setStep("creating");
     createMutation.mutate(payload);
@@ -677,13 +683,13 @@ export default function QuotationsPage() {
   // Step 3: Notes, T&C, dates
   if (step === "details") {
     return (
-      <div className="mx-auto max-w-lg space-y-6">
+      <div className="mx-auto max-w-2xl space-y-6">
         <div>
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
             Quotation Details
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Step 3 of 3 — Add notes, terms, and dates
+            Step 3 of 3 — Add notes, terms, speaker configuration & dates
           </p>
         </div>
 
@@ -727,6 +733,19 @@ export default function QuotationsPage() {
               className="min-h-[80px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
               value={termsAndConditions}
               onChange={(e) => setTermsAndConditions(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Speaker Configuration
+            </label>
+            <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+              Pick a configuration — its diagram appears in the PDF. Add a new
+              one with “Add configuration”.
+            </p>
+            <SpeakerConfigPicker
+              value={speakerConfig}
+              onChange={setSpeakerConfig}
             />
           </div>
         </div>
