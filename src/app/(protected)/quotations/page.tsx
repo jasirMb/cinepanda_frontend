@@ -7,13 +7,18 @@ import {
   Lock,
   FolderKanban,
   CheckCircle2,
+  Check,
   Plus,
+  ChevronLeft,
   ChevronRight,
+  Search,
+  X,
 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { quotationsKeys, useQuotations } from "@/hooks/useQuotations";
 import { useTemplates } from "@/hooks/useTemplates";
+import { type Template } from "@/lib/api/templates";
 import { useCustomers } from "@/hooks/useCustomers";
 import {
   createQuotation,
@@ -91,11 +96,27 @@ export default function QuotationsPage() {
   const queryClient = useQueryClient();
 
   const quotationsQuery = useQuotations();
-  const templatesQuery = useTemplates();
+  // Template picker: 10 per page, latest-first, searchable by name (debounced).
+  const [templateSearch, setTemplateSearch] = useState("");
+  const [debouncedTemplateSearch, setDebouncedTemplateSearch] = useState("");
+  const [templatePage, setTemplatePage] = useState(1);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedTemplateSearch(templateSearch), 300);
+    return () => clearTimeout(t);
+  }, [templateSearch]);
+  useEffect(() => {
+    setTemplatePage(1);
+  }, [debouncedTemplateSearch]);
+  const templatesQuery = useTemplates({
+    search: debouncedTemplateSearch || undefined,
+    page: templatePage,
+    limit: 10,
+  });
   const customersQuery = useCustomers();
 
   const quotations = quotationsQuery.data?.data ?? [];
   const templates = templatesQuery.data?.data ?? [];
+  const templatePagination = templatesQuery.data?.pagination;
   const customers = customersQuery.data?.data ?? [];
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -187,6 +208,10 @@ export default function QuotationsPage() {
   // ── wizard state ──────────────────────────
   const [step, setStep] = useState<Step>("list");
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
+  // Full objects of selected templates, so a pick survives search/pagination.
+  const [selectedTemplatesById, setSelectedTemplatesById] = useState<
+    Record<string, Template>
+  >({});
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [notes, setNotes] = useState("");
@@ -200,8 +225,11 @@ export default function QuotationsPage() {
 
   // Derived
   const selectedTemplates = useMemo(
-    () => templates.filter((t) => selectedTemplateIds.includes(t._id)),
-    [templates, selectedTemplateIds]
+    () =>
+      selectedTemplateIds
+        .map((id) => selectedTemplatesById[id])
+        .filter(Boolean) as Template[],
+    [selectedTemplateIds, selectedTemplatesById]
   );
 
   const selectedCustomer = useMemo(
@@ -262,6 +290,10 @@ export default function QuotationsPage() {
   function resetWizard() {
     setStep("list");
     setSelectedTemplateIds([]);
+    setSelectedTemplatesById({});
+    setTemplateSearch("");
+    setDebouncedTemplateSearch("");
+    setTemplatePage(1);
     setSelectedCustomerId("");
     setCustomerSearch("");
     setNotes("");
@@ -270,10 +302,20 @@ export default function QuotationsPage() {
     setValidUntil("");
   }
 
-  function toggleTemplate(id: string) {
+  function toggleTemplate(tpl: Template) {
     setSelectedTemplateIds((prev) =>
-      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
+      prev.includes(tpl._id)
+        ? prev.filter((t) => t !== tpl._id)
+        : [...prev, tpl._id]
     );
+    setSelectedTemplatesById((prev) => {
+      if (prev[tpl._id]) {
+        const next = { ...prev };
+        delete next[tpl._id];
+        return next;
+      }
+      return { ...prev, [tpl._id]: tpl };
+    });
   }
 
   function handleCreate() {
@@ -332,6 +374,37 @@ export default function QuotationsPage() {
           </p>
         </div>
 
+        {/* Selected templates — persist even while searching */}
+        {selectedTemplates.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-cine-primary/30 bg-cine-primary/5 p-3 dark:border-cine-primary/40 dark:bg-cine-primary/10">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              Selected ({selectedTemplates.length}):
+            </span>
+            {selectedTemplates.map((tpl, i) => (
+              <button
+                key={tpl._id}
+                type="button"
+                onClick={() => toggleTemplate(tpl)}
+                className="inline-flex items-center gap-1 rounded-full border border-cine-primary/30 bg-white px-2.5 py-1 text-xs font-medium text-cine-primary transition hover:bg-cine-primary/10 dark:bg-slate-900"
+              >
+                Option {i + 1}: {tpl.name}
+                <X className="h-3 w-3" />
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Search — latest templates shown first; type to find any */}
+        <div className="relative max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            placeholder="Search templates by name…"
+            value={templateSearch}
+            onChange={(e) => setTemplateSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
         {templatesQuery.isLoading ? (
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Loading templates...
@@ -339,62 +412,131 @@ export default function QuotationsPage() {
         ) : templates.length === 0 ? (
           <div className="rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              No templates available.{" "}
-              <Link href="/templates" className="text-cine-primary underline">
-                Create a template first
-              </Link>
-              .
+              {debouncedTemplateSearch ? (
+                `No templates match “${debouncedTemplateSearch}”.`
+              ) : (
+                <>
+                  No templates available.{" "}
+                  <Link href="/templates" className="text-cine-primary underline">
+                    Create a template first
+                  </Link>
+                  .
+                </>
+              )}
             </p>
           </div>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {templates.map((tpl) => {
-              const isSelected = selectedTemplateIds.includes(tpl._id);
-              return (
-                <button
-                  key={tpl._id}
-                  type="button"
-                  onClick={() => toggleTemplate(tpl._id)}
-                  className={`rounded-lg border p-4 text-left transition ${
-                    isSelected
-                      ? "border-cine-primary bg-cine-primary/5 ring-2 ring-cine-primary/30 dark:bg-cine-primary/10"
-                      : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                        {tpl.name}
-                      </p>
-                      {tpl.description && (
-                        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                          {tpl.description}
+          <>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {templates.map((tpl) => {
+                const isSelected = selectedTemplateIds.includes(tpl._id);
+                const totalProducts = tpl.groups.reduce(
+                  (s, g) => s + g.productItems.length,
+                  0
+                );
+                return (
+                  <button
+                    key={tpl._id}
+                    type="button"
+                    onClick={() => toggleTemplate(tpl)}
+                    className={`group flex flex-col gap-2 rounded-xl border bg-white p-3 text-left shadow-sm transition hover:shadow-md dark:bg-slate-900/60 ${
+                      isSelected
+                        ? "border-cine-primary ring-2 ring-cine-primary/30 dark:border-cine-primary"
+                        : "border-slate-200 hover:border-cine-primary/40 dark:border-slate-800 dark:hover:border-slate-700"
+                    }`}
+                  >
+                    {/* Header */}
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gradient-to-br text-xs font-bold text-white shadow-sm ${gradientFor(
+                          tpl._id
+                        )}`}
+                      >
+                        {tpl.name.trim().charAt(0).toUpperCase() || "T"}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
+                          {tpl.name}
                         </p>
+                        <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                          {tpl.description ||
+                            `${totalProducts} item${totalProducts !== 1 ? "s" : ""} · ${tpl.groups.length} grp`}
+                        </p>
+                      </div>
+                      <span
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${
+                          isSelected
+                            ? "border-cine-primary bg-cine-primary text-white"
+                            : "border-slate-300 dark:border-slate-600"
+                        }`}
+                      >
+                        {isSelected && <Check className="h-3 w-3" />}
+                      </span>
+                    </div>
+
+                    {/* Price */}
+                    <div className="flex items-baseline justify-between">
+                      <p className="text-base font-bold text-emerald-700 dark:text-emerald-300">
+                        {INR(tpl.grandTotal)}
+                      </p>
+                      {isSelected && (
+                        <span className="text-[11px] font-semibold text-cine-primary">
+                          Option {selectedTemplateIds.indexOf(tpl._id) + 1}
+                        </span>
                       )}
                     </div>
-                    <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
-                      {INR(tpl.grandTotal)}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {tpl.groups.map((g) => (
-                      <span
-                        key={g.name}
-                        className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600 dark:bg-slate-800 dark:text-slate-400"
-                      >
-                        {g.name}
-                      </span>
-                    ))}
-                  </div>
-                  {isSelected && (
-                    <p className="mt-2 text-xs font-semibold text-cine-primary">
-                      Selected as Option {selectedTemplateIds.indexOf(tpl._id) + 1}
-                    </p>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+
+                    {/* Group chips */}
+                    {tpl.groups.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {tpl.groups.slice(0, 3).map((g) => (
+                          <span
+                            key={g.name}
+                            className="truncate rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300"
+                          >
+                            {g.name}
+                          </span>
+                        ))}
+                        {tpl.groups.length > 3 && (
+                          <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-500">
+                            +{tpl.groups.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Pagination */}
+            {templatePagination && templatePagination.totalPages > 1 && (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Showing {templates.length} of {templatePagination.total} · page{" "}
+                  {templatePagination.page} of {templatePagination.totalPages}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!templatePagination.hasPrev}
+                    onClick={() => setTemplatePage((p) => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft className="h-4 w-4" /> Prev
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!templatePagination.hasNext}
+                    onClick={() => setTemplatePage((p) => p + 1)}
+                  >
+                    Next <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         <div className="flex gap-3">
