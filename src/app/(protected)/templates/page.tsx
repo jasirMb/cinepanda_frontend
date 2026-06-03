@@ -1241,13 +1241,7 @@ function TemplateCard({
   const initial = template.name.trim().charAt(0).toUpperCase() || "T";
 
   return (
-    <div
-      className={`group flex h-full flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:bg-slate-900/60 ${
-        locked
-          ? "border-amber-200/70 dark:border-amber-900/40"
-          : "border-slate-200 hover:border-cine-primary/40 dark:border-slate-800 dark:hover:border-slate-700"
-      }`}
-    >
+    <div className="group flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-cine-primary/40 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
       <div className="flex flex-1 flex-col gap-3 p-4">
         {/* Header */}
         <Link
