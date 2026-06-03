@@ -15,12 +15,13 @@ import {
   X,
   Phone,
   MapPin,
+  Package,
 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { quotationsKeys, useQuotations } from "@/hooks/useQuotations";
 import { useTemplates } from "@/hooks/useTemplates";
-import { type Template } from "@/lib/api/templates";
+import { productItemImage, type Template } from "@/lib/api/templates";
 import { useCustomers } from "@/hooks/useCustomers";
 import {
   createQuotation,
@@ -810,30 +811,57 @@ export default function QuotationsPage() {
                         Subtotal: {INR(group.subtotal)}
                       </p>
                     </div>
-                    <table className="mt-1 w-full text-sm">
+                    <table className="mt-1 w-full table-fixed text-sm">
                       <thead>
                         <tr className="text-left text-[10px] uppercase tracking-wider text-slate-400">
                           <th className="py-1 font-medium">Item</th>
-                          <th className="py-1 font-medium text-center">Qty</th>
-                          <th className="py-1 font-medium text-right">
+                          <th className="w-16 py-1 text-center font-medium">
+                            Qty
+                          </th>
+                          <th className="w-32 py-1 text-right font-medium">
                             Unit Price
                           </th>
-                          <th className="py-1 font-medium text-right">Total</th>
+                          <th className="w-32 py-1 text-right font-medium">
+                            Total
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="text-slate-700 dark:text-slate-300">
-                        {group.productItems.map((item, i) => (
+                        {group.productItems.map((item, i) => {
+                          const img = productItemImage(item.productId);
+                          return (
                           <tr key={i}>
-                            <td className="py-1">{item.productName}</td>
-                            <td className="py-1 text-center">{item.quantity}</td>
-                            <td className="py-1 text-right">
+                            <td className="py-1 pr-2">
+                              <div className="flex items-center gap-2">
+                                <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
+                                  {img ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={img}
+                                      alt={item.productName}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <Package className="h-3.5 w-3.5 text-slate-400" />
+                                  )}
+                                </span>
+                                <span className="truncate">
+                                  {item.productName}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-1 text-center tabular-nums">
+                              {item.quantity}
+                            </td>
+                            <td className="py-1 text-right tabular-nums">
                               {INR(item.unitPrice)}
                             </td>
-                            <td className="py-1 text-right font-medium">
+                            <td className="py-1 text-right font-medium tabular-nums">
                               {INR(item.lineTotal)}
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
 

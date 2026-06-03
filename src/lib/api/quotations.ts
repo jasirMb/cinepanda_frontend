@@ -6,13 +6,26 @@ import { API_BASE_URL } from "@/lib/api-base";
    ──────────────────────────────────────────── */
 
 export interface QuotationProductItem {
-  productId?: string;
+  /** Populated to {_id, name, imageUrl} on the detail endpoint; id string otherwise. */
+  productId?:
+    | string
+    | { _id: string; name?: string; imageUrl?: string }
+    | null;
   productName: string;
   category: string;
   subcategory: string;
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+}
+
+/** The product image from a (possibly populated) quotation item's productId. */
+export function quotationItemImage(
+  productId: QuotationProductItem["productId"]
+): string | undefined {
+  return productId && typeof productId === "object"
+    ? productId.imageUrl
+    : undefined;
 }
 
 export interface QuotationManualItem {

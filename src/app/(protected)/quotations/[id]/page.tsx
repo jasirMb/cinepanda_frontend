@@ -12,6 +12,7 @@ import {
   updateQuotationStatus,
   deleteQuotation,
   quotationProjectId,
+  quotationItemImage,
   type Quotation,
 } from "@/lib/api/quotations";
 import { createProjectFromQuotation } from "@/lib/api/projects";
@@ -21,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Spinner } from "@/components/ui/spinner";
-import { FolderKanban, Lock } from "lucide-react";
+import { FolderKanban, Lock, Package } from "lucide-react";
 
 /* ────────────────────────────────────────────
    Helpers
@@ -217,7 +218,7 @@ export default function QuotationDetailPage() {
 
   // ── RENDER ────────────────────────────────
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-5xl space-y-3">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -411,8 +412,8 @@ export default function QuotationDetailPage() {
       </div>
 
       {/* Dates & editable fields */}
-      <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <p className="text-xs font-medium uppercase text-slate-400">
               Quotation Date
@@ -479,25 +480,25 @@ export default function QuotationDetailPage() {
       </div>
 
       {/* Sections (template options) — document style */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         {quotation.sections.map((section, si) => (
           <div
             key={si}
-            className="rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
+            className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
           >
             {/* Section header */}
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-slate-50">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/60 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-800/30">
+              <div className="min-w-0">
+                <h3 className="truncate text-sm font-bold text-slate-900 dark:text-slate-50">
                   Option {si + 1}: {section.sectionName}
                 </h3>
                 {section.description && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
                     {section.description}
                   </p>
                 )}
               </div>
-              <span className="text-lg font-bold text-emerald-700 dark:text-emerald-400">
+              <span className="shrink-0 text-base font-bold text-emerald-700 dark:text-emerald-400">
                 {INR(section.grandTotal)}
               </span>
             </div>
@@ -505,7 +506,7 @@ export default function QuotationDetailPage() {
             {/* Groups */}
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
               {section.groups.map((group, gi) => (
-                <div key={gi} className="px-6 py-4">
+                <div key={gi} className="px-4 py-2.5">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
                       {group.name}
@@ -516,40 +517,63 @@ export default function QuotationDetailPage() {
                   </div>
 
                   {/* Products table */}
-                  <div className="-mx-6 mt-2 overflow-x-auto px-6">
-                    <table className="w-full min-w-[480px] text-sm">
+                  <div className="-mx-4 mt-1.5 overflow-x-auto px-4">
+                    <table className="w-full min-w-[480px] table-fixed text-sm">
                       <thead>
                         <tr className="text-left text-[10px] uppercase tracking-wider text-slate-400">
-                          <th className="py-1 font-medium">#</th>
+                          <th className="w-8 py-1 font-medium">#</th>
                           <th className="py-1 font-medium">Product</th>
-                          <th className="py-1 font-medium text-center">Qty</th>
-                          <th className="py-1 font-medium text-right">
+                          <th className="w-14 py-1 text-center font-medium">
+                            Qty
+                          </th>
+                          <th className="w-28 py-1 text-right font-medium">
                             Unit Price
                           </th>
-                          <th className="py-1 font-medium text-right">Total</th>
+                          <th className="w-28 py-1 text-right font-medium">
+                            Total
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="text-slate-700 dark:text-slate-300">
-                        {group.productItems.map((item, ii) => (
+                        {group.productItems.map((item, ii) => {
+                          const img = quotationItemImage(item.productId);
+                          return (
                           <tr key={ii}>
                             <td className="py-1 text-slate-400">{ii + 1}</td>
-                            <td className="py-1">
-                              <p>{item.productName}</p>
-                              <p className="text-[10px] text-slate-400">
-                                {item.category} / {item.subcategory}
-                              </p>
+                            <td className="py-1 pr-2">
+                              <div className="flex items-center gap-2">
+                                <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
+                                  {img ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={img}
+                                      alt={item.productName}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <Package className="h-4 w-4 text-slate-400" />
+                                  )}
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="truncate">{item.productName}</p>
+                                  <p className="truncate text-[10px] text-slate-400">
+                                    {item.category} / {item.subcategory}
+                                  </p>
+                                </div>
+                              </div>
                             </td>
-                            <td className="py-1 text-center">
+                            <td className="py-1 text-center tabular-nums">
                               {item.quantity}
                             </td>
-                            <td className="py-1 text-right">
+                            <td className="py-1 text-right tabular-nums">
                               {INR(item.unitPrice)}
                             </td>
-                            <td className="py-1 text-right font-medium">
+                            <td className="py-1 text-right font-medium tabular-nums">
                               {INR(item.lineTotal)}
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -586,7 +610,7 @@ export default function QuotationDetailPage() {
 
             {/* Section-level manual items (GST, discounts, etc.) */}
             {section.manualItems?.length > 0 && (
-              <div className="border-t border-slate-200 px-6 py-3 dark:border-slate-800">
+              <div className="border-t border-slate-200 px-4 py-2.5 dark:border-slate-800">
                 <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-400">
                   Adjustments
                 </p>
