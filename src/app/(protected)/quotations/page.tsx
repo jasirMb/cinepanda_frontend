@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { Lock } from "lucide-react";
+import { Lock, FolderKanban } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { quotationsKeys, useQuotations } from "@/hooks/useQuotations";
@@ -13,6 +13,8 @@ import {
   createQuotation,
   deleteQuotation,
   updateQuotationStatus,
+  quotationProject,
+  quotationProjectId,
   type CreateQuotationPayload,
   type Quotation,
 } from "@/lib/api/quotations";
@@ -1022,6 +1024,35 @@ function QuotationCard({
             ` · Valid until ${new Date(quotation.validUntil).toLocaleDateString()}`}
         </div>
       </Link>
+
+      {/* Linked project */}
+      {(() => {
+        const pid = quotationProjectId(quotation.projectId);
+        const proj = quotationProject(quotation.projectId);
+        if (pid) {
+          return (
+            <Link
+              href={`/projects/${pid}`}
+              className="mt-2 inline-flex items-center gap-1.5 self-start rounded-md border border-cine-primary/30 bg-cine-primary/5 px-2 py-1 text-[11px] font-medium text-cine-primary transition hover:bg-cine-primary/10"
+            >
+              <FolderKanban className="h-3 w-3" />
+              {proj?.clientName ? `Project: ${proj.clientName}` : "View project"}
+              {proj?.status ? ` · ${proj.status}` : ""}
+            </Link>
+          );
+        }
+        if (quotation.status === "APPROVED") {
+          return (
+            <Link
+              href={`/quotations/${quotation._id}`}
+              className="mt-2 inline-flex items-center gap-1.5 self-start text-[11px] font-medium text-slate-500 transition hover:text-cine-primary dark:text-slate-400"
+            >
+              <FolderKanban className="h-3 w-3" /> Create project →
+            </Link>
+          );
+        }
+        return null;
+      })()}
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
         <Link

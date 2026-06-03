@@ -11,6 +11,7 @@ import {
   updateQuotation,
   updateQuotationStatus,
   deleteQuotation,
+  quotationProjectId,
   type Quotation,
 } from "@/lib/api/quotations";
 import { createProjectFromQuotation } from "@/lib/api/projects";
@@ -313,7 +314,9 @@ export default function QuotationDetailPage() {
           </div>
           {quotation.projectId ? (
             <Button variant="outline" size="sm" asChild>
-              <Link href={`/projects/${quotation.projectId}`}>View project</Link>
+              <Link href={`/projects/${quotationProjectId(quotation.projectId)}`}>
+                View project
+              </Link>
             </Button>
           ) : quotation.status === "APPROVED" ? (
             <Button size="sm" onClick={() => setShowProjectForm((v) => !v)}>

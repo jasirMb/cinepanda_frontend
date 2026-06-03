@@ -48,6 +48,14 @@ export interface QuotationCustomer {
   email?: string;
 }
 
+/** projectId comes back populated (full project) from list/detail endpoints. */
+export interface QuotationProjectRef {
+  _id: string;
+  clientName?: string;
+  serviceType?: string;
+  status?: string;
+}
+
 export interface Quotation {
   _id: string;
   customerId: QuotationCustomer;
@@ -57,9 +65,24 @@ export interface Quotation {
   quotationDate: string;
   validUntil?: string;
   status: "DRAFT" | "SENT" | "APPROVED" | "REJECTED";
-  projectId?: string;
+  projectId?: string | QuotationProjectRef | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Extract the plain project id from a (possibly populated) projectId field. */
+export function quotationProjectId(
+  projectId: string | QuotationProjectRef | null | undefined
+): string | undefined {
+  if (!projectId) return undefined;
+  return typeof projectId === "string" ? projectId : projectId._id;
+}
+
+/** Extract the populated project (label info), if present. */
+export function quotationProject(
+  projectId: string | QuotationProjectRef | null | undefined
+): QuotationProjectRef | undefined {
+  return projectId && typeof projectId === "object" ? projectId : undefined;
 }
 
 export interface QuotationsListResponse {
