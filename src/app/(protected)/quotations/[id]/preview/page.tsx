@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { toast } from "sonner";
 
 import { useQuotation } from "@/hooks/useQuotations";
-import { QuotationPreview } from "@/components/quotation/QuotationPreview";
+import QuotationPdfDocument from "@/components/quotation/QuotationPdfDocument";
 import { downloadProposalPdf } from "@/lib/quotation-pdf";
 import { Button } from "@/components/ui/button";
 
@@ -67,9 +67,11 @@ export default function QuotationPreviewPage() {
         </Button>
       </div>
 
-      {/* Preview container with paper-like styling */}
-      <div className="mx-auto max-w-[850px] rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700">
-        <QuotationPreview quotation={quotation} />
+      {/* Preview — the exact document that gets exported as the PDF */}
+      <div className="overflow-x-auto">
+        <div className="mx-auto w-fit rounded-lg bg-white shadow-lg ring-1 ring-slate-200 dark:ring-slate-700">
+          <QuotationPdfDocument quotation={quotation} />
+        </div>
       </div>
     </div>
   );
