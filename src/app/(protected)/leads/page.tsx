@@ -162,12 +162,12 @@ function getInitials(name: string) {
 
 function avatarColor(seed: string) {
   const palette = [
-    "bg-cine-primary/15 text-cine-primary",
-    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-    "bg-violet-500/15 text-violet-700 dark:text-violet-300",
-    "bg-amber-500/15 text-amber-800 dark:text-amber-300",
-    "bg-rose-500/15 text-rose-700 dark:text-rose-300",
-    "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+    "from-violet-500 to-fuchsia-500",
+    "from-sky-500 to-indigo-500",
+    "from-emerald-500 to-teal-500",
+    "from-amber-500 to-orange-500",
+    "from-rose-500 to-pink-500",
+    "from-cyan-500 to-blue-500",
   ];
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
@@ -406,7 +406,7 @@ export default function LeadsPage() {
           {/* Header */}
           <div className="flex items-start gap-3">
             <div
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${avatarColor(
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-sm font-bold text-white shadow-sm ${avatarColor(
                 lead.customerName
               )}`}
             >
@@ -813,7 +813,7 @@ export default function LeadsPage() {
                   {attentionLeads.length} lead{attentionLeads.length === 1 ? "" : "s"}
                 </span>
               </div>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 {attentionLeads.map((lead) => (
                   <LeadCard key={lead._id} lead={lead} />
                 ))}
@@ -836,7 +836,7 @@ export default function LeadsPage() {
                   {grouped.upcoming.length} scheduled
                 </span>
               </div>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 {grouped.upcoming.map((lead) => (
                   <LeadCard key={lead._id} lead={lead} />
                 ))}
@@ -859,7 +859,7 @@ export default function LeadsPage() {
                   {grouped.unscheduled.length} waiting
                 </span>
               </div>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 {grouped.unscheduled.map((lead) => (
                   <LeadCard key={lead._id} lead={lead} />
                 ))}
@@ -882,7 +882,7 @@ export default function LeadsPage() {
                   {toConvertLeads.length} to convert
                 </span>
               </div>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 {toConvertLeads.map((lead) => (
                   <LeadCard key={lead._id} lead={lead} />
                 ))}
