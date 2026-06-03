@@ -155,7 +155,7 @@ function LoginForm() {
       </div>
 
       {/* Right form panel */}
-      <div className="flex w-full lg:w-[45%] xl:w-[40%] items-center justify-center px-6 py-12 sm:px-12">
+      <div className="flex w-full items-center justify-center bg-gradient-to-b from-white to-slate-100 px-6 py-12 dark:from-slate-950 dark:to-slate-900 sm:px-12 lg:w-[45%] xl:w-[40%]">
         <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-2 duration-500">
           {/* Mobile logo */}
           <div className="mb-8 flex flex-col items-center text-center lg:hidden">
@@ -169,11 +169,12 @@ function LoginForm() {
             />
           </div>
 
-          <div className="mb-8">
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xl shadow-slate-200/40 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/30 sm:p-8">
+          <div className="mb-7">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
               Welcome back
             </h1>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+            <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-400">
               Sign in to manage leads, projects, and more.
             </p>
           </div>
@@ -181,38 +182,29 @@ function LoginForm() {
           <form onSubmit={handleSubmit} className="space-y-5" aria-busy={submitting || redirecting}>
             <div>
               <label
-                htmlFor="email"
+                htmlFor="username"
                 className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300"
               >
-                Email
+                Username
               </label>
               <Input
-                id="email"
+                id="username"
                 type="text"
-                autoComplete="email"
+                autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@cinepanda.com"
+                placeholder="Enter your username"
                 className="h-11"
               />
             </div>
 
             <div>
-              <div className="mb-1.5 flex items-center justify-between">
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-slate-700 dark:text-slate-300"
-                >
-                  Password
-                </label>
-                <button
-                  type="button"
-                  className="text-xs font-medium text-cine-primary hover:underline"
-                  onClick={(e) => e.preventDefault()}
-                >
-                  Forgot password?
-                </button>
-              </div>
+              <label
+                htmlFor="password"
+                className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300"
+              >
+                Password
+              </label>
               <div className="relative">
                 <Input
                   id="password"
@@ -272,8 +264,9 @@ function LoginForm() {
               )}
             </Button>
           </form>
+          </div>
 
-          <p className="mt-8 text-center text-xs text-slate-500 dark:text-slate-500 lg:hidden">
+          <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-500 lg:hidden">
             © {new Date().getFullYear()} CinePanda Entertainments
           </p>
         </div>
