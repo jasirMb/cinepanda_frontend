@@ -152,6 +152,42 @@ function sectionOffer(section: QuotationSection): number {
   return section.grandTotal;
 }
 
+/** Full price breakdown for a section: products subtotal, each adjustment
+ *  (discount −, tax/service/other +), and the grand total. */
+function sectionBreakdown(section: QuotationSection) {
+  let subtotal = 0;
+  const adjustments: { label: string; amount: number; isDiscount: boolean }[] = [];
+  const add = (m: QuotationManualItem) =>
+    adjustments.push({
+      label: `${m.name}${m.isPercentage ? ` (${m.amount}%)` : ""}`,
+      amount: Math.abs(m.resolvedAmount),
+      isDiscount: m.type === "discount",
+    });
+  for (const g of section.groups ?? []) {
+    for (const p of g.productItems ?? []) subtotal += p.lineTotal;
+    for (const m of g.manualItems ?? []) add(m);
+  }
+  for (const m of section.manualItems ?? []) add(m);
+
+  // Reconcile: if the listed lines don't add up to the grand total (e.g. older
+  // quotations whose snapshot didn't store adjustments), show the difference
+  // as a single "GST & taxes" line so the breakdown always balances.
+  const adjSum = adjustments.reduce(
+    (s, a) => s + (a.isDiscount ? -a.amount : a.amount),
+    0
+  );
+  const diff = Math.round(section.grandTotal) - Math.round(subtotal + adjSum);
+  if (Math.abs(diff) >= 1) {
+    adjustments.push({
+      label: "GST & taxes",
+      amount: Math.abs(diff),
+      isDiscount: diff < 0,
+    });
+  }
+
+  return { subtotal, adjustments, grandTotal: section.grandTotal };
+}
+
 /* ────────────────────────────────────────────
    Inline styles (Puppeteer-friendly — no external CSS)
    ──────────────────────────────────────────── */
@@ -407,7 +443,13 @@ function ProductImageCell({ src }: { src: string }) {
    Bucketed item tables
    ──────────────────────────────────────────── */
 
-function EquipmentTable({ items }: { items: ExtendedProductItem[] }) {
+function EquipmentTable({
+  items,
+  totalLabel = "TOTAL",
+}: {
+  items: ExtendedProductItem[];
+  totalLabel?: string;
+}) {
   if (items.length === 0) return null;
   const subtotal = items.reduce((s, i) => s + i.lineTotal, 0);
   return (
@@ -472,7 +514,7 @@ function EquipmentTable({ items }: { items: ExtendedProductItem[] }) {
             colSpan={4}
             style={totalLabelStyle}
           >
-            TOTAL
+            {totalLabel}
           </td>
           <td colSpan={2} style={{ ...totalAmountStyle, fontSize: "16px" }}>
             {fmtAmount(subtotal)}
@@ -483,7 +525,13 @@ function EquipmentTable({ items }: { items: ExtendedProductItem[] }) {
   );
 }
 
-function SqftTable({ items }: { items: ExtendedProductItem[] }) {
+function SqftTable({
+  items,
+  totalLabel = "Total",
+}: {
+  items: ExtendedProductItem[];
+  totalLabel?: string;
+}) {
   if (items.length === 0) return null;
   const total = items.reduce((s, i) => s + i.lineTotal, 0);
   return (
@@ -536,7 +584,7 @@ function SqftTable({ items }: { items: ExtendedProductItem[] }) {
             colSpan={4}
             style={totalLabelStyle}
           >
-            Total
+            {totalLabel}
           </td>
           <td style={totalAmountStyle}>{fmtAmount(total)}</td>
         </tr>
@@ -545,7 +593,13 @@ function SqftTable({ items }: { items: ExtendedProductItem[] }) {
   );
 }
 
-function InstallationTable({ items }: { items: ExtendedProductItem[] }) {
+function InstallationTable({
+  items,
+  totalLabel = "TOTAL",
+}: {
+  items: ExtendedProductItem[];
+  totalLabel?: string;
+}) {
   if (items.length === 0) return null;
   const total = items.reduce((s, i) => s + i.lineTotal, 0);
   return (
@@ -583,7 +637,7 @@ function InstallationTable({ items }: { items: ExtendedProductItem[] }) {
             colSpan={3}
             style={totalLabelStyle}
           >
-            TOTAL
+            {totalLabel}
           </td>
           <td style={totalAmountStyle}>{fmtAmount(total)}</td>
         </tr>
@@ -592,34 +646,92 @@ function InstallationTable({ items }: { items: ExtendedProductItem[] }) {
   );
 }
 
-function ManualItemsTable({ items }: { items: QuotationManualItem[] }) {
-  if (!items || items.length === 0) return null;
+/** One line in the right-aligned section totals stack. */
+function TotalsLine({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color?: string;
+}) {
   return (
-    <table
+    <div
       style={{
-        width: "60%",
-        borderCollapse: "collapse",
-        marginTop: "20px",
+        display: "flex",
+        justifyContent: "space-between",
+        gap: "16px",
+        padding: "6px 0",
+        borderBottom: `1px solid ${BORDER}`,
         fontSize: "13px",
-        marginLeft: "auto",
       }}
     >
-      <tbody>
-        {items.map((m, i) => (
-          <tr key={i}>
-            <td style={{ ...tdStyle, textAlign: "left" }}>
-              {m.type === "discount" ? "(-) " : "(+) "}
-              {m.name}
-              {m.isPercentage ? ` (${m.amount}%)` : ""}
-            </td>
-            <td style={{ ...tdStyle, textAlign: "right", fontWeight: "bold" }}>
-              {m.type === "discount" ? "-" : ""}
-              {fmtAmount(Math.abs(m.resolvedAmount))}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+      <span style={{ color: color ?? "#444" }}>{label}</span>
+      <span
+        style={{ color: color ?? "#222", fontWeight: 600, whiteSpace: "nowrap" }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/** Right-aligned invoice-style totals: adjustment lines + a Grand Total bar.
+ *  Replaces the old free-floating bordered GST box for a cohesive, professional
+ *  finish to each option page. */
+function SectionTotals({ section }: { section: QuotationSection }) {
+  const { adjustments, grandTotal } = sectionBreakdown(section);
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "flex-end",
+        marginTop: "18px",
+      }}
+    >
+      <div style={{ width: "340px", maxWidth: "100%" }}>
+        {adjustments.length > 0 && (
+          <div style={{ padding: "0 2px" }}>
+            {adjustments.map((a, k) => (
+              <TotalsLine
+                key={k}
+                label={a.label}
+                value={`${a.isDiscount ? "−" : "+"} ${fmtAmount(a.amount)}`}
+                color={a.isDiscount ? "#b3261e" : "#333"}
+              />
+            ))}
+          </div>
+        )}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            background: `linear-gradient(120deg, ${BRAND} 0%, ${BRAND_DARK} 100%)`,
+            color: "#fff",
+            padding: "11px 16px",
+            marginTop: "8px",
+            borderLeft: `4px solid ${GOLD}`,
+            borderRadius: "3px",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "13px",
+              fontWeight: "bold",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+            }}
+          >
+            Grand Total
+          </span>
+          <span style={{ fontSize: "18px", fontWeight: "bold", color: "#f0e2c4" }}>
+            {fmtAmount(grandTotal)}/-
+          </span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -652,11 +764,15 @@ function SectionPage({
     (i) => bucketForCategory(i.category) === "installation"
   );
 
-  // Section-level + group-level manual items
-  const allManualItems: QuotationManualItem[] = [
-    ...groups.flatMap((g) => g.manualItems ?? []),
-    ...(section.manualItems ?? []),
-  ];
+  // Does this section have any adjustments (GST, discount, …) or multiple
+  // item tables? If so, each table shows a "SUB TOTAL" and we render a unified
+  // Grand-Total panel below; otherwise the single table's "TOTAL" is the total.
+  const { adjustments } = sectionBreakdown(section);
+  const bucketCount = [equipment.length, sqft.length, installation.length].filter(
+    (n) => n > 0
+  ).length;
+  const showTotalsPanel = adjustments.length > 0 || bucketCount > 1;
+  const subLabel = showTotalsPanel ? "Sub Total" : "Total";
 
   return (
     <div style={pageStyle}>
@@ -694,7 +810,7 @@ function SectionPage({
         )}
 
         {/* Equipment block */}
-        <EquipmentTable items={equipment} />
+        <EquipmentTable items={equipment} totalLabel={subLabel} />
 
         {/* Room Acoustics block */}
         {sqft.length > 0 && (
@@ -712,7 +828,7 @@ function SectionPage({
                 Room Acoustics, Ceiling &amp; Carpet Work
               </span>
             </h3>
-            <SqftTable items={sqft} />
+            <SqftTable items={sqft} totalLabel={subLabel} />
           </>
         )}
 
@@ -732,12 +848,12 @@ function SectionPage({
                 Installation and Accessories
               </span>
             </h3>
-            <InstallationTable items={installation} />
+            <InstallationTable items={installation} totalLabel={subLabel} />
           </>
         )}
 
-        {/* Section-level adjustments (GST, discount, etc.) */}
-        <ManualItemsTable items={allManualItems} />
+        {/* Section adjustments (GST, discount, …) + Grand Total */}
+        {showTotalsPanel && <SectionTotals section={section} />}
       </div>
       <Footer />
     </div>
@@ -803,6 +919,34 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
+    </div>
+  );
+}
+
+function BreakdownRow({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color?: string;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        gap: "16px",
+        padding: "3px 0",
+      }}
+    >
+      <span style={{ color: color ?? "#444" }}>{label}</span>
+      <span
+        style={{ color: color ?? "#222", fontWeight: 600, whiteSpace: "nowrap" }}
+      >
+        {value}
+      </span>
     </div>
   );
 }
@@ -991,9 +1135,8 @@ function SummaryPage({ quotation }: { quotation: Quotation }) {
 
         <div style={{ marginTop: "16px" }}>
           {sections.map((section, i) => {
-            const estimated = sectionEstimated(section);
-            const offer = sectionOffer(section);
-            const hasDiscount = Math.round(estimated) !== Math.round(offer);
+            const { subtotal, adjustments, grandTotal } =
+              sectionBreakdown(section);
             const optionLabel =
               sections.length > 1 ? `AV Option ${i + 1}` : section.sectionName;
 
@@ -1001,9 +1144,6 @@ function SummaryPage({ quotation }: { quotation: Quotation }) {
               <div
                 key={i}
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
                   border: `1px solid ${BORDER}`,
                   borderLeft: `4px solid ${BRAND}`,
                   borderRadius: "8px",
@@ -1012,8 +1152,15 @@ function SummaryPage({ quotation }: { quotation: Quotation }) {
                   background: "#fff",
                 }}
               >
-                <div style={{ paddingRight: "16px" }}>
-                  <div
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "baseline",
+                    marginBottom: "8px",
+                  }}
+                >
+                  <span
                     style={{
                       fontSize: "15px",
                       fontWeight: "bold",
@@ -1021,47 +1168,57 @@ function SummaryPage({ quotation }: { quotation: Quotation }) {
                     }}
                   >
                     {optionLabel}
-                  </div>
-                  <div
-                    style={{ fontSize: "12px", color: "#666", marginTop: "3px" }}
-                  >
-                    Includes equipment, accessories &amp; installation
-                  </div>
-                </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  {hasDiscount && (
-                    <div
-                      style={{
-                        fontSize: "13px",
-                        color: "#9aa3b2",
-                        textDecoration: "line-through",
-                      }}
-                    >
-                      ₹{fmtAmount(estimated)}/-
-                    </div>
+                  </span>
+                  {sections.length > 1 && (
+                    <span style={{ fontSize: "11px", color: "#8a93a3" }}>
+                      {section.sectionName}
+                    </span>
                   )}
+                </div>
+
+                {/* Price breakdown */}
+                <div style={{ fontSize: "12.5px", color: "#333" }}>
+                  <BreakdownRow
+                    label="Equipment, accessories & installation"
+                    value={`₹${fmtAmount(subtotal)}`}
+                  />
+                  {adjustments.map((a, k) => (
+                    <BreakdownRow
+                      key={k}
+                      label={a.label}
+                      value={`${a.isDiscount ? "−" : "+"} ₹${fmtAmount(a.amount)}`}
+                      color={a.isDiscount ? "#b3261e" : "#444"}
+                    />
+                  ))}
                   <div
                     style={{
-                      fontSize: "23px",
-                      fontWeight: "bold",
-                      color: BRAND_DARK,
-                      lineHeight: 1.1,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      borderTop: `2px solid ${BRAND}`,
+                      marginTop: "8px",
+                      paddingTop: "8px",
                     }}
                   >
-                    ₹{fmtAmount(offer)}/-
-                  </div>
-                  {hasDiscount && (
-                    <div
+                    <span
                       style={{
-                        fontSize: "9px",
                         fontWeight: "bold",
-                        color: GOLD,
-                        letterSpacing: "0.12em",
+                        fontSize: "14px",
+                        color: BRAND_DARK,
                       }}
                     >
-                      OFFER PRICE
-                    </div>
-                  )}
+                      Grand Total
+                    </span>
+                    <span
+                      style={{
+                        fontWeight: "bold",
+                        fontSize: "19px",
+                        color: BRAND_DARK,
+                      }}
+                    >
+                      ₹{fmtAmount(grandTotal)}/-
+                    </span>
+                  </div>
                 </div>
               </div>
             );
