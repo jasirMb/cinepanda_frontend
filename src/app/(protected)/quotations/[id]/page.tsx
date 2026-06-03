@@ -66,6 +66,8 @@ export default function QuotationDetailPage() {
   const [projServiceType, setProjServiceType] = useState("");
   const [projStart, setProjStart] = useState("");
   const [projEnd, setProjEnd] = useState("");
+  // Which quotation option (section) to build the project from.
+  const [selectedSectionIndex, setSelectedSectionIndex] = useState(0);
 
   const createProjectMutation = useMutation({
     mutationFn: () =>
@@ -73,6 +75,7 @@ export default function QuotationDetailPage() {
         serviceType: projServiceType.trim(),
         startDate: projStart,
         expectedCompletionDate: projEnd,
+        selectedSectionIndex,
       }),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: quotationsKeys.all });
@@ -330,6 +333,50 @@ export default function QuotationDetailPage() {
         </div>
         {showProjectForm && !quotation.projectId && quotation.status === "APPROVED" && (
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            {quotation.sections.length > 1 && (
+              <div className="sm:col-span-3">
+                <p className="mb-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
+                  Which option to build? *
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {quotation.sections.map((sec, si) => {
+                    const active = selectedSectionIndex === si;
+                    return (
+                      <button
+                        key={si}
+                        type="button"
+                        onClick={() => setSelectedSectionIndex(si)}
+                        className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm transition ${
+                          active
+                            ? "border-cine-primary bg-cine-primary/5 dark:border-cine-primary dark:bg-cine-primary/10"
+                            : "border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600"
+                        }`}
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span
+                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
+                              active
+                                ? "border-cine-primary"
+                                : "border-slate-300 dark:border-slate-600"
+                            }`}
+                          >
+                            {active && (
+                              <span className="h-2 w-2 rounded-full bg-cine-primary" />
+                            )}
+                          </span>
+                          <span className="truncate text-slate-700 dark:text-slate-200">
+                            Option {si + 1}: {sec.sectionName}
+                          </span>
+                        </span>
+                        <span className="shrink-0 font-semibold text-emerald-700 dark:text-emerald-300">
+                          {INR(sec.grandTotal)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <label className="text-xs font-medium text-slate-600 dark:text-slate-300">
               Service type *
               <Input
