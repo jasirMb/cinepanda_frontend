@@ -248,15 +248,19 @@ const BRAND_TINT = "#f2f5f9";
 const ROW_ALT = "#f8fafc";
 const BORDER = "#dde3ec";
 
+// Table/list column header: a light tint with dark text + a navy underline,
+// so it reads as a column header and is clearly distinct from the navy
+// option banner above it (they no longer look like two identical bars).
 const tableHeaderStyle: React.CSSProperties = {
-  background: BRAND,
-  color: "#fff",
+  background: BRAND_TINT,
+  color: BRAND_DARK,
   fontWeight: "bold",
   padding: "9px 10px",
-  border: `1px solid ${BRAND}`,
+  border: `1px solid ${BORDER}`,
+  borderBottom: `2px solid ${BRAND}`,
   textAlign: "center",
-  fontSize: "12px",
-  letterSpacing: "0.03em",
+  fontSize: "11.5px",
+  letterSpacing: "0.04em",
   textTransform: "uppercase",
 };
 
@@ -388,55 +392,21 @@ function LogoSmall() {
   );
 }
 
-function PlaceholderImage({
-  width,
-  height,
-  label,
-}: {
-  width: number;
-  height: number;
-  label: string;
-}) {
-  return (
-    <div
-      style={{
-        width,
-        height,
-        background: "#f1f5f9",
-        border: "1px dashed #94a3b8",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "#64748b",
-        fontSize: "10px",
-        fontStyle: "italic",
-        textAlign: "center",
-        padding: "4px",
-        boxSizing: "border-box",
-      }}
-    >
-      {label}
-    </div>
-  );
-}
-
 function ProductImageCell({ src }: { src: string }) {
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt=""
-        style={{
-          width: "130px",
-          height: "100px",
-          objectFit: "cover",
-          display: "block",
-          margin: "0 auto",
-        }}
-      />
-    );
-  }
-  return <PlaceholderImage width={130} height={100} label="Product image" />;
+  if (!src) return null;
+  return (
+    <img
+      src={src}
+      alt=""
+      style={{
+        width: "130px",
+        height: "100px",
+        objectFit: "cover",
+        display: "block",
+        margin: "0 auto",
+      }}
+    />
+  );
 }
 
 /* ────────────────────────────────────────────
@@ -452,6 +422,9 @@ function EquipmentTable({
 }) {
   if (items.length === 0) return null;
   const subtotal = items.reduce((s, i) => s + i.lineTotal, 0);
+  // Only show the IMAGE column when at least one product actually has an image —
+  // otherwise the column is just empty space (no placeholders).
+  const hasImages = items.some((i) => !!getImage(i));
   return (
     <table
       style={{
@@ -468,12 +441,13 @@ function EquipmentTable({
           <th style={tableHeaderStyle}>SPECIFICATIONS</th>
           <th style={tableHeaderStyle}>QTY</th>
           <th style={tableHeaderStyle}>PRICE</th>
-          <th style={tableHeaderStyle}>IMAGE</th>
+          {hasImages && <th style={tableHeaderStyle}>IMAGE</th>}
         </tr>
       </thead>
       <tbody>
         {items.map((item, i) => {
           const specs = getSpecifications(item);
+          const img = getImage(item);
           return (
             <tr key={i} style={rowStyle(i)}>
               <td style={tdStyle}>{i + 1}</td>
@@ -503,20 +477,22 @@ function EquipmentTable({
               <td style={{ ...tdStyle, fontWeight: "bold" }}>
                 {fmtAmount(item.lineTotal)}
               </td>
-              <td style={{ ...tdStyle, width: "150px" }}>
-                <ProductImageCell src={getImage(item)} />
-              </td>
+              {hasImages && (
+                <td style={{ ...tdStyle, width: "150px" }}>
+                  {img ? <ProductImageCell src={img} /> : null}
+                </td>
+              )}
             </tr>
           );
         })}
         <tr>
-          <td
-            colSpan={4}
-            style={totalLabelStyle}
-          >
+          <td colSpan={4} style={totalLabelStyle}>
             {totalLabel}
           </td>
-          <td colSpan={2} style={{ ...totalAmountStyle, fontSize: "16px" }}>
+          <td
+            colSpan={hasImages ? 2 : 1}
+            style={{ ...totalAmountStyle, fontSize: "16px" }}
+          >
             {fmtAmount(subtotal)}
           </td>
         </tr>
@@ -882,47 +858,6 @@ function SectionPage({
    Page 1: Cover
    ──────────────────────────────────────────── */
 
-function MetaCell({
-  label,
-  value,
-  border,
-}: {
-  label: string;
-  value: string;
-  border?: boolean;
-}) {
-  return (
-    <div
-      style={{
-        flex: 1,
-        padding: "11px 16px",
-        borderLeft: border ? `1px solid ${BORDER}` : "none",
-      }}
-    >
-      <div
-        style={{
-          fontSize: "9px",
-          color: "#8a93a3",
-          letterSpacing: "0.1em",
-          textTransform: "uppercase",
-        }}
-      >
-        {label}
-      </div>
-      <div
-        style={{
-          fontSize: "14px",
-          fontWeight: "bold",
-          color: BRAND_DARK,
-          marginTop: "3px",
-        }}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
     <div
@@ -975,116 +910,88 @@ function CoverPage({ quotation }: { quotation: Quotation }) {
     <div style={pageStyle}>
       <div style={watermarkStyle} />
       <div style={contentStyle}>
-        {/* Brand header band (full bleed) */}
-        <div
-          style={{
-            margin: "-20mm -20mm 0",
-            background: `linear-gradient(120deg, ${BRAND} 0%, ${BRAND_DARK} 100%)`,
-            color: "#fff",
-            padding: "32px 20mm 34px",
-            borderBottom: `3px solid ${GOLD}`,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontSize: "36px",
-                fontWeight: "bold",
-                letterSpacing: "0.12em",
-                lineHeight: 1,
-              }}
-            >
-              QUOTATION
-            </div>
-            <div
-              style={{
-                fontSize: "11px",
-                letterSpacing: "0.26em",
-                marginTop: "10px",
-                color: GOLD,
-                fontWeight: "bold",
-              }}
-            >
-              PREMIUM AV PROPOSAL
-            </div>
-          </div>
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: "10px",
-              padding: "8px 12px",
-            }}
-          >
-            <img
-              src={CINEPANDA_LOGO_DATA_URI}
-              alt="CinePanda"
-              style={{ height: "54px", objectFit: "contain", display: "block" }}
-            />
-          </div>
-        </div>
-
-        {/* Meta strip */}
-        <div
-          style={{
-            display: "flex",
-            marginTop: "26px",
-            border: `1px solid ${BORDER}`,
-            borderRadius: "8px",
-            overflow: "hidden",
-            background: "#fff",
-          }}
-        >
-          <MetaCell
-            label="Quotation No."
-            value={quotation._id.slice(-8).toUpperCase()}
+        {/* Header — logo on the top-right */}
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <img
+            src={CINEPANDA_LOGO_DATA_URI}
+            alt="CinePanda Entertainments"
+            style={{ height: "74px", objectFit: "contain", display: "block" }}
           />
-          <MetaCell label="Date" value={fmtDate(quotation.quotationDate)} border />
+        </div>
+        <div style={{ height: "2px", background: GOLD, marginTop: "12px" }} />
+
+        {/* Meta line */}
+        <div
+          style={{
+            textAlign: "left",
+            marginTop: "18px",
+            fontSize: "12px",
+            color: "#666",
+          }}
+        >
+          Quotation No.{" "}
+          <span style={{ fontWeight: "bold", color: BRAND_DARK }}>
+            {quotation._id.slice(-8).toUpperCase()}
+          </span>
+          {"  ·  "}Date{" "}
+          <span style={{ fontWeight: "bold", color: BRAND_DARK }}>
+            {fmtDate(quotation.quotationDate)}
+          </span>
           {quotation.validUntil && (
-            <MetaCell
-              label="Valid Until"
-              value={fmtDate(quotation.validUntil)}
-              border
-            />
+            <>
+              {"  ·  "}Valid Until{" "}
+              <span style={{ fontWeight: "bold", color: BRAND_DARK }}>
+                {fmtDate(quotation.validUntil)}
+              </span>
+            </>
           )}
         </div>
 
-        {/* Prepared for */}
-        <div style={{ marginTop: "28px" }}>
+        {/* Hero — the client is the focus */}
+        <div style={{ marginTop: "40px" }}>
           <div
             style={{
               fontSize: "11px",
               fontWeight: "bold",
-              color: BRAND,
-              letterSpacing: "0.14em",
-              marginBottom: "8px",
+              color: "#8a93a3",
+              letterSpacing: "0.26em",
             }}
           >
-            PREPARED FOR
+            PROPOSAL PREPARED FOR
           </div>
-          <div style={{ borderLeft: `3px solid ${BRAND}`, paddingLeft: "14px" }}>
-            <div style={{ fontSize: "19px", fontWeight: "bold", color: "#111" }}>
-              {customer.name}
+          <div
+            style={{
+              fontSize: "30px",
+              fontWeight: "bold",
+              color: BRAND_DARK,
+              marginTop: "8px",
+              lineHeight: 1.1,
+            }}
+          >
+            {customer.name}
+          </div>
+          <div
+            style={{
+              width: "54px",
+              height: "3px",
+              background: GOLD,
+              marginTop: "13px",
+              borderRadius: "2px",
+            }}
+          />
+          {(customer.place || customer.phone) && (
+            <div style={{ fontSize: "13px", color: "#555", marginTop: "12px" }}>
+              {customer.place}
+              {customer.place && customer.phone ? "  ·  " : ""}
+              {customer.phone ? `Mob: ${customer.phone}` : ""}
             </div>
-            {customer.place && (
-              <div style={{ fontSize: "13px", color: "#555", marginTop: "2px" }}>
-                {customer.place}
-              </div>
-            )}
-            {customer.phone && (
-              <div style={{ fontSize: "13px", color: "#555" }}>
-                Mob: {customer.phone}
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
         {/* Intro */}
         <p
           style={{
-            margin: "26px 0 30px",
+            margin: "26px 0 28px",
             fontSize: "13.5px",
             lineHeight: 1.75,
             color: "#222",
@@ -1095,33 +1002,39 @@ function CoverPage({ quotation }: { quotation: Quotation }) {
           {INTRO_PARAGRAPH}
         </p>
 
-        {/* Speaker config */}
-        <SectionHeading>
-          Speaker Configuration
-          {quotation.speakerConfig?.name
-            ? `  —  ${quotation.speakerConfig.name}`
-            : ""}
-        </SectionHeading>
-        <div style={{ marginTop: "16px", textAlign: "center" }}>
-          {quotation.speakerConfig?.imageUrl ? (
-            <img
-              src={quotation.speakerConfig.imageUrl}
-              alt={quotation.speakerConfig.name}
+        {/* Speaker config — only when a diagram image is actually set */}
+        {quotation.speakerConfig?.imageUrl && (
+          <>
+            <SectionHeading>
+              Speaker Configuration
+              {quotation.speakerConfig.name
+                ? `  —  ${quotation.speakerConfig.name}`
+                : ""}
+            </SectionHeading>
+            <div
               style={{
-                maxWidth: "100%",
-                maxHeight: "330px",
-                height: "auto",
-                display: "inline-block",
+                marginTop: "14px",
+                textAlign: "center",
+                border: `1px solid ${BORDER}`,
+                borderRadius: "8px",
+                padding: "14px",
+                background: ROW_ALT,
               }}
-            />
-          ) : (
-            <PlaceholderImage
-              width={500}
-              height={280}
-              label="Speaker configuration diagram (to be added)"
-            />
-          )}
-        </div>
+            >
+              <img
+                src={quotation.speakerConfig.imageUrl}
+                alt={quotation.speakerConfig.name}
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "300px",
+                  height: "auto",
+                  display: "inline-block",
+                  borderRadius: "4px",
+                }}
+              />
+            </div>
+          </>
+        )}
       </div>
       <Footer />
     </div>
