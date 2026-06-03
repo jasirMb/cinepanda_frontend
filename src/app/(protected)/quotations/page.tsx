@@ -13,6 +13,8 @@ import {
   ChevronRight,
   Search,
   X,
+  Phone,
+  MapPin,
 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -86,6 +88,16 @@ function gradientFor(seed: string) {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
   return CARD_GRADIENTS[Math.abs(h) % CARD_GRADIENTS.length];
+}
+function getInitials(name: string) {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  );
 }
 
 /* ────────────────────────────────────────────
@@ -567,61 +579,82 @@ export default function QuotationsPage() {
           </p>
         </div>
 
-        <Input
-          placeholder="Search by name, phone, or place..."
-          value={customerSearch}
-          onChange={(e) => setCustomerSearch(e.target.value)}
-        />
+        <div className="relative max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            placeholder="Search by name, phone, or place..."
+            value={customerSearch}
+            onChange={(e) => setCustomerSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
 
         {customersQuery.isLoading ? (
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Loading customers...
           </p>
         ) : filteredCustomers.length === 0 ? (
-          <div className="rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              No customers found.
-            </p>
+          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
+            No customers found.
           </div>
         ) : (
-          <div className="max-h-96 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filteredCustomers.map((cust) => {
-                const isSelected = selectedCustomerId === cust._id;
-                return (
-                  <label
-                    key={cust._id}
-                    className={`flex cursor-pointer items-center gap-4 px-6 py-3 transition ${
-                      isSelected
-                        ? "bg-cine-primary/5 dark:bg-cine-primary/10"
-                        : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="customer"
-                      checked={isSelected}
-                      onChange={() => setSelectedCustomerId(cust._id)}
-                      className="h-4 w-4 shrink-0 accent-cine-primary"
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            {filteredCustomers.map((cust) => {
+              const isSelected = selectedCustomerId === cust._id;
+              return (
+                <button
+                  key={cust._id}
+                  type="button"
+                  onClick={() => setSelectedCustomerId(cust._id)}
+                  className={`group flex h-full items-start gap-3 rounded-xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:bg-slate-900/60 ${
+                    isSelected
+                      ? "border-cine-primary ring-2 ring-cine-primary/30 dark:border-cine-primary"
+                      : "border-slate-200 hover:border-cine-primary/40 dark:border-slate-800 dark:hover:border-slate-700"
+                  }`}
+                >
+                  {cust.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={cust.imageUrl}
+                      alt={cust.name}
+                      className="h-12 w-12 shrink-0 rounded-full object-cover ring-2 ring-slate-100 dark:ring-slate-800"
                     />
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className={`text-sm truncate ${
-                          isSelected
-                            ? "font-semibold text-slate-900 dark:text-slate-50"
-                            : "font-medium text-slate-700 dark:text-slate-300"
-                        }`}
-                      >
-                        {cust.name}
+                  ) : (
+                    <div
+                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-sm font-bold text-white shadow-sm ${gradientFor(
+                        cust._id
+                      )}`}
+                    >
+                      {getInitials(cust.name)}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base font-semibold text-slate-900 dark:text-slate-50">
+                      {cust.name}
+                    </p>
+                    <div className="mt-1.5 space-y-1 text-sm text-slate-600 dark:text-slate-300">
+                      <p className="flex items-center gap-2">
+                        <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                        <span className="truncate">{cust.phone}</span>
                       </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {cust.place} · {cust.phone}
+                      <p className="flex items-center gap-2">
+                        <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                        <span className="truncate">{cust.place}</span>
                       </p>
                     </div>
-                  </label>
-                );
-              })}
-            </div>
+                  </div>
+                  <span
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${
+                      isSelected
+                        ? "border-cine-primary bg-cine-primary text-white"
+                        : "border-slate-300 dark:border-slate-600"
+                    }`}
+                  >
+                    {isSelected && <Check className="h-3 w-3" />}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 
