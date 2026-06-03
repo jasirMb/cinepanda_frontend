@@ -16,7 +16,12 @@ import {
 } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { leadsKeys } from "@/hooks/useLeads";
+import {
+  leadsKeys,
+  useLeadSources,
+  usePriorityTypes,
+  useLeadStatuses,
+} from "@/hooks/useLeads";
 import {
   createLead,
   fetchLead,
@@ -26,26 +31,28 @@ import {
 
 type Option = { label: string; value: string };
 
-const leadSourceOptions: Option[] = [
+// Fallbacks used only until the live enum lists load (values match the backend
+// seed). The actual options come from the backend enum endpoints — see below.
+const DEFAULT_LEAD_SOURCES: Option[] = [
   { label: "Meta", value: "META" },
-  { label: "Youtube", value: "YOUTUBE" },
-  { label: "Walk-in", value: "WALK_IN" },
-  { label: "Referral", value: "REFERRAL" },
+  { label: "YouTube", value: "YOUTUBE" },
+  { label: "Reference", value: "REFERENCE" },
+  { label: "Walk-in", value: "WALKIN" },
   { label: "Other", value: "OTHER" },
 ];
 
-const priorityTypeOptions: Option[] = [
+const DEFAULT_PRIORITY_TYPES: Option[] = [
   { label: "Enquired", value: "ENQUIRED" },
-  { label: "Takes time", value: "TAKES_TIME" },
-  { label: "Urgent building", value: "URGENT_BUILD" },
+  { label: "Takes Time", value: "TAKES_TIME" },
+  { label: "Urgent Build", value: "URGENT_BUILD" },
 ];
 
-const statusOptions: Option[] = [
+const DEFAULT_STATUSES: Option[] = [
   { label: "Open", value: "OPEN" },
   { label: "Closed Won", value: "CLOSED_WON" },
   { label: "Closed Lost", value: "CLOSED_LOST" },
   { label: "On Hold", value: "ON_HOLD" },
-  { label: "Follow up", value: "FOLLOW_UP" },
+  { label: "Follow Up", value: "FOLLOW_UP" },
 ];
 
 const initialFormValues: CreateLeadPayload = {
@@ -74,6 +81,11 @@ export default function NewLeadPage() {
   const [formValues, setFormValues] =
     useState<CreateLeadPayload>(initialFormValues);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // Options come from the backend enums so they always match accepted values.
+  const leadSourceOptions = useLeadSources().data ?? DEFAULT_LEAD_SOURCES;
+  const priorityTypeOptions = usePriorityTypes().data ?? DEFAULT_PRIORITY_TYPES;
+  const statusOptions = useLeadStatuses().data ?? DEFAULT_STATUSES;
 
   const leadQuery = useQuery({
     queryKey: leadsKeys.detail(editId as string),

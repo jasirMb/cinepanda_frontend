@@ -105,6 +105,27 @@ export async function updateLeadStatus(
   return data;
 }
 
+/* ────────────────────────────────────────────
+   Lead enums (sources / priorities / statuses) — from the backend so the
+   dropdown values always match what the server accepts.
+   ──────────────────────────────────────────── */
+
+export interface LeadEnumOption {
+  value: string;
+  label: string;
+}
+
+async function fetchLeadEnum(path: string): Promise<LeadEnumOption[]> {
+  const { data } = await api.get<{ success: boolean; data: any[] }>(path);
+  return (data.data ?? [])
+    .filter((o) => o?.value && o.isActive !== false)
+    .map((o) => ({ value: o.value as string, label: (o.label ?? o.value) as string }));
+}
+
+export const fetchLeadSources = () => fetchLeadEnum("/leads/enums/sources");
+export const fetchPriorityTypes = () => fetchLeadEnum("/leads/enums/priorities");
+export const fetchLeadStatuses = () => fetchLeadEnum("/leads/enums/statuses");
+
 export interface CreateLeadPayload {
   customerName: string;
   place: string;

@@ -21,7 +21,7 @@ import {
   XCircle,
 } from "lucide-react";
 
-import { leadsKeys, useFollowupLeads, useLeads } from "@/hooks/useLeads";
+import { leadsKeys, useLeads } from "@/hooks/useLeads";
 import { LeadsTable } from "@/components/tables/LeadsTable";
 import { Button } from "@/components/ui/button";
 import {
@@ -197,11 +197,6 @@ export default function LeadsPage() {
       | "nextCallTime_asc"
   });
 
-  const todayDate = useMemo(() => {
-    const now = new Date();
-    return now.toISOString().slice(0, 10);
-  }, []);
-
   const statusOptions = [
     { label: "All statuses", value: "" },
     { label: "Open", value: "OPEN" },
@@ -222,12 +217,10 @@ export default function LeadsPage() {
     { label: "All sources", value: "" },
     { label: "Meta", value: "META" },
     { label: "Youtube", value: "YOUTUBE" },
-    { label: "Walk-in", value: "WALK_IN" },
-    { label: "Referral", value: "REFERRAL" },
+    { label: "Reference", value: "REFERENCE" },
+    { label: "Walk-in", value: "WALKIN" },
     { label: "Other", value: "OTHER" }
   ];
-
-  const followupQuery = useFollowupLeads({ date: todayDate });
 
   const leadsParams = useMemo(
     () => ({
@@ -262,7 +255,6 @@ export default function LeadsPage() {
     }
   }, [router, searchParams]);
 
-  const attentionLeads = followupQuery.data?.data ?? [];
   const allLeadsRaw = leadsQuery.data?.data ?? [];
   const sortedAllLeads = useMemo(() => {
     const [field, dir] = filters.sort.split("_") as [keyof Lead | string, "asc" | "desc"];
@@ -304,14 +296,8 @@ export default function LeadsPage() {
     return { total, open, won, lost, onHold, urgent, overdue, dueToday, conversion };
   }, [allLeadsRaw]);
 
-  const attentionIds = useMemo(
-    () => new Set(attentionLeads.map((lead) => lead._id)),
-    [attentionLeads]
-  );
-  const leads = useMemo(
-    () => allLeads.filter((lead) => !attentionIds.has(lead._id)),
-    [allLeads, attentionIds]
-  );
+  // Categorise EVERY lead purely by its schedule (not priority), so leads of
+  // any priority type (Takes Time included) appear in the right section.
   const grouped = useMemo(() => {
     const buckets: Record<LeadCategory, Lead[]> = {
       overdue: [],
@@ -320,10 +306,17 @@ export default function LeadsPage() {
       unscheduled: []
     };
 
-    leads.forEach((lead) => {
-      const category = getCategory(lead);
-      buckets[category].push(lead);
-    });
+    // Only leads that still need action — a Closed Won/Lost lead is resolved and
+    // shouldn't sit in Needs attention / Upcoming / Unscheduled.
+    allLeads
+      .filter(
+        (lead) =>
+          lead.status !== "CLOSED_WON" && lead.status !== "CLOSED_LOST"
+      )
+      .forEach((lead) => {
+        const category = getCategory(lead);
+        buckets[category].push(lead);
+      });
 
     const byNextCall = (a: Lead, b: Lead) => {
       const aDate = a.nextCallTime ? new Date(a.nextCallTime).getTime() : Infinity;
@@ -339,7 +332,19 @@ export default function LeadsPage() {
     );
 
     return buckets;
-  }, [leads]);
+  }, [allLeads]);
+
+  // "Needs attention" = overdue + due-today (any priority), most overdue first.
+  const attentionLeads = useMemo(
+    () => [...grouped.overdue, ...grouped.today],
+    [grouped]
+  );
+
+  // Won leads that still need a customer (not yet linked/converted).
+  const toConvertLeads = useMemo(
+    () => allLeads.filter((l) => l.status === "CLOSED_WON" && !l.customerId),
+    [allLeads]
+  );
 
   function LeadCard({ lead }: { lead: Lead }) {
     const category = getCategory(lead);
@@ -594,8 +599,8 @@ export default function LeadsPage() {
     );
   }
 
-  const isLoading = followupQuery.isLoading || leadsQuery.isLoading;
-  const isError = followupQuery.isError || leadsQuery.isError;
+  const isLoading = leadsQuery.isLoading;
+  const isError = leadsQuery.isError;
 
   if (isLoading) {
     return (
@@ -853,9 +858,33 @@ export default function LeadsPage() {
             </section>
           )}
 
+          {toConvertLeads.length > 0 && (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                    To convert
+                  </h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Won leads not yet linked to a customer.
+                  </p>
+                </div>
+                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100">
+                  {toConvertLeads.length} to convert
+                </span>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {toConvertLeads.map((lead) => (
+                  <LeadCard key={lead._id} lead={lead} />
+                ))}
+              </div>
+            </section>
+          )}
+
           {attentionLeads.length === 0 &&
             grouped.upcoming.length === 0 &&
-            grouped.unscheduled.length === 0 && (
+            grouped.unscheduled.length === 0 &&
+            toConvertLeads.length === 0 && (
               <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
                 No leads to show. Add a lead or adjust your filters.
               </div>
