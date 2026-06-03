@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Combobox } from "@/components/ui/combobox";
 import {
   Select,
   SelectContent,
@@ -126,6 +127,24 @@ export default function EditLedgerEntryPage({
     ? accounts.filter((a) => a.type === accountType)
     : accounts;
   const selectedAccount = accounts.find((a) => a._id === form.paymentAccountId);
+
+  // Searchable-dropdown options for the long lists.
+  const projectOptions = projects.map((p: ProjectPopulated) => ({
+    value: p._id,
+    label: p.clientName,
+    hint: p.serviceType,
+  }));
+  const customerOptions = customers.map((c: Customer) => ({
+    value: c._id,
+    label: c.name,
+    hint: c.place,
+  }));
+  const vendorOptions = vendors.map((v) => ({ value: v._id, label: v.name }));
+
+  // Selecting a project forces the customer to that project's customer.
+  const selectedProject = projects.find((p) => p._id === form.projectId);
+  const projectCustomerId = selectedProject?.customerId?._id ?? "";
+  const customerLocked = Boolean(form.projectId && projectCustomerId);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -370,67 +389,53 @@ export default function EditLedgerEntryPage({
 
         {form.entryType === "EXPENSE" && (
           <Field label="Vendor (optional)">
-            <Select
-              value={form.vendorId || "NONE"}
-              onValueChange={(v) =>
-                v && setForm((f) => ({ ...f, vendorId: v === "NONE" ? "" : v }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select vendor (e.g. KSEB)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="NONE">No vendor</SelectItem>
-                {vendors.map((vd) => (
-                  <SelectItem key={vd._id} value={vd._id}>
-                    {vd.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              options={vendorOptions}
+              value={form.vendorId}
+              onChange={(v) => setForm((f) => ({ ...f, vendorId: v }))}
+              placeholder="Select vendor (e.g. KSEB)"
+              searchPlaceholder="Search vendors…"
+              clearable
+              clearLabel="No vendor"
+            />
           </Field>
         )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Project (optional)">
-            <Select
-              value={form.projectId || "NONE"}
-              onValueChange={(v) =>
-                v && setForm((f) => ({ ...f, projectId: v === "NONE" ? "" : v }))
+            <Combobox
+              options={projectOptions}
+              value={form.projectId}
+              onChange={(v) =>
+                setForm((f) => {
+                  if (!v) return { ...f, projectId: "" };
+                  const proj = projects.find((p) => p._id === v);
+                  const cust = proj?.customerId?._id ?? "";
+                  return { ...f, projectId: v, customerId: cust || f.customerId };
+                })
               }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select project" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="NONE">No project</SelectItem>
-                {projects.map((p: ProjectPopulated) => (
-                  <SelectItem key={p._id} value={p._id}>
-                    {p.clientName} — {p.serviceType}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Select project"
+              searchPlaceholder="Search projects…"
+              clearable
+              clearLabel="No project"
+            />
           </Field>
           <Field label="Customer (optional)">
-            <Select
-              value={form.customerId || "NONE"}
-              onValueChange={(v) =>
-                v && setForm((f) => ({ ...f, customerId: v === "NONE" ? "" : v }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select customer" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="NONE">No customer</SelectItem>
-                {customers.map((c: Customer) => (
-                  <SelectItem key={c._id} value={c._id}>
-                    {c.name} — {c.place}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              options={customerOptions}
+              value={form.customerId}
+              onChange={(v) => setForm((f) => ({ ...f, customerId: v }))}
+              placeholder="Select customer"
+              searchPlaceholder="Search customers…"
+              clearable
+              clearLabel="No customer"
+              disabled={customerLocked}
+            />
+            {customerLocked && (
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                Set from the selected project. Clear the project to change it.
+              </p>
+            )}
           </Field>
         </div>
 
@@ -557,31 +562,27 @@ function CategorySelect({
     !categoriesQuery.isError &&
     categories.length === 0;
 
+  const options = categories.map((c) => ({ value: c.value, label: c.label }));
+  if (value && !known) options.unshift({ value, label: value });
+
   return (
     <div className="space-y-1">
-      <Select value={value || undefined} onValueChange={(v) => v && onChange(v)}>
-        <SelectTrigger>
-          <SelectValue
-            placeholder={
-              categoriesQuery.isLoading
-                ? "Loading categories..."
-                : categoriesQuery.isError
-                  ? "Failed to load categories"
-                  : isEmpty
-                    ? "No categories available"
-                    : "Select category"
-            }
-          />
-        </SelectTrigger>
-        <SelectContent>
-          {value && !known && <SelectItem value={value}>{value}</SelectItem>}
-          {categories.map((c) => (
-            <SelectItem key={c.value} value={c.value}>
-              {c.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <Combobox
+        options={options}
+        value={value}
+        onChange={(v) => onChange(v)}
+        disabled={categoriesQuery.isLoading}
+        searchPlaceholder="Search categories…"
+        placeholder={
+          categoriesQuery.isLoading
+            ? "Loading categories..."
+            : categoriesQuery.isError
+              ? "Failed to load categories"
+              : isEmpty
+                ? "No categories available"
+                : "Select category"
+        }
+      />
       {categoriesQuery.isError && (
         <p className="text-xs text-red-500">
           Could not load categories from /api/ledger/categories.

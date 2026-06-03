@@ -62,6 +62,7 @@ export function DateTimePicker({
   className,
   defaultTime = "09:00",
 }: DateTimePickerProps) {
+  const [open, setOpen] = React.useState(false);
   const { date, time } = parseValue(value);
 
   const label = date
@@ -73,7 +74,7 @@ export function DateTimePicker({
     : placeholder;
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -113,6 +114,14 @@ export function DateTimePicker({
               onChange(format(base, t || defaultTime));
             }}
           />
+          <Button
+            type="button"
+            size="sm"
+            className="mt-3 w-full"
+            onClick={() => setOpen(false)}
+          >
+            Done
+          </Button>
         </div>
       </PopoverContent>
     </Popover>
