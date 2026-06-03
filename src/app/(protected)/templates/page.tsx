@@ -1023,7 +1023,7 @@ export default function TemplatesPage() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {templates.map((template) => (
             <TemplateCard
               key={template._id}
@@ -1213,6 +1213,19 @@ function WizardField({
   );
 }
 
+const CARD_GRADIENTS = [
+  "from-violet-500 to-fuchsia-500",
+  "from-sky-500 to-indigo-500",
+  "from-emerald-500 to-teal-500",
+  "from-amber-500 to-orange-500",
+  "from-rose-500 to-pink-500",
+];
+function gradientFor(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return CARD_GRADIENTS[Math.abs(h) % CARD_GRADIENTS.length];
+}
+
 function TemplateCard({
   template,
   onDelete,
@@ -1224,75 +1237,106 @@ function TemplateCard({
     (sum, g) => sum + g.productItems.length,
     0
   );
+  const locked = !!template.locked;
+  const initial = template.name.trim().charAt(0).toUpperCase() || "T";
+
   return (
-    <div className="group flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
-      <div className="flex flex-1 flex-col gap-2 p-3">
-        {/* Title */}
+    <div
+      className={`group flex h-full flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:bg-slate-900/60 ${
+        locked
+          ? "border-amber-200/70 dark:border-amber-900/40"
+          : "border-slate-200 hover:border-cine-primary/40 dark:border-slate-800 dark:hover:border-slate-700"
+      }`}
+    >
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        {/* Header */}
         <Link
           href={`/templates/${template._id}`}
-          className="flex items-center gap-2.5"
+          className="flex items-start gap-3"
         >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300">
-            <span className="text-sm font-bold">T</span>
+          <div
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-base font-bold text-white shadow-sm ${gradientFor(
+              template._id
+            )}`}
+          >
+            {initial}
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
+            <h3 className="truncate text-sm font-semibold text-slate-900 group-hover:text-cine-primary dark:text-slate-50">
               {template.name}
             </h3>
             <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-              {template.description ||
-                `${totalProducts} product${totalProducts !== 1 ? "s" : ""} · ${template.groups.length} group${template.groups.length !== 1 ? "s" : ""}`}
+              {template.description || "Quotation template"}
             </p>
           </div>
+          {locked && (
+            <span
+              title={
+                template.lockReason === "project"
+                  ? "Part of a project"
+                  : "Used by an approved quotation"
+              }
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400"
+            >
+              <Lock className="h-3 w-3" />
+            </span>
+          )}
         </Link>
 
         {/* Price */}
-        <div className="flex items-baseline justify-between">
-          <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
-            {INR(template.grandTotal)}
-          </p>
-          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-            {totalProducts} item{totalProducts !== 1 ? "s" : ""}
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+              Grand total
+            </p>
+            <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
+              {INR(template.grandTotal)}
+            </p>
+          </div>
+          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            {totalProducts} item{totalProducts !== 1 ? "s" : ""} ·{" "}
+            {template.groups.length} grp
           </span>
         </div>
 
-        {/* Group tags */}
+        {/* Group chips */}
         {template.groups.length > 0 && (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1.5">
             {template.groups.slice(0, 3).map((group) => (
               <span
                 key={group.name}
-                className="truncate rounded-md bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                className="truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300"
               >
-                {group.name} ({group.productItems.length})
+                {group.name}
+                <span className="ml-1 text-slate-400">
+                  {group.productItems.length}
+                </span>
               </span>
             ))}
             {template.groups.length > 3 && (
-              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+              <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-400 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-500">
                 +{template.groups.length - 3}
               </span>
             )}
           </div>
         )}
+      </div>
 
-        {/* Footer */}
-        <div className="mt-auto flex items-center justify-end gap-1.5 border-t border-slate-100 pt-3 dark:border-slate-800">
+      {/* Footer bar */}
+      <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/70 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-800/30">
+        <span className="text-[10px] text-slate-400 dark:text-slate-500">
+          {new Date(template.createdAt).toLocaleDateString()}
+        </span>
+        <div className="flex gap-1.5">
           <Link
             href={`/templates/${template._id}`}
-            className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
           >
             <Eye className="h-3 w-3" />
             View
           </Link>
-          {template.locked ? (
-            <span
-              title={
-                template.lockReason === "project"
-                  ? "Part of a project — can't be deleted"
-                  : "Used by an approved quotation — can't be deleted"
-              }
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 text-xs font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
-            >
+          {locked ? (
+            <span className="inline-flex h-7 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 text-xs font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
               <Lock className="h-3 w-3" /> Locked
             </span>
           ) : (
@@ -1302,7 +1346,7 @@ function TemplateCard({
                 e.preventDefault();
                 onDelete(template._id);
               }}
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
             >
               <Trash2 className="h-3 w-3" />
               Delete
