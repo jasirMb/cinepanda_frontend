@@ -11,6 +11,7 @@ import {
   CalendarClock,
   CheckCircle2,
   Clock,
+  Eye,
   MapPin,
   Pencil,
   Phone,
@@ -413,9 +414,12 @@ export default function LeadsPage() {
               {getInitials(lead.customerName)}
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="truncate text-base font-semibold text-slate-900 dark:text-slate-50">
+              <Link
+                href={`/leads/${lead._id}`}
+                className="block truncate text-base font-semibold text-slate-900 hover:text-cine-primary dark:text-slate-50"
+              >
                 {lead.customerName}
-              </h3>
+              </Link>
               <p className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                 <MapPin className="h-3 w-3 shrink-0" />
                 <span className="truncate">{lead.place}</span>
@@ -501,6 +505,13 @@ export default function LeadsPage() {
             >
               {statusMutation.isPending ? "..." : "Save"}
             </Button>
+            <Link
+              href={`/leads/${lead._id}`}
+              aria-label="View lead"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            >
+              <Eye className="h-3.5 w-3.5" />
+            </Link>
             <Link
               href={`/leads/new?edit=${lead._id}`}
               className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"

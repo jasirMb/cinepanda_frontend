@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Pencil, Phone, UserCheck } from "lucide-react";
+import { Eye, Pencil, Phone, UserCheck } from "lucide-react";
 import { type Lead } from "@/lib/api/leads";
 
 interface LeadsTableProps {
@@ -125,7 +125,7 @@ export function LeadsTable({ leads }: LeadsTableProps) {
                       </span>
                       <div className="min-w-0">
                         <Link
-                          href={`/leads/new?edit=${lead._id}`}
+                          href={`/leads/${lead._id}`}
                           className="block truncate font-medium text-slate-900 hover:text-cine-primary hover:underline dark:text-slate-50"
                           title={lead.customerName}
                         >
@@ -195,6 +195,13 @@ export function LeadsTable({ leads }: LeadsTableProps) {
                           <UserCheck className="h-3.5 w-3.5" />
                         </Link>
                       )}
+                      <Link
+                        href={`/leads/${lead._id}`}
+                        aria-label={`View ${lead.customerName}`}
+                        className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-cine-primary dark:hover:bg-slate-800"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </Link>
                       <Link
                         href={`/leads/new?edit=${lead._id}`}
                         aria-label={`Edit ${lead.customerName}`}
