@@ -1,5 +1,6 @@
 import { AppBackdrop } from "@/components/layout/AppBackdrop";
 import { AuthGuard } from "@/components/auth/AuthGuard";
+import { NavigationProgress } from "@/components/layout/NavigationProgress";
 import { ProfileHydrator } from "@/components/layout/ProfileHydrator";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { SettingsModal } from "@/components/layout/SettingsPanel";
@@ -13,6 +14,7 @@ export default function ProtectedLayout({
 }) {
   return (
     <AuthGuard>
+      <NavigationProgress />
       <ThemeApplier />
       <AppBackdrop />
       <ProfileHydrator />
