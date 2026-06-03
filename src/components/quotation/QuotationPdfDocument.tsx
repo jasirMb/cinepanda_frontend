@@ -605,7 +605,7 @@ function InstallationTable({
   return (
     <table
       style={{
-        width: "80%",
+        width: "100%",
         borderCollapse: "collapse",
         marginTop: "20px",
         fontSize: "13px",
@@ -777,40 +777,57 @@ function SectionPage({
   return (
     <div style={pageStyle}>
       <div style={watermarkStyle} />
-      <div style={contentStyle}>
-        <div style={{ textAlign: "right", marginBottom: "8px" }}>
+      <div
+        style={{
+          ...contentStyle,
+          display: "flex",
+          flexDirection: "column",
+          minHeight: "240mm",
+        }}
+      >
+        <div style={{ textAlign: "center", marginBottom: "8px" }}>
           <LogoSmall />
         </div>
+        {/* Centre the option content vertically so short options don't leave a
+            big blank gap at the bottom of the page. */}
         <div
           style={{
+            flex: 1,
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            background: `linear-gradient(120deg, ${BRAND} 0%, ${BRAND_DARK} 100%)`,
-            color: "#fff",
-            padding: "12px 18px",
-            borderLeft: `4px solid ${GOLD}`,
-            borderRadius: "3px",
+            flexDirection: "column",
+            justifyContent: "center",
           }}
         >
-          <span style={{ fontSize: "15px", fontWeight: "bold", letterSpacing: "0.02em" }}>
-            {total > 1
-              ? `OPTION ${index + 1}  ·  ${section.sectionName}`
-              : section.sectionName}
-          </span>
-          <span style={{ fontSize: "16px", fontWeight: "bold", color: "#f0e2c4" }}>
-            {fmtAmount(section.grandTotal)}
-          </span>
-        </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              background: `linear-gradient(120deg, ${BRAND} 0%, ${BRAND_DARK} 100%)`,
+              color: "#fff",
+              padding: "12px 18px",
+              borderLeft: `4px solid ${GOLD}`,
+              borderRadius: "3px",
+            }}
+          >
+            <span style={{ fontSize: "15px", fontWeight: "bold", letterSpacing: "0.02em" }}>
+              {total > 1
+                ? `OPTION ${index + 1}  ·  ${section.sectionName}`
+                : section.sectionName}
+            </span>
+            <span style={{ fontSize: "16px", fontWeight: "bold", color: "#f0e2c4" }}>
+              {fmtAmount(section.grandTotal)}
+            </span>
+          </div>
 
-        {section.description && (
-          <p style={{ marginTop: "12px", fontSize: "13px", color: "#333" }}>
-            {section.description}
-          </p>
-        )}
+          {section.description && (
+            <p style={{ marginTop: "12px", fontSize: "13px", color: "#333" }}>
+              {section.description}
+            </p>
+          )}
 
-        {/* Equipment block */}
-        <EquipmentTable items={equipment} totalLabel={subLabel} />
+          {/* Equipment block */}
+          <EquipmentTable items={equipment} totalLabel={subLabel} />
 
         {/* Room Acoustics block */}
         {sqft.length > 0 && (
@@ -852,8 +869,9 @@ function SectionPage({
           </>
         )}
 
-        {/* Section adjustments (GST, discount, …) + Grand Total */}
-        {showTotalsPanel && <SectionTotals section={section} />}
+          {/* Section adjustments (GST, discount, …) + Grand Total */}
+          {showTotalsPanel && <SectionTotals section={section} />}
+        </div>
       </div>
       <Footer />
     </div>
