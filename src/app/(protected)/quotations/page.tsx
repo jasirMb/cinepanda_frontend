@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { Lock } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { quotationsKeys, useQuotations } from "@/hooks/useQuotations";
@@ -210,8 +211,9 @@ export default function QuotationsPage() {
       queryClient.invalidateQueries({ queryKey: quotationsKeys.all });
       toast.success("Quotation deleted");
     },
-    onError: () => {
-      toast.error("Failed to delete quotation");
+    onError: (err) => {
+      const e = err as { response?: { data?: { error?: string } } };
+      toast.error(e?.response?.data?.error ?? "Failed to delete quotation");
     },
   });
 
@@ -958,6 +960,9 @@ function QuotationCard({
     REJECTED: [],
   };
   const nextStatuses = statusMap[quotation.status];
+  // APPROVED / REJECTED quotations are final — no edit or delete.
+  const locked =
+    quotation.status === "APPROVED" || quotation.status === "REJECTED";
 
   return (
     <div className="flex h-full flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800/70 dark:bg-slate-900/60">
@@ -1037,13 +1042,22 @@ function QuotationCard({
           </button>
         ))}
 
-        <button
-          type="button"
-          onClick={() => onDelete(quotation._id)}
-          className="ml-auto inline-flex items-center rounded-full border border-red-200 bg-white px-3 py-1 font-semibold text-red-600 shadow-sm transition hover:bg-red-50 dark:border-red-800 dark:bg-slate-900 dark:text-red-400"
-        >
-          Delete
-        </button>
+        {locked ? (
+          <span
+            title={`${quotation.status[0]}${quotation.status.slice(1).toLowerCase()} quotations can't be edited or deleted`}
+            className="ml-auto inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 font-semibold text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
+          >
+            <Lock className="h-3 w-3" /> Locked
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onDelete(quotation._id)}
+            className="ml-auto inline-flex items-center rounded-full border border-red-200 bg-white px-3 py-1 font-semibold text-red-600 shadow-sm transition hover:bg-red-50 dark:border-red-800 dark:bg-slate-900 dark:text-red-400"
+          >
+            Delete
+          </button>
+        )}
       </div>
     </div>
   );
