@@ -7,6 +7,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronLeft,
   ChevronRight,
+  Eye,
   ImagePlus,
   Loader2,
   Pencil,
@@ -38,12 +39,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const AVATAR_PALETTE = [
-  "bg-cine-primary/15 text-cine-primary",
-  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-  "bg-violet-500/15 text-violet-700 dark:text-violet-300",
-  "bg-amber-500/15 text-amber-800 dark:text-amber-300",
-  "bg-rose-500/15 text-rose-700 dark:text-rose-300",
-  "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+  "from-violet-500 to-fuchsia-500",
+  "from-sky-500 to-indigo-500",
+  "from-emerald-500 to-teal-500",
+  "from-amber-500 to-orange-500",
+  "from-rose-500 to-pink-500",
+  "from-cyan-500 to-blue-500",
 ];
 
 function getInitials(name: string) {
@@ -294,8 +295,8 @@ export default function LaboursPage() {
           </div>
           <Skeleton className="h-9 w-28" />
         </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
             <Skeleton key={i} className="h-28 w-full rounded-xl" />
           ))}
         </div>
@@ -370,7 +371,7 @@ export default function LaboursPage() {
           <div className="flex items-center gap-4">
             <div className="relative h-16 w-16 shrink-0">
               <div
-                className={`flex h-16 w-16 items-center justify-center overflow-hidden rounded-full text-lg font-semibold ${avatarColor(
+                className={`flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br text-lg font-semibold text-white ${avatarColor(
                   form.name || "?"
                 )}`}
               >
@@ -539,7 +540,7 @@ export default function LaboursPage() {
         </p>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {pagedLabours.map((labour: Labour) => (
               <LabourCard
                 key={labour._id}
@@ -626,84 +627,92 @@ function LabourCard({
   ].filter(Boolean) as string[];
 
   return (
-    <div className="group flex h-full flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
-      <div className="flex items-center gap-3">
-        <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-semibold ${avatarColor(
-            labour.name
-          )}`}
-        >
-          {labour.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={labour.avatarUrl}
-              alt={labour.name}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            getInitials(labour.name)
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <Link
-            href={`/labours/${labour._id}`}
-            className="block truncate text-sm font-semibold text-slate-900 hover:text-cine-primary hover:underline dark:text-slate-50"
+    <div className="group flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-cine-primary/40 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60">
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <div className="flex items-center gap-3">
+          <div
+            className={`flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br text-sm font-bold text-white shadow-sm ${avatarColor(
+              labour.name
+            )}`}
           >
-            {labour.name}
-          </Link>
-          <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-            {[labour.role, ...meta].filter(Boolean).join(" · ") || "—"}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
-          {labour.phone && (
-            <a
-              href={`tel:${labour.phone}`}
-              aria-label="Call"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            {labour.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={labour.avatarUrl}
+                alt={labour.name}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              getInitials(labour.name)
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <Link
+              href={`/labours/${labour._id}`}
+              className="block truncate text-base font-semibold text-slate-900 group-hover:text-cine-primary dark:text-slate-50"
             >
-              <Phone className="h-3.5 w-3.5" />
-            </a>
-          )}
-          <button
-            type="button"
-            onClick={onEdit}
-            aria-label="Edit labour"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onDelete}
-            aria-label="Delete labour"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+              {labour.name}
+            </Link>
+            <p className="truncate text-sm text-slate-500 dark:text-slate-400">
+              {[labour.role, ...meta].filter(Boolean).join(" · ") || "—"}
+            </p>
+          </div>
         </div>
+
+        {groups.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {groups.map((g) => (
+              <Link
+                key={g._id}
+                href={`/groups/${g._id}`}
+                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 py-0.5 pl-1 pr-2 text-[11px] font-medium text-slate-600 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+              >
+                <GroupAvatar
+                  name={g.name}
+                  color={g.color}
+                  avatarUrl={g.avatarUrl}
+                  size={16}
+                  iconClassName="h-2.5 w-2.5"
+                />
+                {g.name}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
-      {groups.length > 0 && (
-        <div className="mt-auto flex flex-wrap items-center gap-1.5">
-          {groups.map((g) => (
-            <Link
-              key={g._id}
-              href={`/groups/${g._id}`}
-              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 py-0.5 pl-1 pr-2 text-[11px] font-medium text-slate-600 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-            >
-              <GroupAvatar
-                name={g.name}
-                color={g.color}
-                avatarUrl={g.avatarUrl}
-                size={16}
-                iconClassName="h-2.5 w-2.5"
-              />
-              {g.name}
-            </Link>
-          ))}
-        </div>
-      )}
+      {/* Footer */}
+      <div className="flex items-center gap-1.5 border-t border-slate-100 bg-slate-50/70 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-800/30">
+        {labour.phone && (
+          <a
+            href={`tel:${labour.phone}`}
+            aria-label="Call"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-emerald-300 hover:text-emerald-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+          >
+            <Phone className="h-3.5 w-3.5" />
+          </a>
+        )}
+        <Link
+          href={`/labours/${labour._id}`}
+          className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+        >
+          <Eye className="h-3 w-3" /> View
+        </Link>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+        >
+          <Pencil className="h-3 w-3" /> Edit
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="ml-auto inline-flex h-8 items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
+        >
+          <Trash2 className="h-3 w-3" /> Delete
+        </button>
+      </div>
     </div>
   );
 }

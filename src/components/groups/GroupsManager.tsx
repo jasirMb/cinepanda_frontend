@@ -184,8 +184,8 @@ export function GroupsManager({ showHeader = true }: { showHeader?: boolean }) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-9 w-40" />
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
             <Skeleton key={i} className="h-24 w-full rounded-xl" />
           ))}
         </div>
@@ -336,7 +336,7 @@ export function GroupsManager({ showHeader = true }: { showHeader?: boolean }) {
           No groups yet. Create a crew and add labours to it.
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {filtered.map((g) => {
             const count = g.labours?.length ?? 0;
             return (
@@ -368,28 +368,28 @@ export function GroupsManager({ showHeader = true }: { showHeader?: boolean }) {
                       {count} labour{count === 1 ? "" : "s"}
                     </span>
                   </div>
-                  <div className="mt-auto flex items-center justify-end gap-1.5 border-t border-slate-100 pt-3 dark:border-slate-800">
-                    <Link
-                      href={`/groups/${g._id}`}
-                      className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                    >
-                      <Eye className="h-3 w-3" /> View
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => startEdit(g)}
-                      className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                    >
-                      <Pencil className="h-3 w-3" /> Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPendingDelete(g)}
-                      className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
-                    >
-                      <Trash2 className="h-3 w-3" /> Delete
-                    </button>
-                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-1.5 border-t border-slate-100 bg-slate-50/70 px-4 py-2.5 pl-5 dark:border-slate-800 dark:bg-slate-800/30">
+                  <Link
+                    href={`/groups/${g._id}`}
+                    className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  >
+                    <Eye className="h-3 w-3" /> View
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => startEdit(g)}
+                    className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  >
+                    <Pencil className="h-3 w-3" /> Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingDelete(g)}
+                    className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
+                  >
+                    <Trash2 className="h-3 w-3" /> Delete
+                  </button>
                 </div>
               </div>
             );
