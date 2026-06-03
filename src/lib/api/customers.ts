@@ -11,6 +11,8 @@ export interface Customer {
   place: string;
   email?: string;
   notes?: string;
+  imageUrl?: string;
+  imageKey?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,6 +36,10 @@ export interface CreateCustomerPayload {
   name: string;
   phone: string;
   place: string;
+  email?: string;
+  notes?: string;
+  imageUrl?: string;
+  imageKey?: string;
 }
 
 export async function createCustomer(
@@ -41,6 +47,17 @@ export async function createCustomer(
 ): Promise<Customer> {
   const { data } = await api.post<{ success: boolean; data: Customer }>(
     "/customers",
+    payload
+  );
+  return data.data;
+}
+
+export async function updateCustomer(
+  id: string,
+  payload: Partial<CreateCustomerPayload>
+): Promise<Customer> {
+  const { data } = await api.put<{ success: boolean; data: Customer }>(
+    `/customers/${id}`,
     payload
   );
   return data.data;
