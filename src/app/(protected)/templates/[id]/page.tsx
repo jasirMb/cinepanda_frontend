@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { templatesKeys, useTemplate } from "@/hooks/useTemplates";
+import { useCategories } from "@/hooks/useProducts";
 import {
   updateTemplate,
   deleteTemplate,
@@ -97,6 +98,9 @@ export default function TemplateDetailPage() {
   const templateQuery = useTemplate(templateId);
   const template = templateQuery.data;
 
+  const categoriesQuery = useCategories();
+  const allCategories = categoriesQuery.data?.data ?? [];
+
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -108,7 +112,7 @@ export default function TemplateDetailPage() {
   // Product picker target — replace an existing line, or add a new one to a group.
   const [pickerTarget, setPickerTarget] = useState<
     | { mode: "replace"; gi: number; pi: number; category: string }
-    | { mode: "add"; gi: number }
+    | { mode: "add"; gi: number; category: string }
     | null
   >(null);
 
@@ -190,18 +194,21 @@ export default function TemplateDetailPage() {
     const payload: CreateTemplatePayload = {
       name: name.trim(),
       description: description.trim() || undefined,
-      groups: groups.map((g) => ({
-        name: g.name,
-        productItems: g.productItems.map((p) => ({
-          productId: p.productId,
-          productName: p.productName,
-          category: p.category,
-          subcategory: p.subcategory,
-          quantity: p.quantity,
-          unitPrice: p.unitPrice,
+      // Drop empty category groups (added but never given a product).
+      groups: groups
+        .filter((g) => g.productItems.length > 0)
+        .map((g) => ({
+          name: g.name,
+          productItems: g.productItems.map((p) => ({
+            productId: p.productId,
+            productName: p.productName,
+            category: p.category,
+            subcategory: p.subcategory,
+            quantity: p.quantity,
+            unitPrice: p.unitPrice,
+          })),
+          manualItems: g.manualItems,
         })),
-        manualItems: g.manualItems,
-      })),
       manualItems,
     };
     updateMutation.mutate(payload);
@@ -305,6 +312,22 @@ export default function TemplateDetailPage() {
 
   function removeGroup(gi: number) {
     setGroups((prev) => prev.filter((_, i) => i !== gi));
+  }
+
+  // Categories not yet present as a group — available to add.
+  const availableGroupCategories = useMemo(() => {
+    const existing = new Set(groups.map((g) => g.name));
+    return allCategories.filter((c) => !existing.has(c.name));
+  }, [allCategories, groups]);
+
+  /** Add a new (empty) category group — products are then added via "Add product". */
+  function addGroup(catName: string) {
+    if (!catName) return;
+    setGroups((prev) =>
+      prev.some((g) => g.name === catName)
+        ? prev
+        : [...prev, { name: catName, productItems: [], manualItems: [] }]
+    );
   }
 
   /** Build an editable line from a catalog product (keeping an existing quantity). */
@@ -645,7 +668,13 @@ export default function TemplateDetailPage() {
                 {isEditing && (
                   <button
                     type="button"
-                    onClick={() => setPickerTarget({ mode: "add", gi })}
+                    onClick={() =>
+                      setPickerTarget({
+                        mode: "add",
+                        gi,
+                        category: group.name,
+                      })
+                    }
                     className="flex w-full items-center justify-center gap-1.5 px-5 py-3 text-xs font-medium text-cine-primary transition hover:bg-cine-primary/5"
                   >
                     <Plus className="h-3.5 w-3.5" /> Add product
@@ -680,6 +709,48 @@ export default function TemplateDetailPage() {
           );
         })}
       </div>
+
+      {/* Add another category (edit mode) */}
+      {isEditing && (
+        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Plus className="h-4 w-4 text-cine-primary" />
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  Add another category
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Adds a new group — then use “Add product” to fill it from that
+                  category.
+                </p>
+              </div>
+            </div>
+            <Select
+              value=""
+              onValueChange={(v) => v && addGroup(v)}
+              disabled={availableGroupCategories.length === 0}
+            >
+              <SelectTrigger className="w-60">
+                <SelectValue
+                  placeholder={
+                    availableGroupCategories.length === 0
+                      ? "All categories added"
+                      : "Choose a category to add…"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {availableGroupCategories.map((c) => (
+                  <SelectItem key={c._id} value={c.name}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
 
       {/* Template-level adjustments */}
       {((isEditing ? manualItems : template.manualItems).length > 0 ||
@@ -770,12 +841,10 @@ export default function TemplateDetailPage() {
         }}
       />
 
-      {/* Replace / add product picker (edit mode) */}
+      {/* Replace / add product picker (edit mode) — scoped to the group's category */}
       <CategoryProductPicker
         open={!!pickerTarget}
-        category={
-          pickerTarget?.mode === "replace" ? pickerTarget.category : undefined
-        }
+        category={pickerTarget?.category}
         selectedId={
           pickerTarget?.mode === "replace"
             ? groups[pickerTarget.gi]?.productItems[pickerTarget.pi]?.productId

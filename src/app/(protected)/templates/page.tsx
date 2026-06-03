@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Eye,
   Trash2,
+  Plus,
 } from "lucide-react";
 
 import { templatesKeys, useTemplates } from "@/hooks/useTemplates";
@@ -140,6 +141,8 @@ export default function TemplatesPage() {
   // One selected product per category
   const [categorySelection, setCategorySelection] =
     useState<CategorySelection>({});
+  // Category currently being added (loading state) via the "Add category" control.
+  const [isAddingCat, setIsAddingCat] = useState(false);
 
   // Discount & GST
   const [discountType, setDiscountType] = useState<"flat" | "percent">("percent");
@@ -163,10 +166,13 @@ export default function TemplatesPage() {
     return products;
   }, [categorySelection, allCategoryProducts]);
 
+  // All products that go into the template (one per selected/added category).
+  const templateProducts = selectedProducts;
+
   // Totals
   const subtotal = useMemo(
-    () => selectedProducts.reduce((s, p) => s + p.price * p.quantity, 0),
-    [selectedProducts]
+    () => templateProducts.reduce((s, p) => s + p.price * p.quantity, 0),
+    [templateProducts]
   );
 
   const discountAmount = useMemo(() => {
@@ -189,6 +195,17 @@ export default function TemplatesPage() {
   const productCategories = useMemo(
     () => Object.keys(allCategoryProducts),
     [allCategoryProducts]
+  );
+
+  // Categories not yet shown in the review — available to add.
+  const availableCategories = useMemo(
+    () =>
+      categories.filter(
+        (c) =>
+          !productCategories.includes(c.name) &&
+          !selectedCategories.includes(c.name)
+      ),
+    [categories, productCategories, selectedCategories]
   );
 
   // ── mutations ─────────────────────────────
@@ -310,6 +327,57 @@ export default function TemplatesPage() {
     setReplaceTarget(null);
   }
 
+  /** Add another category's products to the review (fetches its recommendations,
+   *  shows it as a new category card with the top product preselected). */
+  async function addCategory(catName: string) {
+    if (!catName || isAddingCat) return;
+    setIsAddingCat(true);
+    try {
+      const res = await suggestProducts({
+        category: catName,
+        limit: MAX_PER_CATEGORY,
+      });
+      if (!res.data.length) {
+        toast.info(`No products found in "${catName}".`);
+        return;
+      }
+      const newByCat: Record<string, ProductOption[]> = {};
+      const newSel: Record<string, string> = {};
+      res.data.forEach((p, index) => {
+        const option: ProductOption = {
+          _id: p._id,
+          name: p.name,
+          category: p.category,
+          subcategory: p.subcategory,
+          price: p.price,
+          rank: index + 1,
+          imageUrl: p.imageUrl,
+        };
+        (newByCat[p.category] ||= []).push(option);
+        if (!newSel[p.category]) newSel[p.category] = p._id;
+      });
+      setAllCategoryProducts((prev) => {
+        const next = { ...prev };
+        for (const [c, opts] of Object.entries(newByCat)) {
+          if (!next[c]) next[c] = opts.slice(0, MAX_PER_CATEGORY);
+        }
+        return next;
+      });
+      setCategorySelection((prev) => {
+        const sel = { ...prev };
+        for (const [c, id] of Object.entries(newSel)) if (!sel[c]) sel[c] = id;
+        return sel;
+      });
+      setSelectedCategories((prev) =>
+        prev.includes(catName) ? prev : [...prev, catName]
+      );
+    } catch {
+      toast.error("Failed to add category");
+    } finally {
+      setIsAddingCat(false);
+    }
+  }
+
   function handleConfirmCreate() {
     const manualItems: CreateTemplatePayload["manualItems"] = [];
 
@@ -333,21 +401,31 @@ export default function TemplatesPage() {
       });
     }
 
-    const groups: CreateTemplatePayload["groups"] = selectedProducts.map(
-      (product) => ({
-        name: product.category,
-        productItems: [
-          {
-            productId: product._id,
-            productName: product.name,
-            category: product.category,
-            subcategory: product.subcategory,
-            quantity: product.quantity,
-            unitPrice: product.price,
-          },
-        ],
-        manualItems: [],
-      })
+    // Group all products (recommendations + extras) by category — one group per
+    // category, so extra products in the same category merge in (no duplicates).
+    const groupsByCategory = new Map<string, CreateTemplatePayload["groups"][number]>();
+    templateProducts.forEach((product) => {
+      const item = {
+        productId: product._id,
+        productName: product.name,
+        category: product.category,
+        subcategory: product.subcategory,
+        quantity: product.quantity,
+        unitPrice: product.price,
+      };
+      const existing = groupsByCategory.get(product.category);
+      if (existing) {
+        existing.productItems.push(item);
+      } else {
+        groupsByCategory.set(product.category, {
+          name: product.category,
+          productItems: [item],
+          manualItems: [],
+        });
+      }
+    });
+    const groups: CreateTemplatePayload["groups"] = Array.from(
+      groupsByCategory.values()
     );
 
     const payload: CreateTemplatePayload = {
@@ -561,8 +639,8 @@ export default function TemplatesPage() {
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 Budget: {INR(budgetNum)} ·{" "}
-                {selectedProducts.length} product
-                {selectedProducts.length !== 1 ? "s" : ""} selected
+                {templateProducts.length} product
+                {templateProducts.length !== 1 ? "s" : ""} selected
               </p>
             </div>
             <div className="text-right">
@@ -690,6 +768,47 @@ export default function TemplatesPage() {
           </div>
         )}
 
+        {/* Add another category */}
+        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Plus className="h-4 w-4 text-cine-primary" />
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  Add another category
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Pull in products from another category (e.g. speakers, screens).
+                </p>
+              </div>
+            </div>
+            <Select
+              value=""
+              onValueChange={(v) => v && addCategory(v)}
+              disabled={isAddingCat || availableCategories.length === 0}
+            >
+              <SelectTrigger className="w-60">
+                <SelectValue
+                  placeholder={
+                    isAddingCat
+                      ? "Adding…"
+                      : availableCategories.length === 0
+                        ? "All categories added"
+                        : "Choose a category to add…"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {availableCategories.map((c) => (
+                  <SelectItem key={c._id} value={c.name}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         {/* Adjustments */}
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
           <div className="mb-4">
@@ -755,8 +874,8 @@ export default function TemplatesPage() {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between text-slate-600 dark:text-slate-400">
               <span>
-                Subtotal ({selectedProducts.length} product
-                {selectedProducts.length !== 1 ? "s" : ""})
+                Subtotal ({templateProducts.length} product
+                {templateProducts.length !== 1 ? "s" : ""})
               </span>
               <span className="font-medium text-slate-900 dark:text-slate-50">
                 {INR(subtotal)}
@@ -809,7 +928,7 @@ export default function TemplatesPage() {
             Back
           </Button>
           <Button
-            disabled={selectedProducts.length === 0}
+            disabled={templateProducts.length === 0}
             onClick={handleConfirmCreate}
           >
             <Check className="h-4 w-4" />
@@ -817,10 +936,10 @@ export default function TemplatesPage() {
           </Button>
         </div>
 
-        {/* Browse-all product picker */}
+        {/* Browse-all product picker (replace the selected product within a category) */}
         <CategoryProductPicker
           open={!!replaceTarget}
-          category={replaceTarget}
+          category={replaceTarget ?? undefined}
           selectedId={replaceTarget ? categorySelection[replaceTarget] : undefined}
           title="Replace product"
           onClose={() => setReplaceTarget(null)}
