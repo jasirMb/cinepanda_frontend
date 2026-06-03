@@ -14,6 +14,8 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  Eye,
+  Trash2,
 } from "lucide-react";
 
 import { templatesKeys, useTemplates } from "@/hooks/useTemplates";
@@ -109,7 +111,7 @@ export default function TemplatesPage() {
   const templatesParams = useMemo(
     () => ({
       page: listPage,
-      limit: 9,
+      limit: 12,
       search: listSearch || undefined,
       lock: lockFilter === "all" ? undefined : lockFilter,
     }),
@@ -902,7 +904,7 @@ export default function TemplatesPage() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {templates.map((template) => (
             <TemplateCard
               key={template._id}
@@ -1104,61 +1106,63 @@ function TemplateCard({
     0
   );
   return (
-    <div className="group flex h-full flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
-      <Link href={`/templates/${template._id}`} className="space-y-3">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300">
-            <span className="text-base font-bold">T</span>
+    <div className="group flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
+      <div className="flex flex-1 flex-col gap-2 p-3">
+        {/* Title */}
+        <Link
+          href={`/templates/${template._id}`}
+          className="flex items-center gap-2.5"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300">
+            <span className="text-sm font-bold">T</span>
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-base font-semibold text-slate-900 dark:text-slate-50">
+            <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
               {template.name}
             </h3>
-            {template.description && (
-              <p className="line-clamp-1 text-xs text-slate-500 dark:text-slate-400">
-                {template.description}
-              </p>
-            )}
+            <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+              {template.description ||
+                `${totalProducts} product${totalProducts !== 1 ? "s" : ""} · ${template.groups.length} group${template.groups.length !== 1 ? "s" : ""}`}
+            </p>
           </div>
-        </div>
+        </Link>
 
+        {/* Price */}
         <div className="flex items-baseline justify-between">
-          <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
+          <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
             {INR(template.grandTotal)}
           </p>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">
-            {totalProducts} product{totalProducts !== 1 ? "s" : ""} ·{" "}
-            {template.groups.length} group
-            {template.groups.length !== 1 ? "s" : ""}
-          </p>
+          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            {totalProducts} item{totalProducts !== 1 ? "s" : ""}
+          </span>
         </div>
 
-        <div className="flex flex-wrap gap-1">
-          {template.groups.slice(0, 5).map((group) => (
-            <span
-              key={group.name}
-              className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-            >
-              {group.name} ({group.productItems.length})
-            </span>
-          ))}
-          {template.groups.length > 5 && (
-            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-              +{template.groups.length - 5} more
-            </span>
-          )}
-        </div>
-      </Link>
+        {/* Group tags */}
+        {template.groups.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {template.groups.slice(0, 3).map((group) => (
+              <span
+                key={group.name}
+                className="truncate rounded-md bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+              >
+                {group.name} ({group.productItems.length})
+              </span>
+            ))}
+            {template.groups.length > 3 && (
+              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                +{template.groups.length - 3}
+              </span>
+            )}
+          </div>
+        )}
 
-      <div className="mt-auto flex items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-        <span className="text-[10px] text-slate-500 dark:text-slate-400">
-          Created {new Date(template.createdAt).toLocaleDateString()}
-        </span>
-        <div className="flex gap-1.5">
+        {/* Footer */}
+        <div className="mt-auto flex items-center justify-end gap-1.5 border-t border-slate-100 pt-3 dark:border-slate-800">
           <Link
             href={`/templates/${template._id}`}
             className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
           >
+            <Eye className="h-3 w-3" />
             View
           </Link>
           {template.locked ? (
@@ -1181,6 +1185,7 @@ function TemplateCard({
               }}
               className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
             >
+              <Trash2 className="h-3 w-3" />
               Delete
             </button>
           )}
