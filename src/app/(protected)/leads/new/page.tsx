@@ -283,7 +283,7 @@ export default function NewLeadPage() {
             <Field label="Lead Source *" error={formErrors.leadSource}>
               <Select
                 value={formValues.leadSource || undefined}
-                onValueChange={(v) => handleChange("leadSource", v)}
+                onValueChange={(v) => v && handleChange("leadSource", v)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select lead source" />
@@ -327,7 +327,7 @@ export default function NewLeadPage() {
             <Field label="Priority Type *" error={formErrors.priorityType}>
               <Select
                 value={formValues.priorityType || undefined}
-                onValueChange={(v) => handleChange("priorityType", v)}
+                onValueChange={(v) => v && handleChange("priorityType", v)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select priority" />
@@ -344,7 +344,7 @@ export default function NewLeadPage() {
             <Field label="Status *" error={formErrors.status}>
               <Select
                 value={formValues.status || undefined}
-                onValueChange={(v) => handleChange("status", v)}
+                onValueChange={(v) => v && handleChange("status", v)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select status" />
