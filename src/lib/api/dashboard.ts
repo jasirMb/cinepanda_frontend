@@ -8,6 +8,7 @@ export interface ProjectsOverview {
   totalProjects: number;
   planningProjects: number;
   ongoingProjects: number;
+  onHoldProjects: number;
   completedProjects: number;
   cancelledProjects: number;
   totalProjectValue: number;

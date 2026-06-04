@@ -341,6 +341,7 @@ export default function DashboardPage() {
       [
         { name: "Planning", value: data?.planningProjects ?? 0, key: "PLANNING" },
         { name: "Ongoing", value: data?.ongoingProjects ?? 0, key: "ONGOING" },
+        { name: "On Hold", value: data?.onHoldProjects ?? 0, key: "ON_HOLD" },
         {
           name: "Completed",
           value: data?.completedProjects ?? 0,
@@ -448,6 +449,7 @@ export default function DashboardPage() {
           totalProjects={data?.totalProjects ?? 0}
           planning={data?.planningProjects ?? 0}
           ongoing={data?.ongoingProjects ?? 0}
+          onHold={data?.onHoldProjects ?? 0}
           completed={data?.completedProjects ?? 0}
         />
         <SalesSummaryCard
@@ -947,6 +949,7 @@ function ReceivablesCard({
   totalProjects,
   planning,
   ongoing,
+  onHold,
   completed,
 }: {
   totalPending: number;
@@ -954,13 +957,14 @@ function ReceivablesCard({
   totalProjects: number;
   planning: number;
   ongoing: number;
+  onHold: number;
   completed: number;
 }) {
   const pct =
     totalProjectValue > 0
       ? Math.min(100, Math.round((totalPending / totalProjectValue) * 100))
       : 0;
-  const total = planning + ongoing + completed || 1;
+  const total = planning + ongoing + onHold + completed || 1;
   const segments = [
     {
       label: "Planning",
@@ -971,6 +975,11 @@ function ReceivablesCard({
       label: "Ongoing",
       value: ongoing,
       color: PROJECT_STATUS_COLORS.ONGOING,
+    },
+    {
+      label: "On Hold",
+      value: onHold,
+      color: PROJECT_STATUS_COLORS.ON_HOLD,
     },
     {
       label: "Completed",
@@ -1018,7 +1027,7 @@ function ReceivablesCard({
               />
             ))}
           </div>
-          <ul className="mt-3 grid grid-cols-3 gap-3">
+          <ul className="mt-3 grid grid-cols-4 gap-3">
             {segments.map((s) => (
               <li key={s.label} className="space-y-0.5">
                 <div className="flex items-center gap-1.5">
