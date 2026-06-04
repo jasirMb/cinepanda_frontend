@@ -64,7 +64,7 @@ export function InstallSection() {
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
           <Image
             src="/cinepanda-logo.png"
-            alt="CinePanda"
+            alt="Cinepanda"
             width={44}
             height={44}
             className="h-11 w-11 object-contain"
@@ -72,7 +72,7 @@ export function InstallSection() {
         </div>
         <div>
           <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">
-            Install CinePanda
+            Install Cinepanda
           </h3>
           <p className="mx-auto mt-1 max-w-xs text-xs text-slate-500 dark:text-slate-400">
             Add the app to your {effective} for a faster, full-screen experience

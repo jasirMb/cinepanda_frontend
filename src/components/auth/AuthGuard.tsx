@@ -31,7 +31,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
           <span className="absolute h-20 w-20 animate-ping rounded-full bg-cine-primary/10" />
           <Image
             src="/cinepanda-logo.png"
-            alt="CinePanda"
+            alt="Cinepanda"
             width={56}
             height={56}
             priority

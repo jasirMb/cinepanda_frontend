@@ -780,7 +780,7 @@ export default function QuotationsPage() {
           {/* Header */}
           <div className="border-b border-slate-200 px-8 py-6 text-center dark:border-slate-800">
             <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">
-              CinePanda — Quotation
+              Cinepanda — Quotation
             </h1>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               Date: {new Date(quotationDate).toLocaleDateString("en-IN", { dateStyle: "long" })}
@@ -979,7 +979,7 @@ export default function QuotationsPage() {
             Quotations
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Manage quotations and pricing for CinePanda projects.
+            Manage quotations and pricing for Cinepanda projects.
           </p>
         </div>
         <Button onClick={() => setStep("templates")}>
@@ -1171,7 +1171,7 @@ function buildWhatsappUrl(phone: string, message: string): string {
 
 function defaultWhatsappMessage(customerName: string): string {
   const firstName = customerName.trim().split(/\s+/)[0] || "there";
-  return `Hi ${firstName}, this is regarding your quotation from CinePanda. Please let me know if you have any questions.`;
+  return `Hi ${firstName}, this is regarding your quotation from Cinepanda. Please let me know if you have any questions.`;
 }
 
 function WhatsappIcon({ className }: { className?: string }) {

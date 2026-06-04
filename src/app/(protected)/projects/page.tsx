@@ -171,7 +171,7 @@ export default function ProjectsPage() {
             Projects
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Track CinePanda installation projects and their lifecycle.
+            Track Cinepanda installation projects and their lifecycle.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

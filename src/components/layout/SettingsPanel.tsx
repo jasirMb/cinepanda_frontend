@@ -591,7 +591,7 @@ export function SettingsPanel() {
         <div className="space-y-4">
           <TabHeader
             title="App"
-            subtitle="Install CinePanda on this device."
+            subtitle="Install Cinepanda on this device."
           />
           <InstallSection />
         </div>

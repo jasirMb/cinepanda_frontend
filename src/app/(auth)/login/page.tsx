@@ -102,14 +102,14 @@ function LoginForm() {
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 backdrop-blur-sm ring-1 ring-white/15">
             <Image
               src="/cinepanda-logo.png"
-              alt="CinePanda"
+              alt="Cinepanda"
               width={28}
               height={28}
               className="h-7 w-7 object-contain"
             />
           </div>
           <span className="text-sm font-medium tracking-wide text-slate-200">
-            CinePanda Entertainments
+            Cinepanda Entertainments
           </span>
         </div>
 
@@ -149,7 +149,7 @@ function LoginForm() {
         </div>
 
         <div className="relative z-10 text-xs text-slate-400">
-          © {new Date().getFullYear()} CinePanda Entertainments. All rights
+          © {new Date().getFullYear()} Cinepanda Entertainments. All rights
           reserved.
         </div>
       </div>
@@ -161,7 +161,7 @@ function LoginForm() {
           <div className="mb-8 flex flex-col items-center text-center lg:hidden">
             <Image
               src="/cinepanda-logo.png"
-              alt="CinePanda"
+              alt="Cinepanda"
               width={72}
               height={72}
               priority
@@ -267,7 +267,7 @@ function LoginForm() {
           </div>
 
           <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-500 lg:hidden">
-            © {new Date().getFullYear()} CinePanda Entertainments
+            © {new Date().getFullYear()} Cinepanda Entertainments
           </p>
         </div>
       </div>

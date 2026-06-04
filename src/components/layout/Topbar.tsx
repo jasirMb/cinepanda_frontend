@@ -144,7 +144,7 @@ function resolveMeta(pathname: string): PageMeta {
   for (const r of ROUTE_META) {
     if (r.match(pathname)) return r.meta;
   }
-  return { title: "CinePanda", subtitle: "Admin Console" };
+  return { title: "Cinepanda", subtitle: "Admin Console" };
 }
 
 export function Topbar() {
@@ -165,7 +165,7 @@ export function Topbar() {
       <div className="flex min-w-0 items-center gap-3">
         <Image
           src="/cinepanda-logo.png"
-          alt="CinePanda logo"
+          alt="Cinepanda logo"
           width={32}
           height={32}
           priority

@@ -152,7 +152,7 @@ export function Sidebar() {
           <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-white/10 to-white/0 p-1.5 ring-1 ring-white/10">
             <Image
               src="/cinepanda-logo.png"
-              alt="CinePanda logo"
+              alt="Cinepanda logo"
               width={32}
               height={32}
               priority
@@ -163,7 +163,7 @@ export function Sidebar() {
         {showExpanded && (
           <div className="min-w-0 flex-1 leading-tight">
             <p className="truncate text-base font-semibold tracking-tight text-white">
-              CinePanda
+              Cinepanda
             </p>
             <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-cine-primary">
               Entertainment

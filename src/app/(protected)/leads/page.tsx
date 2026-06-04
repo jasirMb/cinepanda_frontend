@@ -657,7 +657,7 @@ export default function LeadsPage() {
             Leads
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Manage incoming leads from all CinePanda channels.
+            Manage incoming leads from all Cinepanda channels.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

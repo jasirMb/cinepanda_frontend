@@ -365,7 +365,7 @@ function LogoHeader() {
     <div style={{ textAlign: "right", marginBottom: "10px" }}>
       <img
         src={CINEPANDA_LOGO_DATA_URI}
-        alt="CinePanda Entertainments"
+        alt="Cinepanda Entertainments"
         style={{
           height: "80px",
           objectFit: "contain",
@@ -381,7 +381,7 @@ function LogoSmall() {
     <div style={{ textAlign: "center" }}>
       <img
         src={CINEPANDA_LOGO_DATA_URI}
-        alt="CinePanda Entertainments"
+        alt="Cinepanda Entertainments"
         style={{
           height: "55px",
           objectFit: "contain",
@@ -914,7 +914,7 @@ function CoverPage({ quotation }: { quotation: Quotation }) {
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <img
             src={CINEPANDA_LOGO_DATA_URI}
-            alt="CinePanda Entertainments"
+            alt="Cinepanda Entertainments"
             style={{ height: "74px", objectFit: "contain", display: "block" }}
           />
         </div>

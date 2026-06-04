@@ -4,13 +4,13 @@ import { QueryProvider } from "@/components/providers/QueryProvider";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
-  title: "CinePanda Admin",
-  description: "Admin panel for CinePanda",
-  applicationName: "CinePanda",
+  title: "Cinepanda Admin",
+  description: "Admin panel for Cinepanda",
+  applicationName: "Cinepanda",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "CinePanda",
+    title: "Cinepanda",
     statusBarStyle: "black-translucent"
   },
   other: {

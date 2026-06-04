@@ -158,7 +158,7 @@ export async function downloadStatementPdf(opts: {
     <div class="brand">
       ${logo ? `<img src="${logo}" alt="" />` : ""}
       <div>
-        <div class="co">CinePanda Entertainments</div>
+        <div class="co">Cinepanda Entertainments</div>
         <div class="tag">Admin Console</div>
       </div>
     </div>
@@ -212,7 +212,7 @@ export async function downloadStatementPdf(opts: {
     </tfoot>
   </table>
 
-  <p class="foot">System-generated statement · CinePanda Entertainments · Opening balance taken as zero for the selected period.</p>
+  <p class="foot">System-generated statement · Cinepanda Entertainments · Opening balance taken as zero for the selected period.</p>
 </body></html>`;
 
   const filename =
@@ -324,7 +324,7 @@ export async function downloadVendorStatementPdf(opts: {
   <div class="topbar">
     <div class="brand">
       ${logo ? `<img src="${logo}" alt="" />` : ""}
-      <div><div class="co">CinePanda Entertainments</div><div class="tag">Admin Console</div></div>
+      <div><div class="co">Cinepanda Entertainments</div><div class="tag">Admin Console</div></div>
     </div>
     <div class="title"><div class="h">VENDOR STATEMENT</div><div class="s">${esc(periodLabel)}</div></div>
   </div>
@@ -353,7 +353,7 @@ export async function downloadVendorStatementPdf(opts: {
     <tfoot><tr><td colspan="4">Total paid</td><td class="num">${inr(total)}</td></tr></tfoot>
   </table>
 
-  <p class="foot">System-generated vendor statement from CinePanda Entertainments.</p>
+  <p class="foot">System-generated vendor statement from Cinepanda Entertainments.</p>
 </body></html>`;
 
   const filename =

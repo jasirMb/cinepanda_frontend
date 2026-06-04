@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "CinePanda Admin",
-    short_name: "CinePanda",
-    description: "Admin panel for CinePanda",
+    name: "Cinepanda Admin",
+    short_name: "Cinepanda",
+    description: "Admin panel for Cinepanda",
     start_url: "/login",
     scope: "/",
     display: "standalone",
