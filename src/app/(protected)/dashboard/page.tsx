@@ -8,6 +8,8 @@ import {
   CartesianGrid,
   Cell,
   Legend,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -31,7 +33,7 @@ import {
   Wallet,
 } from "lucide-react";
 
-import { useProjectsOverview } from "@/hooks/useDashboard";
+import { useProjectsOverview, useGrowth } from "@/hooks/useDashboard";
 import { useLedger, useLedgerSummary } from "@/hooks/useLedger";
 import { useFollowupLeads } from "@/hooks/useLeads";
 import { useProjects } from "@/hooks/useProjects";
@@ -258,6 +260,7 @@ const tooltipStyle: React.CSSProperties = {
 
 export default function DashboardPage() {
   const overviewQuery = useProjectsOverview();
+  const growthQuery = useGrowth();
   const summaryQuery = useLedgerSummary();
   const profileName = useSettingsStore((s) => s.profile.name);
 
@@ -275,6 +278,7 @@ export default function DashboardPage() {
   const projectsQuery = useProjects();
 
   const data = overviewQuery.data?.data;
+  const growthSeries = growthQuery.data?.data.series ?? [];
 
   // ── Cash Flow widget: date-period filter ──────────────────────────────────
   const [cashPeriod, setCashPeriod] = useState<CashPeriod>("6months");
@@ -613,6 +617,97 @@ export default function DashboardPage() {
           </ResponsiveContainer>
         ) : (
           <EmptyBlock label={`No ledger activity — ${CASH_PERIOD_LABEL[cashPeriod]}`} />
+        )}
+      </SectionCard>
+
+      {/* Company Growth — cumulative since inception */}
+      <SectionCard
+        title="Company Growth"
+        subtitle="Cumulative revenue, project value, customers & projects since the start"
+      >
+        {growthQuery.isLoading ? (
+          <Skeleton className="h-[300px] rounded-lg" />
+        ) : growthSeries.length ? (
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart
+              data={growthSeries}
+              margin={{ top: 10, right: 12, left: 0, bottom: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="currentColor"
+                className="text-slate-200 dark:text-slate-800"
+              />
+              <XAxis
+                dataKey="month"
+                tick={{ fontSize: 12 }}
+                stroke="currentColor"
+                className="text-slate-500"
+              />
+              <YAxis
+                yAxisId="money"
+                tick={{ fontSize: 12 }}
+                stroke="currentColor"
+                className="text-slate-500"
+                tickFormatter={(v) => formatINRCompact(Number(v))}
+              />
+              <YAxis
+                yAxisId="count"
+                orientation="right"
+                tick={{ fontSize: 12 }}
+                stroke="currentColor"
+                className="text-slate-500"
+                allowDecimals={false}
+              />
+              <Tooltip
+                contentStyle={tooltipStyle}
+                formatter={(value, name) =>
+                  name === "Revenue" || name === "Project value"
+                    ? formatINR(Number(value))
+                    : Number(value)
+                }
+              />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Line
+                yAxisId="money"
+                type="monotone"
+                dataKey="revenue"
+                name="Revenue"
+                stroke="#10b981"
+                strokeWidth={2.2}
+                dot={{ r: 2.5, strokeWidth: 0 }}
+              />
+              <Line
+                yAxisId="money"
+                type="monotone"
+                dataKey="projectValue"
+                name="Project value"
+                stroke="#3076A1"
+                strokeWidth={2.2}
+                dot={{ r: 2.5, strokeWidth: 0 }}
+              />
+              <Line
+                yAxisId="count"
+                type="monotone"
+                dataKey="customers"
+                name="Customers"
+                stroke="#f59e0b"
+                strokeWidth={2.2}
+                dot={{ r: 2.5, strokeWidth: 0 }}
+              />
+              <Line
+                yAxisId="count"
+                type="monotone"
+                dataKey="projects"
+                name="Projects"
+                stroke="#8b5cf6"
+                strokeWidth={2.2}
+                dot={{ r: 2.5, strokeWidth: 0 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <EmptyBlock label="Not enough history yet to show growth" />
         )}
       </SectionCard>
 
