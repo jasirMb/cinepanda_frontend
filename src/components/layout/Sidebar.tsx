@@ -17,6 +17,7 @@ import {
   Package,
   Receipt,
   Settings,
+  Trash2,
   UserPlus,
   Users,
   Wallet,
@@ -44,6 +45,7 @@ const navItems: {
   { href: "/vendors", label: "Vendors", icon: Building2 },
   { href: "/payment-accounts", label: "Payment Accounts", icon: CreditCard },
   { href: "/ledger", label: "Ledger", icon: Wallet },
+  { href: "/trash", label: "Trash", icon: Trash2 },
 ];
 
 const STORAGE_KEY = "cp-sidebar-collapsed";

@@ -193,7 +193,7 @@ export default function LedgerPage() {
     mutationFn: deleteLedgerEntry,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ledgerKeys.all });
-      toast.success("Entry deleted");
+      toast.success("Entry moved to trash");
     },
     onError: () => toast.error("Failed to delete entry"),
   });
@@ -337,7 +337,7 @@ export default function LedgerPage() {
           if (!open) setDeleteTarget(null);
         }}
         title="Delete ledger entry"
-        description="Are you sure you want to delete this entry? This action cannot be undone."
+        description="Are you sure you want to delete this entry? It will be moved to the Trash and can be restored later."
         confirmLabel="Delete"
         onConfirm={() => {
           if (deleteTarget) deleteMutation.mutate(deleteTarget);

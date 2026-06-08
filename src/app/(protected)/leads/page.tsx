@@ -15,6 +15,7 @@ import {
   MapPin,
   Pencil,
   Phone,
+  Trash2,
   TrendingUp,
   UserCheck,
   UserPlus,
@@ -29,7 +30,9 @@ import {
   type Lead,
   updateLeadStatus,
   convertLeadToCustomer,
+  deleteLead,
 } from "@/lib/api/leads";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -180,6 +183,22 @@ export default function LeadsPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteLead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: leadsKeys.all });
+      toast.success("Lead moved to trash");
+    },
+    onError: () => {
+      toast.error("Failed to delete lead");
+    },
+  });
+
+  function handleDelete(id: string) {
+    setDeleteTarget(id);
+  }
   const [filters, setFilters] = useState({
     search: "",
     status: "",
@@ -519,6 +538,14 @@ export default function LeadsPage() {
               <Pencil className="h-3 w-3" />
               Edit
             </Link>
+            <button
+              type="button"
+              onClick={() => handleDelete(lead._id)}
+              aria-label="Delete lead"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-red-950/30"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
           </div>
 
           {/* Won lead → customer */}
@@ -806,7 +833,7 @@ export default function LeadsPage() {
       )}
 
       {viewMode === "table" ? (
-        <LeadsTable leads={allLeads} />
+        <LeadsTable leads={allLeads} onDelete={handleDelete} />
       ) : (
         <div className="space-y-10">
           {attentionLeads.length > 0 && (
@@ -912,6 +939,19 @@ export default function LeadsPage() {
         </div>
       )}
 
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Delete lead"
+        description="This lead will be moved to the Trash. You can restore it later from the Trash page."
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate(deleteTarget);
+          setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }

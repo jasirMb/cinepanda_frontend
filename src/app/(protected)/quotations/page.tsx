@@ -283,7 +283,7 @@ export default function QuotationsPage() {
     mutationFn: deleteQuotation,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: quotationsKeys.all });
-      toast.success("Quotation deleted");
+      toast.success("Quotation moved to trash");
     },
     onError: (err) => {
       const e = err as { response?: { data?: { error?: string } } };
@@ -1120,7 +1120,7 @@ export default function QuotationsPage() {
         open={deleteTarget !== null}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
         title="Delete quotation"
-        description="Are you sure you want to delete this quotation? This action cannot be undone."
+        description="Are you sure you want to delete this quotation? It will be moved to the Trash and can be restored later."
         confirmLabel="Delete"
         onConfirm={() => {
           if (deleteTarget) deleteMutation.mutate(deleteTarget);

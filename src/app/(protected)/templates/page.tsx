@@ -226,7 +226,7 @@ export default function TemplatesPage() {
     mutationFn: deleteTemplate,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: templatesKeys.all });
-      toast.success("Template deleted");
+      toast.success("Template moved to trash");
     },
     onError: (err) => {
       const e = err as { response?: { data?: { error?: string } } };
@@ -1070,7 +1070,7 @@ export default function TemplatesPage() {
         open={deleteTarget !== null}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
         title="Delete template"
-        description="Are you sure you want to delete this template? This action cannot be undone."
+        description="Are you sure you want to delete this template? It will be moved to the Trash and can be restored later."
         confirmLabel="Delete"
         onConfirm={() => {
           if (deleteTarget) deleteMutation.mutate(deleteTarget);

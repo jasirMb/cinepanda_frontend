@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Eye, Pencil, Phone, UserCheck } from "lucide-react";
+import { Eye, Pencil, Phone, Trash2, UserCheck } from "lucide-react";
 import { type Lead } from "@/lib/api/leads";
 
 interface LeadsTableProps {
   leads: Lead[];
+  onDelete?: (id: string) => void;
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -85,7 +86,7 @@ function nextCallInfo(iso?: string) {
   return { text, tone: "text-slate-600 dark:text-slate-300" };
 }
 
-export function LeadsTable({ leads }: LeadsTableProps) {
+export function LeadsTable({ leads, onDelete }: LeadsTableProps) {
   return (
     <div className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
       <div className="w-full overflow-x-auto">
@@ -209,6 +210,16 @@ export function LeadsTable({ leads }: LeadsTableProps) {
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </Link>
+                      {onDelete && (
+                        <button
+                          type="button"
+                          onClick={() => onDelete(lead._id)}
+                          aria-label={`Delete ${lead.customerName}`}
+                          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

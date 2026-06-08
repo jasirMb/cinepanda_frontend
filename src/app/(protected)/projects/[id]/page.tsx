@@ -204,7 +204,7 @@ export default function ProjectDetailPage({
   const deleteMutation = useMutation({
     mutationFn: () => deleteProject(id),
     onSuccess: () => {
-      toast.success("Project deleted");
+      toast.success("Project moved to trash");
       router.push("/projects");
     },
     onError: () => toast.error("Failed to delete project"),
@@ -758,7 +758,7 @@ export default function ProjectDetailPage({
         open={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
         title="Delete project"
-        description="Are you sure you want to delete this project? This action cannot be undone."
+        description="Are you sure you want to delete this project? It will be moved to the Trash and can be restored later."
         confirmLabel="Delete"
         onConfirm={() => deleteMutation.mutate()}
       />

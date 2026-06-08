@@ -168,3 +168,8 @@ export async function updateLead(
   return data;
 }
 
+/** Soft delete — moves the lead to the Trash (recoverable). */
+export async function deleteLead(id: string): Promise<void> {
+  await api.delete(`/leads/${id}`);
+}
+

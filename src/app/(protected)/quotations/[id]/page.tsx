@@ -724,7 +724,7 @@ export default function QuotationDetailPage() {
         open={showDeleteDialog}
         onOpenChange={(open) => { if (!open) setShowDeleteDialog(false); }}
         title="Delete quotation"
-        description="Are you sure you want to delete this quotation? This action cannot be undone."
+        description="Are you sure you want to delete this quotation? It will be moved to the Trash and can be restored later."
         confirmLabel="Delete"
         onConfirm={() => {
           deleteMutation.mutate();

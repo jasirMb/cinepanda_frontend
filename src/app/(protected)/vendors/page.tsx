@@ -76,7 +76,7 @@ export default function VendorsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: vendorsKeys.all });
       setPendingDelete(null);
-      toast.success("Vendor deleted");
+      toast.success("Vendor moved to trash");
     },
     onError: () => toast.error("Failed to delete vendor"),
   });
@@ -362,7 +362,7 @@ export default function VendorsPage() {
         open={!!pendingDelete}
         onOpenChange={(open) => !open && setPendingDelete(null)}
         title="Delete vendor?"
-        description={`This removes "${pendingDelete?.name}". Existing ledger entries keep their data.`}
+        description={`This moves "${pendingDelete?.name}" to the Trash (restorable). Existing ledger entries keep their data.`}
         confirmLabel="Delete"
         onConfirm={() => pendingDelete && deleteMutation.mutate(pendingDelete._id)}
       />

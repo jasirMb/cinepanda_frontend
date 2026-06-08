@@ -150,7 +150,7 @@ export default function ProjectsPage() {
     mutationFn: deleteProject,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: projectsKeys.all });
-      toast.success("Project deleted");
+      toast.success("Project moved to trash");
     },
     onError: () => toast.error("Failed to delete project"),
   });
@@ -454,7 +454,7 @@ export default function ProjectsPage() {
           if (!open) setDeleteTarget(null);
         }}
         title="Delete project"
-        description="Are you sure you want to delete this project? This action cannot be undone."
+        description="Are you sure you want to delete this project? It will be moved to the Trash and can be restored later."
         confirmLabel="Delete"
         onConfirm={() => {
           if (deleteTarget) deleteMutation.mutate(deleteTarget);

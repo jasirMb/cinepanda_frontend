@@ -833,7 +833,7 @@ export default function TemplateDetailPage() {
           if (!open) setShowDeleteDialog(false);
         }}
         title="Delete template"
-        description="Are you sure you want to delete this template? This action cannot be undone."
+        description="Are you sure you want to delete this template? It will be moved to the Trash and can be restored later."
         confirmLabel="Delete"
         onConfirm={() => {
           deleteMutation.mutate(templateId);

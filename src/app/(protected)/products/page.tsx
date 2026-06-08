@@ -89,7 +89,7 @@ export default function ProductsPage() {
     mutationFn: deleteProduct,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: productsKeys.all });
-      toast.success("Product deleted");
+      toast.success("Product moved to trash");
     },
     onError: () => {
       toast.error("Failed to delete product");
@@ -414,7 +414,7 @@ export default function ProductsPage() {
         open={deleteTarget !== null}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
         title="Delete product"
-        description="Are you sure you want to delete this product? This action cannot be undone."
+        description="This product will be moved to the Trash. You can restore it later from the Trash page."
         confirmLabel="Delete"
         onConfirm={() => {
           if (deleteTarget) deleteMutation.mutate(deleteTarget);

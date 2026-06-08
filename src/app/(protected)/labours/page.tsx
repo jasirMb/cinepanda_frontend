@@ -183,7 +183,7 @@ export default function LaboursPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: laboursKeys.all });
       setPendingDelete(null);
-      toast.success("Labour deleted");
+      toast.success("Labour moved to trash");
     },
     onError: () => toast.error("Failed to delete labour"),
   });
@@ -600,7 +600,7 @@ export default function LaboursPage() {
         open={!!pendingDelete}
         onOpenChange={(open) => !open && setPendingDelete(null)}
         title="Delete labour?"
-        description={`This will permanently remove "${pendingDelete?.name}".`}
+        description={`This moves "${pendingDelete?.name}" to the Trash. You can restore it later.`}
         confirmLabel="Delete"
         onConfirm={() => pendingDelete && deleteMutation.mutate(pendingDelete._id)}
       />

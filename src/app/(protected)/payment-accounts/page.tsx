@@ -78,7 +78,7 @@ export default function PaymentAccountsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: paymentAccountsKeys.all });
       setPendingDelete(null);
-      toast.success("Account deleted");
+      toast.success("Account moved to trash");
     },
     onError: () => toast.error("Failed to delete account"),
   });
@@ -407,7 +407,7 @@ export default function PaymentAccountsPage() {
         open={!!pendingDelete}
         onOpenChange={(open) => !open && setPendingDelete(null)}
         title="Delete payment account?"
-        description={`This removes "${pendingDelete?.name}". Existing ledger entries keep their data.`}
+        description={`This moves "${pendingDelete?.name}" to the Trash (restorable). Existing ledger entries keep their data.`}
         confirmLabel="Delete"
         onConfirm={() => pendingDelete && deleteMutation.mutate(pendingDelete._id)}
       />
