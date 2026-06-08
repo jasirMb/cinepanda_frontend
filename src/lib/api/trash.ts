@@ -19,6 +19,9 @@ export type TrashType =
   | "payment-accounts"
   | "ledger";
 
+/** Filter value used by the Trash page — a specific type or the "all" view. */
+export type TrashFilter = TrashType | "all";
+
 export interface TrashTypeSummary {
   key: TrashType;
   label: string;
@@ -30,17 +33,25 @@ export interface TrashSummaryResponse {
   data: { types: TrashTypeSummary[]; total: number };
 }
 
+export interface TrashMeta {
+  label: string;
+  value: string;
+}
+
 export interface TrashItem {
   id: string;
   type: TrashType;
+  typeLabel: string;
   title: string;
   subtitle: string;
+  image?: string;
+  meta?: TrashMeta[];
   deletedAt: string;
 }
 
 export interface TrashItemsResponse {
   success: boolean;
-  type: TrashType;
+  type: TrashFilter;
   data: TrashItem[];
 }
 
@@ -50,9 +61,9 @@ export async function fetchTrashSummary(): Promise<TrashSummaryResponse["data"]>
   return data.data;
 }
 
-/** Trashed items of a single type, newest first. */
-export async function fetchTrashItems(type: TrashType): Promise<TrashItem[]> {
-  const { data } = await api.get<TrashItemsResponse>(`/trash/${type}`);
+/** Trashed items for one type — or every type when `filter` is "all". */
+export async function fetchTrashItems(filter: TrashFilter): Promise<TrashItem[]> {
+  const { data } = await api.get<TrashItemsResponse>(`/trash/${filter}`);
   return data.data;
 }
 
