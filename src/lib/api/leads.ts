@@ -16,6 +16,9 @@ export interface Lead {
   status: string;
   requirement: string;
   statusDescription: string;
+  /** Present on the list endpoint — delete is blocked when true. */
+  locked?: boolean;
+  lockReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }

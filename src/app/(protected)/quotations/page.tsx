@@ -1211,12 +1211,18 @@ function QuotationCard({
     REJECTED: [],
   };
   const nextStatuses = statusMap[quotation.status];
-  // APPROVED / REJECTED quotations are final — no edit or delete.
-  const locked =
-    quotation.status === "APPROVED" || quotation.status === "REJECTED";
   const initial = quotation.customerId.name.trim().charAt(0).toUpperCase() || "?";
   const pid = quotationProjectId(quotation.projectId);
   const proj = quotationProject(quotation.projectId);
+  // APPROVED / REJECTED quotations are final, and one already linked to a project
+  // can't be deleted (it would orphan the project).
+  const locked =
+    quotation.status === "APPROVED" ||
+    quotation.status === "REJECTED" ||
+    !!pid;
+  const lockTitle = pid
+    ? "Linked to a project — can't be deleted"
+    : `${quotation.status[0]}${quotation.status.slice(1).toLowerCase()} quotations can't be edited or deleted`;
 
   const highest = Math.max(...quotation.sections.map((s) => s.grandTotal), 0);
 
@@ -1360,7 +1366,7 @@ function QuotationCard({
 
         {locked ? (
           <span
-            title={`${quotation.status[0]}${quotation.status.slice(1).toLowerCase()} quotations can't be edited or deleted`}
+            title={lockTitle}
             className="ml-auto inline-flex h-8 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-3 font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
           >
             <Lock className="h-3 w-3" /> Locked

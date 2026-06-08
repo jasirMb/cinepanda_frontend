@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Eye, Pencil, Phone, Trash2, UserCheck } from "lucide-react";
+import { Eye, Lock, Pencil, Phone, Trash2, UserCheck } from "lucide-react";
 import { type Lead } from "@/lib/api/leads";
 
 interface LeadsTableProps {
@@ -210,15 +210,25 @@ export function LeadsTable({ leads, onDelete }: LeadsTableProps) {
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </Link>
-                      {onDelete && (
-                        <button
-                          type="button"
-                          onClick={() => onDelete(lead._id)}
-                          aria-label={`Delete ${lead.customerName}`}
-                          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
+                      {lead.locked ? (
+                        <span
+                          title={lead.lockReason ?? "Linked — can't be deleted"}
+                          aria-label={lead.lockReason ?? "Locked"}
+                          className="flex h-7 w-7 items-center justify-center rounded-md text-amber-500"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                          <Lock className="h-3.5 w-3.5" />
+                        </span>
+                      ) : (
+                        onDelete && (
+                          <button
+                            type="button"
+                            onClick={() => onDelete(lead._id)}
+                            aria-label={`Delete ${lead.customerName}`}
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )
                       )}
                     </div>
                   </td>

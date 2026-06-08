@@ -8,6 +8,7 @@ import {
   CalendarDays,
   Eye,
   IndianRupee,
+  Lock,
   Pencil,
   Trash2,
   TrendingDown,
@@ -152,7 +153,8 @@ export default function ProjectsPage() {
       queryClient.invalidateQueries({ queryKey: projectsKeys.all });
       toast.success("Project moved to trash");
     },
-    onError: () => toast.error("Failed to delete project"),
+    onError: (e: any) =>
+      toast.error(e?.response?.data?.error ?? "Failed to delete project"),
   });
 
   if (projectsQuery.isLoading) {
@@ -431,14 +433,23 @@ export default function ProjectsPage() {
                           Edit
                         </Button>
                       </Link>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-600 hover:text-red-700 dark:text-red-400"
-                        onClick={() => setDeleteTarget(p._id)}
-                      >
-                        Delete
-                      </Button>
+                      {p.locked ? (
+                        <span
+                          title={p.lockReason ?? "Linked — can't be deleted"}
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-amber-600 dark:text-amber-400"
+                        >
+                          <Lock className="h-3.5 w-3.5" /> Locked
+                        </span>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 dark:text-red-400"
+                          onClick={() => setDeleteTarget(p._id)}
+                        >
+                          Delete
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -571,14 +582,23 @@ function ProjectCard({
           >
             <Pencil className="h-3 w-3" /> Edit
           </Link>
-          <button
-            type="button"
-            onClick={() => onDelete(project._id)}
-            className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
-          >
-            <Trash2 className="h-3 w-3" />
-            Delete
-          </button>
+          {project.locked ? (
+            <span
+              title={project.lockReason ?? "Linked — can't be deleted"}
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 text-xs font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
+            >
+              <Lock className="h-3 w-3" /> Locked
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onDelete(project._id)}
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
+            >
+              <Trash2 className="h-3 w-3" />
+              Delete
+            </button>
+          )}
         </div>
       </div>
     </div>

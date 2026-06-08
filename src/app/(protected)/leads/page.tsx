@@ -13,6 +13,7 @@ import {
   Clock,
   Eye,
   MapPin,
+  Lock,
   Pencil,
   Phone,
   Trash2,
@@ -191,8 +192,8 @@ export default function LeadsPage() {
       queryClient.invalidateQueries({ queryKey: leadsKeys.all });
       toast.success("Lead moved to trash");
     },
-    onError: () => {
-      toast.error("Failed to delete lead");
+    onError: (e: any) => {
+      toast.error(e?.response?.data?.error ?? "Failed to delete lead");
     },
   });
 
@@ -538,14 +539,24 @@ export default function LeadsPage() {
               <Pencil className="h-3 w-3" />
               Edit
             </Link>
-            <button
-              type="button"
-              onClick={() => handleDelete(lead._id)}
-              aria-label="Delete lead"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-red-950/30"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
+            {lead.locked ? (
+              <span
+                title={lead.lockReason ?? "Linked — can't be deleted"}
+                aria-label={lead.lockReason ?? "Locked"}
+                className="inline-flex h-8 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 text-xs font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
+              >
+                <Lock className="h-3 w-3" /> Locked
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleDelete(lead._id)}
+                aria-label="Delete lead"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-red-950/30"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
 
           {/* Won lead → customer */}
