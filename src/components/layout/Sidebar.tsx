@@ -45,7 +45,6 @@ const navItems: {
   { href: "/vendors", label: "Vendors", icon: Building2 },
   { href: "/payment-accounts", label: "Payment Accounts", icon: CreditCard },
   { href: "/ledger", label: "Ledger", icon: Wallet },
-  { href: "/trash", label: "Trash", icon: Trash2 },
 ];
 
 const STORAGE_KEY = "cp-sidebar-collapsed";
@@ -227,6 +226,26 @@ export function Sidebar() {
           <Settings className="h-4 w-4 shrink-0" />
           {showExpanded && <span>Settings</span>}
         </button>
+
+        <Link
+          href="/trash"
+          title={!showExpanded ? "Trash" : undefined}
+          className={clsx(
+            "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+            !showExpanded && "justify-center px-2",
+            pathname.startsWith("/trash")
+              ? "bg-cine-primary/20 text-white ring-1 ring-cine-primary/40"
+              : "text-slate-300 hover:bg-white/5 hover:text-white"
+          )}
+        >
+          <Trash2
+            className={clsx(
+              "h-4 w-4 shrink-0",
+              pathname.startsWith("/trash") ? "text-cine-primary" : "text-slate-400"
+            )}
+          />
+          {showExpanded && <span>Trash</span>}
+        </Link>
 
         <button
           type="button"
