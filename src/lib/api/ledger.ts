@@ -46,6 +46,8 @@ export interface LedgerEntryPopulated {
     clientName: string;
     serviceType: string;
     status: ProjectStatus;
+    /** Set when the project has been deleted (trashed) — the entry still shows its name. */
+    deletedAt?: string | null;
   } | null;
   customerId?: {
     _id: string;

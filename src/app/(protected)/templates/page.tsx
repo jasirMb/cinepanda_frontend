@@ -1263,18 +1263,6 @@ function TemplateCard({
               {template.description || "Quotation template"}
             </p>
           </div>
-          {locked && (
-            <span
-              title={
-                template.lockReason === "project"
-                  ? "Part of a project"
-                  : "Used by an approved quotation"
-              }
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400"
-            >
-              <Lock className="h-3 w-3" />
-            </span>
-          )}
         </Link>
 
         {/* Price */}

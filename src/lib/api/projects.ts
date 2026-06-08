@@ -52,9 +52,8 @@ export interface ProjectPopulated {
   status: ProjectStatus;
   labours?: ProjectLabour[];
   groups?: ProjectGroupInfo[];
-  /** Present on the list endpoint — delete is blocked when true. */
-  locked?: boolean;
-  lockReason?: string | null;
+  /** Present on the list endpoint — number of ledger entries pointing at this project. */
+  ledgerCount?: number;
   createdAt: string;
   updatedAt: string;
 }

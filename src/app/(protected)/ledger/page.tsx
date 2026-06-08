@@ -864,6 +864,14 @@ function EntriesTable({
                         <span className="truncate">
                           {entry.projectId.clientName}
                         </span>
+                        {entry.projectId.deletedAt && (
+                          <span
+                            title="This project has been deleted"
+                            className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                          >
+                            deleted
+                          </span>
+                        )}
                       </span>
                     ) : (
                       <span className="text-slate-400">—</span>
