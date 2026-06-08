@@ -360,34 +360,19 @@ function Footer() {
   );
 }
 
-function LogoHeader() {
+/** Shared page header — identical logo treatment on every page (top-right
+ *  logo + gold underline), matching the cover page. */
+function PageHeader() {
   return (
-    <div style={{ textAlign: "right", marginBottom: "10px" }}>
-      <img
-        src={CINEPANDA_LOGO_DATA_URI}
-        alt="Cinepanda Entertainments"
-        style={{
-          height: "80px",
-          objectFit: "contain",
-          display: "inline-block",
-        }}
-      />
-    </div>
-  );
-}
-
-function LogoSmall() {
-  return (
-    <div style={{ textAlign: "center" }}>
-      <img
-        src={CINEPANDA_LOGO_DATA_URI}
-        alt="Cinepanda Entertainments"
-        style={{
-          height: "55px",
-          objectFit: "contain",
-          display: "inline-block",
-        }}
-      />
+    <div>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <img
+          src={CINEPANDA_LOGO_DATA_URI}
+          alt="Cinepanda Entertainments"
+          style={{ height: "74px", objectFit: "contain", display: "block" }}
+        />
+      </div>
+      <div style={{ height: "2px", background: GOLD, marginTop: "12px" }} />
     </div>
   );
 }
@@ -761,8 +746,8 @@ function SectionPage({
           minHeight: "240mm",
         }}
       >
-        <div style={{ textAlign: "center", marginBottom: "8px" }}>
-          <LogoSmall />
+        <div style={{ marginBottom: "8px" }}>
+          <PageHeader />
         </div>
         {/* Centre the option content vertically so short options don't leave a
             big blank gap at the bottom of the page. */}
@@ -910,15 +895,8 @@ function CoverPage({ quotation }: { quotation: Quotation }) {
     <div style={pageStyle}>
       <div style={watermarkStyle} />
       <div style={contentStyle}>
-        {/* Header — logo on the top-right */}
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <img
-            src={CINEPANDA_LOGO_DATA_URI}
-            alt="Cinepanda Entertainments"
-            style={{ height: "74px", objectFit: "contain", display: "block" }}
-          />
-        </div>
-        <div style={{ height: "2px", background: GOLD, marginTop: "12px" }} />
+        {/* Header — logo on the top-right (shared across all pages) */}
+        <PageHeader />
 
         {/* Meta line */}
         <div
@@ -1058,8 +1036,8 @@ function SummaryPage({ quotation }: { quotation: Quotation }) {
     <div style={lastPageStyle}>
       <div style={watermarkStyle} />
       <div style={contentStyle}>
-        <div style={{ textAlign: "right", marginBottom: "18px" }}>
-          <LogoSmall />
+        <div style={{ marginBottom: "18px" }}>
+          <PageHeader />
         </div>
 
         <SectionHeading>Investment Summary</SectionHeading>
