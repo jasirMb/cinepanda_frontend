@@ -475,6 +475,7 @@ export default function ProjectsPage() {
           parts.push("You can restore it from Trash.");
           return parts.join(" ");
         })()}
+        requireText="DELETE"
         confirmLabel="Delete"
         onConfirm={() => {
           if (deleteTarget) deleteMutation.mutate(deleteTarget);
