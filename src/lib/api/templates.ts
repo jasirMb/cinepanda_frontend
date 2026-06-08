@@ -90,6 +90,8 @@ export interface Template {
   /** Present on the list endpoint — edit/delete blocked when true. */
   locked?: boolean;
   lockReason?: "project" | "quotation" | null;
+  /** Route of the quotation/project that locks it (click-through). */
+  lockHref?: string | null;
 }
 
 export interface TemplatesListQuery {

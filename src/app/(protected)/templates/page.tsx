@@ -1330,9 +1330,23 @@ function TemplateCard({
             View
           </Link>
           {locked ? (
-            <span className="inline-flex h-7 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 text-xs font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
-              <Lock className="h-3 w-3" /> Locked
-            </span>
+            template.lockHref ? (
+              <Link
+                href={template.lockHref}
+                title={
+                  template.lockReason === "project"
+                    ? "Part of a project — open it"
+                    : "Used by an approved quotation — open it"
+                }
+                className="inline-flex h-7 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 text-xs font-medium text-amber-700 transition hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50"
+              >
+                <Lock className="h-3 w-3" /> Locked
+              </Link>
+            ) : (
+              <span className="inline-flex h-7 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 text-xs font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+                <Lock className="h-3 w-3" /> Locked
+              </span>
+            )
           ) : (
             <button
               type="button"

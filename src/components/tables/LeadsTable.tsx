@@ -211,13 +211,24 @@ export function LeadsTable({ leads, onDelete }: LeadsTableProps) {
                         <Pencil className="h-3.5 w-3.5" />
                       </Link>
                       {lead.locked ? (
-                        <span
-                          title={lead.lockReason ?? "Linked — can't be deleted"}
-                          aria-label={lead.lockReason ?? "Locked"}
-                          className="flex h-7 w-7 items-center justify-center rounded-md text-amber-500"
-                        >
-                          <Lock className="h-3.5 w-3.5" />
-                        </span>
+                        lead.lockHref ? (
+                          <Link
+                            href={lead.lockHref}
+                            title={`${lead.lockReason ?? "Locked"} — open it`}
+                            aria-label={`${lead.lockReason ?? "Locked"} — open the linked record`}
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-amber-500 transition hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/40"
+                          >
+                            <Lock className="h-3.5 w-3.5" />
+                          </Link>
+                        ) : (
+                          <span
+                            title={lead.lockReason ?? "Linked — can't be deleted"}
+                            aria-label={lead.lockReason ?? "Locked"}
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-amber-500"
+                          >
+                            <Lock className="h-3.5 w-3.5" />
+                          </span>
+                        )
                       ) : (
                         onDelete && (
                           <button

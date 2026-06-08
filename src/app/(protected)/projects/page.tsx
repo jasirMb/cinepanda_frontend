@@ -434,12 +434,13 @@ export default function ProjectsPage() {
                         </Button>
                       </Link>
                       {p.locked ? (
-                        <span
-                          title={p.lockReason ?? "Linked — can't be deleted"}
-                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-amber-600 dark:text-amber-400"
+                        <Link
+                          href={`/projects/${p._id}`}
+                          title={`${p.lockReason ?? "Locked"} — view them`}
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-amber-600 transition hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40"
                         >
                           <Lock className="h-3.5 w-3.5" /> Locked
-                        </span>
+                        </Link>
                       ) : (
                         <Button
                           variant="ghost"
@@ -583,12 +584,13 @@ function ProjectCard({
             <Pencil className="h-3 w-3" /> Edit
           </Link>
           {project.locked ? (
-            <span
-              title={project.lockReason ?? "Linked — can't be deleted"}
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 text-xs font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
+            <Link
+              href={`/projects/${project._id}`}
+              title={`${project.lockReason ?? "Locked"} — view them`}
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 text-xs font-medium text-amber-700 transition hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50"
             >
               <Lock className="h-3 w-3" /> Locked
-            </span>
+            </Link>
           ) : (
             <button
               type="button"

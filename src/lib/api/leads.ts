@@ -19,6 +19,8 @@ export interface Lead {
   /** Present on the list endpoint — delete is blocked when true. */
   locked?: boolean;
   lockReason?: string | null;
+  /** Route of the record that locks this lead (e.g. /quotations/:id) — click-through. */
+  lockHref?: string | null;
   createdAt: string;
   updatedAt: string;
 }

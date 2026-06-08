@@ -1365,12 +1365,22 @@ function QuotationCard({
         ))}
 
         {locked ? (
-          <span
-            title={lockTitle}
-            className="ml-auto inline-flex h-8 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-3 font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
-          >
-            <Lock className="h-3 w-3" /> Locked
-          </span>
+          pid ? (
+            <Link
+              href={`/projects/${pid}`}
+              title={lockTitle}
+              className="ml-auto inline-flex h-8 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-3 font-medium text-amber-700 transition hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50"
+            >
+              <Lock className="h-3 w-3" /> Locked
+            </Link>
+          ) : (
+            <span
+              title={lockTitle}
+              className="ml-auto inline-flex h-8 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-3 font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
+            >
+              <Lock className="h-3 w-3" /> Locked
+            </span>
+          )
         ) : (
           <button
             type="button"
