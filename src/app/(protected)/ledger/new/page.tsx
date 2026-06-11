@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -78,13 +78,32 @@ export default function NewLedgerEntryPage() {
     interval: 1,
     nextDueDate: "",
     endDate: "",
+    // Optional extra charge/fee on top of this entry (recorded as a separate expense).
+    feePercent: "",
+    feeCategory: "BANK_CHARGES" as "BANK_CHARGES" | "TAXES",
   });
 
+  // Extra-charge preview: a % of the amount, rounded to paise.
+  const feeAmount = useMemo(() => {
+    const pct = Number(form.feePercent);
+    if (!(pct > 0) || !(form.amount > 0)) return 0;
+    return Math.round(((form.amount * pct) / 100) * 100) / 100;
+  }, [form.feePercent, form.amount]);
+
   const createMutation = useMutation({
-    mutationFn: createLedgerEntry,
-    onSuccess: () => {
+    mutationFn: async ({
+      main,
+      fee,
+    }: {
+      main: CreateLedgerPayload;
+      fee?: CreateLedgerPayload;
+    }) => {
+      await createLedgerEntry(main);
+      if (fee) await createLedgerEntry(fee);
+    },
+    onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ledgerKeys.all });
-      toast.success("Ledger entry created");
+      toast.success(vars.fee ? "Entry + fee recorded" : "Ledger entry created");
       router.push("/ledger");
     },
     onError: () => toast.error("Failed to create entry"),
@@ -158,7 +177,26 @@ export default function NewLedgerEntryPage() {
       };
     }
 
-    createMutation.mutate(payload);
+    // Optional extra charge/fee → a separate operating EXPENSE on the same account.
+    let fee: CreateLedgerPayload | undefined;
+    if (feeAmount > 0) {
+      fee = {
+        entryType: "EXPENSE",
+        category: form.feeCategory,
+        amount: feeAmount,
+        description: `${form.feeCategory === "TAXES" ? "Tax" : "Fee"} ${form.feePercent}% on ${
+          form.description.trim() || form.category
+        }`,
+        entryDate: form.entryDate,
+        paymentStatus: form.paymentStatus,
+        paymentAccountId: form.paymentAccountId,
+      };
+      if (form.paymentMethod) fee.paymentMethod = form.paymentMethod;
+      if (form.projectId) fee.projectId = form.projectId;
+      if (form.customerId) fee.customerId = form.customerId;
+    }
+
+    createMutation.mutate({ main: payload, fee });
   }
 
   return (
@@ -445,6 +483,61 @@ export default function NewLedgerEntryPage() {
               onLogged={() => router.push("/ledger")}
             />
           )}
+
+        {/* Extra charge / fee (optional) */}
+        <div className="rounded-md border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-800/40">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+            Extra charge / fee (optional)
+          </p>
+          <p className="mb-3 mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            e.g. a 2% card charge. We record it as a separate expense on the same
+            account, so it counts as a real loss.
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Charge %">
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.feePercent}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, feePercent: e.target.value }))
+                }
+                placeholder="e.g. 2"
+              />
+            </Field>
+            <Field label="Charge type">
+              <Select
+                value={form.feeCategory}
+                onValueChange={(v) =>
+                  v &&
+                  setForm((f) => ({
+                    ...f,
+                    feeCategory: v as "BANK_CHARGES" | "TAXES",
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BANK_CHARGES">Bank / card charge</SelectItem>
+                  <SelectItem value="TAXES">Tax</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          {feeAmount > 0 && (
+            <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+              Fee:{" "}
+              <span className="font-semibold text-red-600 dark:text-red-400">
+                ₹{feeAmount.toLocaleString("en-IN")}
+              </span>{" "}
+              — added as a separate{" "}
+              {form.feeCategory === "TAXES" ? "Taxes" : "Bank Charges"} expense.
+            </p>
+          )}
+        </div>
 
         {/* Recurring toggle */}
         <div className="flex items-center gap-3">

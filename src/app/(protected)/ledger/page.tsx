@@ -17,6 +17,7 @@ import {
   Pencil,
   PiggyBank,
   Plus,
+  Receipt,
   Scale,
   Trash2,
   Wallet,
@@ -238,6 +239,19 @@ export default function LedgerPage() {
   const ownerWithdrawal = summary?.profitLoss?.ownerWithdrawal ?? 0;
   const hasOwnerMoney = ownerContribution > 0 || ownerWithdrawal > 0;
 
+  // Money lost to fees / charges / taxes (Bank Charges + Taxes expense categories).
+  const lostToFees = useMemo(() => {
+    let bankCharges = 0;
+    let taxes = 0;
+    for (const c of summary?.byCategory ?? []) {
+      if (c._id.entryType !== "EXPENSE") continue;
+      if (c._id.category === "BANK_CHARGES") bankCharges += c.total;
+      else if (c._id.category === "TAXES") taxes += c.total;
+    }
+    return { bankCharges, taxes, total: bankCharges + taxes };
+  }, [summary?.byCategory]);
+  const hasFees = lostToFees.total > 0;
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -340,6 +354,36 @@ export default function LedgerPage() {
             </span>
           )}
           <span className="ml-auto flex items-center gap-0.5 text-xs font-medium text-cine-primary">
+            View all
+            <ChevronRight className="h-3.5 w-3.5" />
+          </span>
+        </Link>
+      )}
+
+      {/* Money lost to fees & taxes */}
+      {hasFees && tab === "entries" && (
+        <Link
+          href="/ledger/fees"
+          className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-2.5 text-sm transition hover:border-amber-300 hover:bg-amber-100/60 dark:border-amber-900/50 dark:bg-amber-950/20 dark:hover:bg-amber-900/30"
+        >
+          <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
+            <Receipt className="h-4 w-4 text-amber-500" />
+            Lost to fees &amp; taxes
+          </span>
+          <span className="font-semibold text-red-600 dark:text-red-400">
+            −{formatINR(lostToFees.total)}
+          </span>
+          {lostToFees.bankCharges > 0 && (
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Bank/card charges {formatINR(lostToFees.bankCharges)}
+            </span>
+          )}
+          {lostToFees.taxes > 0 && (
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Taxes {formatINR(lostToFees.taxes)}
+            </span>
+          )}
+          <span className="ml-auto flex items-center gap-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
             View all
             <ChevronRight className="h-3.5 w-3.5" />
           </span>

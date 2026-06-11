@@ -15,6 +15,7 @@ import {
   Clock,
   HandCoins,
   PiggyBank,
+  Receipt,
   Scale,
   Trash2,
   Pencil,
@@ -23,6 +24,7 @@ import {
 
 import { ledgerKeys, useLedger, useLedgerSummary } from "@/hooks/useLedger";
 import { useProjectsOverview } from "@/hooks/useDashboard";
+import { usePaymentAccounts } from "@/hooks/usePaymentAccounts";
 import {
   deleteLedgerEntry,
   type LedgerEntryPopulated,
@@ -106,6 +108,25 @@ export default function OwnerMoneyPage() {
   const totalIncome = profitLoss?.totalIncome ?? 0;
   const totalExpense = profitLoss?.totalExpense ?? 0;
   const netProfitLoss = profitLoss?.netProfitLoss ?? 0;
+
+  // Money lost to fees / charges / taxes (part of Total expense above).
+  const lostToFees = useMemo(() => {
+    let total = 0;
+    for (const c of summaryQuery.data?.data?.byCategory ?? []) {
+      if (
+        c._id.entryType === "EXPENSE" &&
+        (c._id.category === "BANK_CHARGES" || c._id.category === "TAXES")
+      ) {
+        total += c.total;
+      }
+    }
+    return total;
+  }, [summaryQuery.data]);
+
+  // Money in hand = live balance across all your accounts (cash, bank, card…).
+  const accounts = usePaymentAccounts().data?.data ?? [];
+  const moneyInHand = accounts.reduce((s, a) => s + (a.balance ?? 0), 0);
+  const accountCount = accounts.length;
 
   // Client collections — a current snapshot (project value vs paid), all-time.
   const overviewQuery = useProjectsOverview();
@@ -261,16 +282,15 @@ export default function OwnerMoneyPage() {
         )}
       </div>
 
-      {/* ── Owner money bento (hero) ── */}
-      <section>
-        <SectionLabel>Owner money · not in profit</SectionLabel>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:grid-rows-2">
+      {/* ── My money: in the business + in hand ── */}
+      <section className="space-y-3">
+        <SectionLabel>My money</SectionLabel>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <StatCard
-            className="sm:col-span-2 lg:row-span-2"
             featured
             tone="primary"
             icon={<Scale className="h-5 w-5" />}
-            label="Net in business"
+            label="My money in the business"
             value={fmtSigned(net)}
             loading={ownerQuery.isLoading}
             footer={
@@ -280,6 +300,20 @@ export default function OwnerMoneyPage() {
               </div>
             }
           />
+          <StatCard
+            featured
+            tone={moneyInHand >= 0 ? "success" : "danger"}
+            icon={<Wallet className="h-5 w-5" />}
+            label="Money in hand"
+            value={formatINR(moneyInHand)}
+            footer={
+              <Chip tone="neutral">
+                Across {accountCount} account{accountCount !== 1 ? "s" : ""}
+              </Chip>
+            }
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <StatCard
             tone="success"
             icon={<PiggyBank className="h-5 w-5" />}
@@ -326,6 +360,26 @@ export default function OwnerMoneyPage() {
           />
         </div>
       </section>
+
+      {/* Money lost to fees & taxes (part of business expense above) */}
+      {lostToFees > 0 && (
+        <Link
+          href="/ledger/fees"
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-2.5 text-sm transition hover:border-amber-300 hover:bg-amber-100/60 dark:border-amber-900/50 dark:bg-amber-950/20 dark:hover:bg-amber-900/30"
+        >
+          <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
+            <Receipt className="h-4 w-4 text-amber-500" />
+            Lost to fees &amp; taxes
+          </span>
+          <span className="font-semibold text-red-600 dark:text-red-400">
+            −{formatINR(lostToFees)}
+          </span>
+          <span className="ml-auto flex items-center gap-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+            View all
+            <ChevronRight className="h-3.5 w-3.5" />
+          </span>
+        </Link>
+      )}
 
       {/* ── Client collections bento ── */}
       <section>

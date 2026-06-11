@@ -26,6 +26,22 @@ export function isOperatingEntry(e: {
 }): boolean {
   return e.accountingType !== "CAPITAL" && e.accountingType !== "TRANSFER";
 }
+
+/** Expense categories that are money lost to fees / charges / taxes (not goods or services). */
+export const FEE_CATEGORIES = ["BANK_CHARGES", "TAXES"] as const;
+
+/** True for an operating EXPENSE in a fee/charge/tax category (i.e. money lost to fees). */
+export function isFeeEntry(e: {
+  entryType: EntryType;
+  category: string;
+  accountingType?: AccountingType | null;
+}): boolean {
+  return (
+    e.entryType === "EXPENSE" &&
+    isOperatingEntry(e) &&
+    (FEE_CATEGORIES as readonly string[]).includes(e.category)
+  );
+}
 export type PaymentMethod =
   | "CASH"
   | "BANK_TRANSFER"

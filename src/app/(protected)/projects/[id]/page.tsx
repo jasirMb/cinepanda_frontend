@@ -18,6 +18,7 @@ import {
   Phone,
   PiggyBank,
   Plus,
+  Receipt,
   TrendingDown,
   TrendingUp,
   Trash2,
@@ -39,7 +40,11 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProjectLabourSection } from "@/components/labour/ProjectLabourSection";
-import { isOperatingEntry, type LedgerEntryPopulated } from "@/lib/api/ledger";
+import {
+  isFeeEntry,
+  isOperatingEntry,
+  type LedgerEntryPopulated,
+} from "@/lib/api/ledger";
 
 const STATUS_BADGE: Record<ProjectStatus, string> = {
   PLANNING: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
@@ -241,6 +246,11 @@ export default function ProjectDetailPage({
     .filter((e) => e.accountingType === "CAPITAL" && e.entryType === "EXPENSE")
     .reduce((s, e) => s + e.amount, 0);
   const hasOwnerMoney = ownerPutIn > 0 || ownerTakenOut > 0;
+
+  // Money lost to fees / charges / taxes on this project (part of expenses above).
+  const lostToFees = ledgerEntries
+    .filter(isFeeEntry)
+    .reduce((s, e) => s + e.amount, 0);
 
   const hasActivity = totalIncome > 0 || totalExpense > 0;
   const isProfit = netProfit >= 0;
@@ -517,6 +527,26 @@ export default function ProjectDetailPage({
             />
           </div>
         </div>
+      )}
+
+      {/* Money lost to fees & taxes on this project (part of expenses) */}
+      {lostToFees > 0 && (
+        <Link
+          href={`/ledger/fees?projectId=${id}`}
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-2.5 text-sm transition hover:border-amber-300 hover:bg-amber-100/60 dark:border-amber-900/50 dark:bg-amber-950/20 dark:hover:bg-amber-900/30"
+        >
+          <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
+            <Receipt className="h-4 w-4 text-amber-500" />
+            Lost to fees &amp; taxes
+          </span>
+          <span className="font-semibold text-red-600 dark:text-red-400">
+            −{formatINR(lostToFees)}
+          </span>
+          <span className="ml-auto flex items-center gap-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+            View all
+            <ChevronRight className="h-3.5 w-3.5" />
+          </span>
+        </Link>
       )}
 
       {/* Project + Customer details */}
