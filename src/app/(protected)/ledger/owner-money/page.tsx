@@ -26,10 +26,51 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const PAGE_SIZE = 10;
 
 type OwnerView = "all" | "in" | "out";
+
+type LedgerPeriod = "all" | "week" | "month" | "6months" | "year" | "custom";
+
+const PERIOD_OPTIONS: { value: LedgerPeriod; label: string }[] = [
+  { value: "all", label: "All time" },
+  { value: "week", label: "Last 7 days" },
+  { value: "month", label: "Last 30 days" },
+  { value: "6months", label: "Last 6 months" },
+  { value: "year", label: "Last 1 year" },
+  { value: "custom", label: "Custom range" },
+];
+
+function toISODate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Rolling window ending today for a preset; {} means no date filter (all time). */
+function periodDates(period: LedgerPeriod): {
+  startDate?: string;
+  endDate?: string;
+} {
+  if (period === "all" || period === "custom") return {};
+  const now = new Date();
+  const start = new Date(now);
+  if (period === "week") start.setDate(now.getDate() - 7);
+  else if (period === "month") start.setDate(now.getDate() - 30);
+  else if (period === "6months") start.setMonth(now.getMonth() - 6);
+  else start.setFullYear(now.getFullYear() - 1); // year
+  return { startDate: toISODate(start), endDate: toISODate(now) };
+}
 
 function formatINR(amount: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -49,12 +90,24 @@ function formatDate(iso: string) {
 
 export default function OwnerMoneyPage() {
   const queryClient = useQueryClient();
-  const ownerQuery = useLedger({ accountingType: "CAPITAL" });
-  const entries = useMemo(() => ownerQuery.data?.data ?? [], [ownerQuery.data]);
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [view, setView] = useState<OwnerView>("all");
   const [page, setPage] = useState(1);
+  const [period, setPeriod] = useState<LedgerPeriod>("all");
+  const [dates, setDates] = useState<{ startDate?: string; endDate?: string }>(
+    {}
+  );
+
+  // Date filter is applied server-side, so both totals and list reflect it.
+  const ownerQuery = useLedger({ accountingType: "CAPITAL", ...dates });
+  const entries = useMemo(() => ownerQuery.data?.data ?? [], [ownerQuery.data]);
+
+  function handlePeriodChange(value: LedgerPeriod) {
+    setPeriod(value);
+    if (value === "custom") return; // keep current dates; user edits From/To
+    setDates(periodDates(value));
+  }
 
   // Overall totals + counts always reflect every owner entry (not the filter).
   const { contribution, withdrawal, net, contributionCount, withdrawalCount } =
@@ -93,10 +146,10 @@ export default function OwnerMoneyPage() {
     [filtered, page]
   );
 
-  // Reset to page 1 when the filter changes; clamp if the page falls off the end.
+  // Reset to page 1 when a filter changes; clamp if the page falls off the end.
   useEffect(() => {
     setPage(1);
-  }, [view]);
+  }, [view, dates.startDate, dates.endDate]);
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
@@ -170,6 +223,50 @@ export default function OwnerMoneyPage() {
           tone={net >= 0 ? "success" : "danger"}
           loading={ownerQuery.isLoading}
         />
+      </div>
+
+      {/* Date period filter */}
+      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <FilterField label="Period" width="170px">
+          <Select
+            value={period}
+            onValueChange={(v) => v && handlePeriodChange(v as LedgerPeriod)}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PERIOD_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FilterField>
+
+        {period === "custom" && (
+          <>
+            <FilterField label="From" width="150px">
+              <DatePicker
+                value={dates.startDate ?? ""}
+                onChange={(v) =>
+                  setDates((d) => ({ ...d, startDate: v || undefined }))
+                }
+                placeholder="Start date"
+              />
+            </FilterField>
+            <FilterField label="To" width="150px">
+              <DatePicker
+                value={dates.endDate ?? ""}
+                onChange={(v) =>
+                  setDates((d) => ({ ...d, endDate: v || undefined }))
+                }
+                placeholder="End date"
+              />
+            </FilterField>
+          </>
+        )}
       </div>
 
       {/* Filter: All / Put in / Taken out */}
@@ -277,6 +374,25 @@ function ViewTab({
         {count}
       </span>
     </button>
+  );
+}
+
+function FilterField({
+  label,
+  width,
+  children,
+}: {
+  label: string;
+  width: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ minWidth: width }}>
+      <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        {label}
+      </label>
+      {children}
+    </div>
   );
 }
 
