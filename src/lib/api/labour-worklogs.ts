@@ -19,7 +19,9 @@ export interface WorkLogProjectRef {
 export interface LabourWorkLog {
   _id: string;
   labourId: WorkLogLabourRef | string;
-  projectId: WorkLogProjectRef | string;
+  // Can be null at runtime when the referenced project has been trashed/deleted
+  // (the soft-delete plugin hides trashed docs, so populate resolves to null).
+  projectId: WorkLogProjectRef | string | null;
   workDate: string;
   sessionLabel?: string;
   days: number;

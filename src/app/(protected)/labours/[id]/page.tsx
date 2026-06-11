@@ -43,12 +43,14 @@ function inr(n: number) {
   return `₹${n.toLocaleString("en-IN")}`;
 }
 
-function projectLabel(p: WorkLogProjectRef | string): string {
+function projectLabel(p: WorkLogProjectRef | string | null): string {
+  if (!p) return "Deleted project";
   if (typeof p === "string") return "Project";
   return p.clientName || p.serviceType || "Project";
 }
 
-function projId(p: WorkLogProjectRef | string): string {
+function projId(p: WorkLogProjectRef | string | null): string {
+  if (!p) return "__deleted__";
   return typeof p === "string" ? p : p._id;
 }
 
