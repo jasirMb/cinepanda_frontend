@@ -310,8 +310,8 @@ export default function LedgerPage() {
         />
       </div>
 
-      {/* Owner money — tracked separately, never counted in profit/loss */}
-      {hasOwnerMoney && (
+      {/* Owner money — quick glance on the Entries tab (the Summary tab shows a fuller card) */}
+      {hasOwnerMoney && tab === "entries" && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
           <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
             <PiggyBank className="h-4 w-4 text-cine-primary" />
@@ -1157,10 +1157,21 @@ function SummaryPanel({
           count: number;
           project: { _id: string; clientName: string; serviceType: string };
         }[];
-        profitLoss: { totalIncome: number; totalExpense: number; netProfitLoss: number };
+        profitLoss: {
+          totalIncome: number;
+          totalExpense: number;
+          netProfitLoss: number;
+          ownerContribution?: number;
+          ownerWithdrawal?: number;
+        };
       }
     | undefined;
 }) {
+  const ownerContribution = summary?.profitLoss?.ownerContribution ?? 0;
+  const ownerWithdrawal = summary?.profitLoss?.ownerWithdrawal ?? 0;
+  const ownerNet = ownerContribution - ownerWithdrawal;
+  const hasOwnerMoney = ownerContribution > 0 || ownerWithdrawal > 0;
+
   const expenseCategories = useMemo(() => {
     return (summary?.byCategory ?? [])
       .filter((c) => c._id.entryType === "EXPENSE")
@@ -1213,6 +1224,14 @@ function SummaryPanel({
 
   return (
     <div className="space-y-4">
+      {hasOwnerMoney && (
+        <OwnerMoneyCard
+          contribution={ownerContribution}
+          withdrawal={ownerWithdrawal}
+          net={ownerNet}
+        />
+      )}
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <CategoryChartCard
           title="Expense by Category"
@@ -1229,6 +1248,86 @@ function SummaryPanel({
       </div>
 
       <ProjectActivityList projects={byProject} />
+    </div>
+  );
+}
+
+/** Owner's own money in/out — shown separately because it never affects profit. */
+function OwnerMoneyCard({
+  contribution,
+  withdrawal,
+  net,
+}: {
+  contribution: number;
+  withdrawal: number;
+  net: number;
+}) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+      <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3.5 dark:border-slate-800">
+        <div className="flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+            <PiggyBank className="h-4 w-4" />
+          </span>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+              Owner Money
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Your own money in &amp; out — never counted in profit or loss
+            </p>
+          </div>
+        </div>
+      </header>
+      <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-3">
+        <OwnerStat
+          label="Put in"
+          value={`+${formatINR(contribution)}`}
+          icon={<PiggyBank className="h-4 w-4" />}
+          tone="success"
+        />
+        <OwnerStat
+          label="Taken out"
+          value={`−${formatINR(withdrawal)}`}
+          icon={<HandCoins className="h-4 w-4" />}
+          tone="danger"
+        />
+        <OwnerStat
+          label="Net in business"
+          value={`${net >= 0 ? "+" : "−"}${formatINR(Math.abs(net))}`}
+          icon={<Scale className="h-4 w-4" />}
+          tone={net >= 0 ? "success" : "danger"}
+        />
+      </div>
+    </section>
+  );
+}
+
+function OwnerStat({
+  label,
+  value,
+  icon,
+  tone,
+}: {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+  tone: Tone;
+}) {
+  const t = TONES[tone];
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-950/30">
+      <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+        <span
+          className={`flex h-5 w-5 items-center justify-center rounded ${t.bg} ${t.text}`}
+        >
+          {icon}
+        </span>
+        {label}
+      </div>
+      <p className="mt-1.5 text-lg font-semibold text-slate-900 dark:text-slate-50">
+        {value}
+      </p>
     </div>
   );
 }
