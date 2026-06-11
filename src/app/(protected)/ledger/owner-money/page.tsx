@@ -264,9 +264,9 @@ export default function OwnerMoneyPage() {
       {/* ── Owner money bento (hero) ── */}
       <section>
         <SectionLabel>Owner money · not in profit</SectionLabel>
-        <div className="grid gap-3 sm:grid-cols-3 sm:grid-rows-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:grid-rows-2">
           <StatCard
-            className="sm:col-span-2 sm:row-span-2"
+            className="sm:col-span-2 lg:row-span-2"
             featured
             tone="primary"
             icon={<Scale className="h-5 w-5" />}
@@ -300,7 +300,7 @@ export default function OwnerMoneyPage() {
       {/* ── Business profit & loss bento ── */}
       <section>
         <SectionLabel>Business · profit &amp; loss</SectionLabel>
-        <div className="grid gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             tone="success"
             icon={<ArrowUpRight className="h-5 w-5" />}
@@ -335,7 +335,7 @@ export default function OwnerMoneyPage() {
             · overall, all projects to date
           </span>
         </SectionLabel>
-        <div className="grid gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             tone="neutral"
             icon={<Briefcase className="h-5 w-5" />}
@@ -369,7 +369,7 @@ export default function OwnerMoneyPage() {
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
             Owner money entries
           </h3>
-          <div className="flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
+          <div className="flex w-full gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800 sm:w-auto">
             <ViewTab
               label="All"
               count={entries.length}
@@ -564,7 +564,7 @@ function ViewTab({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+      className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors sm:flex-none ${
         active
           ? `bg-white shadow-sm dark:bg-slate-900 ${activeText}`
           : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
@@ -719,7 +719,7 @@ function OwnerEntriesList({
                   title="Delete"
                   aria-label="Delete"
                   onClick={() => onDelete(entry._id)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:hover:bg-red-950/40"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 opacity-100 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 sm:opacity-0 sm:group-hover:opacity-100"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
