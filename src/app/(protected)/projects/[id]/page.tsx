@@ -38,7 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProjectLabourSection } from "@/components/labour/ProjectLabourSection";
-import type { LedgerEntryPopulated } from "@/lib/api/ledger";
+import { isOperatingEntry, type LedgerEntryPopulated } from "@/lib/api/ledger";
 
 const STATUS_BADGE: Record<ProjectStatus, string> = {
   PLANNING: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
@@ -210,10 +210,13 @@ export default function ProjectDetailPage({
     onError: () => toast.error("Failed to delete project"),
   });
 
-  const totalIncome = ledgerEntries
+  // Operating entries only — owner contributions/withdrawals and account
+  // transfers move money around but aren't this project's income/expense.
+  const operatingEntries = ledgerEntries.filter(isOperatingEntry);
+  const totalIncome = operatingEntries
     .filter((e) => e.entryType === "INCOME")
     .reduce((s, e) => s + e.amount, 0);
-  const totalExpense = ledgerEntries
+  const totalExpense = operatingEntries
     .filter((e) => e.entryType === "EXPENSE")
     .reduce((s, e) => s + e.amount, 0);
   const pendingAmount = project ? project.projectValue - totalIncome : 0;

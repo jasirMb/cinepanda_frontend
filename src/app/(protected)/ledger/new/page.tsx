@@ -48,6 +48,9 @@ export default function NewLedgerEntryPage() {
 
   const preProjectId = searchParams.get("projectId") ?? "";
   const preCustomerId = searchParams.get("customerId") ?? "";
+  const preEntryType =
+    searchParams.get("entryType") === "INCOME" ? "INCOME" : "EXPENSE";
+  const preCategory = searchParams.get("category") ?? "";
 
   const projectsQuery = useProjects();
   const projects = projectsQuery.data?.data ?? [];
@@ -57,8 +60,8 @@ export default function NewLedgerEntryPage() {
   const vendors = useVendors().data?.data ?? [];
 
   const [form, setForm] = useState({
-    entryType: "EXPENSE" as EntryType,
-    category: "",
+    entryType: preEntryType as EntryType,
+    category: preCategory,
     amount: 0,
     description: "",
     entryDate: todayISO(),

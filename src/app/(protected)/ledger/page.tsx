@@ -6,13 +6,16 @@ import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDownRight,
+  ArrowLeftRight,
   ArrowUpRight,
   Briefcase,
   Check,
   ChevronLeft,
   ChevronRight,
   Clock,
+  HandCoins,
   Pencil,
+  PiggyBank,
   Plus,
   Scale,
   Trash2,
@@ -37,6 +40,7 @@ import {
   type EntryType,
   type PaymentStatus,
   type ApprovalStatus,
+  type AccountingType,
 } from "@/lib/api/ledger";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -230,6 +234,9 @@ export default function LedgerPage() {
   const totalIncome = summary?.profitLoss?.totalIncome ?? 0;
   const totalExpense = summary?.profitLoss?.totalExpense ?? 0;
   const netProfitLoss = summary?.profitLoss?.netProfitLoss ?? 0;
+  const ownerContribution = summary?.profitLoss?.ownerContribution ?? 0;
+  const ownerWithdrawal = summary?.profitLoss?.ownerWithdrawal ?? 0;
+  const hasOwnerMoney = ownerContribution > 0 || ownerWithdrawal > 0;
 
   return (
     <div className="space-y-5">
@@ -244,6 +251,24 @@ export default function LedgerPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link href="/ledger/new?entryType=INCOME&category=OWNER_CONTRIBUTION">
+            <Button variant="outline" className="gap-1.5">
+              <PiggyBank className="h-4 w-4" />
+              Add my money
+            </Button>
+          </Link>
+          <Link href="/ledger/new?entryType=EXPENSE&category=OWNER_WITHDRAWAL">
+            <Button variant="outline" className="gap-1.5">
+              <HandCoins className="h-4 w-4" />
+              Take out
+            </Button>
+          </Link>
+          <Link href="/ledger/transfer">
+            <Button variant="outline" className="gap-1.5">
+              <ArrowLeftRight className="h-4 w-4" />
+              Transfer
+            </Button>
+          </Link>
           <Link href="/ledger/new">
             <Button className="gap-1.5">
               <Plus className="h-4 w-4" />
@@ -284,6 +309,35 @@ export default function LedgerPage() {
           loading={ledgerQuery.isLoading}
         />
       </div>
+
+      {/* Owner money — tracked separately, never counted in profit/loss */}
+      {hasOwnerMoney && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
+            <PiggyBank className="h-4 w-4 text-cine-primary" />
+            Owner money
+            <span className="text-xs font-normal text-slate-400">
+              (not in profit)
+            </span>
+          </span>
+          {ownerContribution > 0 && (
+            <span className="text-slate-600 dark:text-slate-300">
+              Put in:{" "}
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                +{formatINR(ownerContribution)}
+              </span>
+            </span>
+          )}
+          {ownerWithdrawal > 0 && (
+            <span className="text-slate-600 dark:text-slate-300">
+              Taken out:{" "}
+              <span className="font-semibold text-red-600 dark:text-red-400">
+                −{formatINR(ownerWithdrawal)}
+              </span>
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="inline-flex gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
@@ -814,9 +868,12 @@ function EntriesTable({
                         )}
                       </span>
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-slate-900 dark:text-slate-50">
-                          {entry.category || "Uncategorised"}
-                        </p>
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <p className="truncate font-medium text-slate-900 dark:text-slate-50">
+                            {entry.category || "Uncategorised"}
+                          </p>
+                          <AccountingBadge type={entry.accountingType} />
+                        </div>
                         {entry.description ? (
                           <p className="mt-0.5 max-w-[360px] truncate text-xs text-slate-500 dark:text-slate-400">
                             {entry.description}
@@ -1032,6 +1089,18 @@ function accountDetail(a: {
     );
   if (a.type === "CASH") return "Cash";
   return "Other";
+}
+
+/** Small pill marking entries that are owner capital or account transfers
+ *  (i.e. not part of operating profit/loss). */
+function AccountingBadge({ type }: { type?: AccountingType }) {
+  if (!type || type === "OPERATING") return null;
+  const label = type === "CAPITAL" ? "Owner" : "Transfer";
+  return (
+    <span className="shrink-0 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
+      {label}
+    </span>
+  );
 }
 
 function accountDetailShort(a: {

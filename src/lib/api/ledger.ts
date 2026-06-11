@@ -6,6 +6,26 @@ import type { ProjectStatus } from "./projects";
    ──────────────────────────────────────────── */
 
 export type EntryType = "INCOME" | "EXPENSE";
+/** OPERATING = real business P&L; CAPITAL = owner money in/out; TRANSFER = between own accounts. */
+export type AccountingType = "OPERATING" | "CAPITAL" | "TRANSFER";
+
+// Categories that classify an entry as non-operating (excluded from profit).
+export const OWNER_CONTRIBUTION_CATEGORY = "OWNER_CONTRIBUTION";
+export const OWNER_WITHDRAWAL_CATEGORY = "OWNER_WITHDRAWAL";
+export const TRANSFER_IN_CATEGORY = "TRANSFER_IN";
+export const TRANSFER_OUT_CATEGORY = "TRANSFER_OUT";
+
+/**
+ * Whether an entry counts toward operating profit/loss. Owner capital
+ * (contributions/withdrawals) and account transfers do NOT — they only move
+ * money around. Treats a missing accountingType (legacy rows) as operating.
+ * Use this anywhere you sum income/expense from the raw entry list.
+ */
+export function isOperatingEntry(e: {
+  accountingType?: AccountingType | null;
+}): boolean {
+  return e.accountingType !== "CAPITAL" && e.accountingType !== "TRANSFER";
+}
 export type PaymentMethod =
   | "CASH"
   | "BANK_TRANSFER"
@@ -56,6 +76,10 @@ export interface LedgerEntryPopulated {
   } | null;
   entryType: EntryType;
   category: string;
+  /** OPERATING (counts toward profit), CAPITAL (owner money) or TRANSFER. */
+  accountingType?: AccountingType;
+  /** Present on transfer legs; links the OUT and IN entries. */
+  transferGroupId?: string | null;
   amount: number;
   description: string;
   entryDate: string;
@@ -188,6 +212,19 @@ export interface ProfitLossSummary {
   totalIncome: number;
   totalExpense: number;
   netProfitLoss: number;
+  /** Owner's own money put in (not counted as income/profit). */
+  ownerContribution?: number;
+  /** Owner's own money taken out for personal use (not counted as expense/loss). */
+  ownerWithdrawal?: number;
+}
+
+export interface TransferPayload {
+  fromAccountId: string;
+  toAccountId: string;
+  amount: number;
+  entryDate: string;
+  description?: string;
+  projectId?: string;
 }
 
 export interface LedgerSummaryResponse {
@@ -232,6 +269,14 @@ export async function updateLedgerEntry(
 
 export async function deleteLedgerEntry(id: string): Promise<MutationResponse> {
   const { data } = await api.delete<MutationResponse>(`/ledger/${id}`);
+  return data;
+}
+
+/** Record a money transfer between two of your own accounts (no profit impact). */
+export async function createLedgerTransfer(
+  payload: TransferPayload
+): Promise<MutationResponse> {
+  const { data } = await api.post<MutationResponse>("/ledger/transfer", payload);
   return data;
 }
 

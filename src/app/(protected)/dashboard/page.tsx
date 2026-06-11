@@ -48,9 +48,10 @@ import {
 } from "@/components/ui/select";
 import { useSettingsStore } from "@/store/settings-store";
 import type { Lead } from "@/lib/api/leads";
-import type {
-  CategorySummary,
-  LedgerEntryPopulated,
+import {
+  isOperatingEntry,
+  type CategorySummary,
+  type LedgerEntryPopulated,
 } from "@/lib/api/ledger";
 import type { ProjectPopulated } from "@/lib/api/projects";
 
@@ -212,6 +213,7 @@ function buildCashSeries(
   }
 
   for (const e of entries) {
+    if (!isOperatingEntry(e)) continue; // skip owner money & transfers
     const d = new Date(e.entryDate);
     const k = granularity === "day" ? dayKey(d) : monthKey(d);
     const bucket = base[k];
@@ -326,6 +328,7 @@ export default function DashboardPage() {
     }
     const entries: LedgerEntryPopulated[] = ledgerQuery.data?.data ?? [];
     for (const e of entries) {
+      if (!isOperatingEntry(e)) continue; // skip owner money & transfers
       const d = new Date(e.entryDate);
       const key = monthKey(d);
       const bucket = base[key];
