@@ -126,6 +126,10 @@ export default function NewLedgerEntryPage() {
       toast.error("Amount must be greater than 0");
       return;
     }
+    if (!form.paymentAccountId) {
+      toast.error("Please choose the account it was paid through");
+      return;
+    }
 
     const payload: CreateLedgerPayload = {
       entryType: form.entryType,
@@ -310,7 +314,7 @@ export default function NewLedgerEntryPage() {
 
         {/* Paid through + goods/service */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Paid through (account)">
+          <Field label="Paid through (account) *">
             <Select
               value={form.paymentAccountId || "NONE"}
               onValueChange={(v) => {
