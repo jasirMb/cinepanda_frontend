@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DatePicker } from "@/components/ui/date-picker";
+import { ProjectFilter } from "@/components/ui/project-filter";
 
 const PAGE_SIZE = 10;
 
@@ -82,6 +83,7 @@ export default function FeesPage() {
   const queryClient = useQueryClient();
 
   const [view, setView] = useState<FeeView>("all");
+  const [projectFilter, setProjectFilter] = useState(""); // "" all · "NONE" general · id
   const [page, setPage] = useState(1);
   const [period, setPeriod] = useState<LedgerPeriod>("all");
   const [dates, setDates] = useState<{ startDate?: string; endDate?: string }>(
@@ -108,8 +110,21 @@ export default function FeesPage() {
   const loading = bankQ.isLoading || taxQ.isLoading;
   const error = bankQ.isError || taxQ.isError;
 
-  const bankTotal = bankEntries.reduce((s, e) => s + e.amount, 0);
-  const taxTotal = taxEntries.reduce((s, e) => s + e.amount, 0);
+  // Entries after the project filter — the summary cards + tab counts reflect this scope.
+  const scoped = useMemo(() => {
+    if (!projectFilter) return entries;
+    return entries.filter((e) => {
+      const p = e.projectId;
+      const hasProject = p && typeof p === "object";
+      if (projectFilter === "NONE") return !hasProject;
+      return Boolean(hasProject && p._id === projectFilter);
+    });
+  }, [entries, projectFilter]);
+
+  const scopedBank = scoped.filter((e) => e.category === "BANK_CHARGES");
+  const scopedTax = scoped.filter((e) => e.category === "TAXES");
+  const bankTotal = scopedBank.reduce((s, e) => s + e.amount, 0);
+  const taxTotal = scopedTax.reduce((s, e) => s + e.amount, 0);
   const total = bankTotal + taxTotal;
 
   function handlePeriodChange(value: LedgerPeriod) {
@@ -118,10 +133,22 @@ export default function FeesPage() {
     setDates(periodDates(value));
   }
 
+  // Distinct projects present in the fee entries (for the project filter).
+  const projectOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const e of entries) {
+      const p = e.projectId;
+      if (p && typeof p === "object" && !map.has(p._id)) {
+        map.set(p._id, p.clientName);
+      }
+    }
+    return Array.from(map, ([_id, name]) => ({ _id, name }));
+  }, [entries]);
+
   const filtered = useMemo(() => {
-    if (view === "all") return entries;
-    return entries.filter((e) => e.category === view);
-  }, [entries, view]);
+    if (view === "all") return scoped;
+    return scoped.filter((e) => e.category === view);
+  }, [scoped, view]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = useMemo(
@@ -131,7 +158,7 @@ export default function FeesPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [view, dates.startDate, dates.endDate]);
+  }, [view, projectFilter, dates.startDate, dates.endDate]);
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
@@ -213,6 +240,18 @@ export default function FeesPage() {
             </div>
           </div>
         )}
+        {!projectId && projectOptions.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Project
+            </span>
+            <ProjectFilter
+              value={projectFilter}
+              onChange={setProjectFilter}
+              options={projectOptions}
+            />
+          </div>
+        )}
       </div>
 
       {/* Totals */}
@@ -246,19 +285,19 @@ export default function FeesPage() {
           <div className="flex w-full gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800 sm:w-auto">
             <ViewTab
               label="All"
-              count={entries.length}
+              count={scoped.length}
               active={view === "all"}
               onClick={() => setView("all")}
             />
             <ViewTab
               label="Charges"
-              count={bankEntries.length}
+              count={scopedBank.length}
               active={view === "BANK_CHARGES"}
               onClick={() => setView("BANK_CHARGES")}
             />
             <ViewTab
               label="Taxes"
-              count={taxEntries.length}
+              count={scopedTax.length}
               active={view === "TAXES"}
               onClick={() => setView("TAXES")}
             />
