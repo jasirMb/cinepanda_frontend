@@ -16,6 +16,7 @@ import {
   MapPin,
   Pencil,
   Phone,
+  PiggyBank,
   Plus,
   TrendingDown,
   TrendingUp,
@@ -125,9 +126,9 @@ export default function ProjectDetailPage({
   const ledgerEntries = ledgerQuery.data?.data ?? [];
 
   // Ledger filters: type, category and date range (all combine).
-  const [ledgerType, setLedgerType] = useState<"all" | "INCOME" | "EXPENSE">(
-    "all"
-  );
+  const [ledgerType, setLedgerType] = useState<
+    "all" | "INCOME" | "EXPENSE" | "OWNER" | "TRANSFER"
+  >("all");
   const [ledgerCategory, setLedgerCategory] = useState("");
   const [ledgerFrom, setLedgerFrom] = useState("");
   const [ledgerTo, setLedgerTo] = useState("");
@@ -146,7 +147,13 @@ export default function ProjectDetailPage({
     const fromTs = ledgerFrom ? new Date(ledgerFrom).getTime() : null;
     const toTs = ledgerTo ? new Date(`${ledgerTo}T23:59:59`).getTime() : null;
     return ledgerEntries.filter((e) => {
-      if (ledgerType !== "all" && e.entryType !== ledgerType) return false;
+      if (ledgerType === "OWNER") {
+        if (e.accountingType !== "CAPITAL") return false;
+      } else if (ledgerType === "TRANSFER") {
+        if (e.accountingType !== "TRANSFER") return false;
+      } else if (ledgerType === "INCOME" || ledgerType === "EXPENSE") {
+        if (e.entryType !== ledgerType) return false;
+      }
       if (ledgerCategory && e.category !== ledgerCategory) return false;
       const ts = new Date(e.entryDate).getTime();
       if (fromTs != null && ts < fromTs) return false;
@@ -225,6 +232,16 @@ export default function ProjectDetailPage({
       ? Math.min(100, (totalIncome / project.projectValue) * 100)
       : 0;
   const netProfit = totalIncome - totalExpense;
+
+  // Owner's own money in/out for THIS project (kept out of profit above).
+  const ownerPutIn = ledgerEntries
+    .filter((e) => e.accountingType === "CAPITAL" && e.entryType === "INCOME")
+    .reduce((s, e) => s + e.amount, 0);
+  const ownerTakenOut = ledgerEntries
+    .filter((e) => e.accountingType === "CAPITAL" && e.entryType === "EXPENSE")
+    .reduce((s, e) => s + e.amount, 0);
+  const hasOwnerMoney = ownerPutIn > 0 || ownerTakenOut > 0;
+
   const hasActivity = totalIncome > 0 || totalExpense > 0;
   const isProfit = netProfit >= 0;
   const marginPct =
@@ -467,6 +484,41 @@ export default function ProjectDetailPage({
         />
       </div>
 
+      {/* Owner money on this project — tracked separately, not part of profit */}
+      {hasOwnerMoney && (
+        <div className="space-y-2">
+          <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <PiggyBank className="h-3.5 w-3.5 text-indigo-500" />
+            Owner money
+            <span className="font-normal normal-case text-slate-400">
+              (not in profit)
+            </span>
+          </h3>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            <StatCard
+              icon={PiggyBank}
+              label="Owner Put In"
+              value={`+${formatINR(ownerPutIn)}`}
+              tone="emerald"
+            />
+            <StatCard
+              icon={Wallet}
+              label="Owner Taken Out"
+              value={`−${formatINR(ownerTakenOut)}`}
+              tone="red"
+            />
+            <StatCard
+              icon={IndianRupee}
+              label="Net Owner"
+              value={`${
+                ownerPutIn - ownerTakenOut >= 0 ? "+" : "−"
+              }${formatINR(Math.abs(ownerPutIn - ownerTakenOut))}`}
+              tone="slate"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Project + Customer details */}
       <div className="grid gap-4 lg:grid-cols-2">
         <DetailsCard title="Project Details" icon={CalendarDays}>
@@ -574,13 +626,22 @@ export default function ProjectDetailPage({
               <select
                 value={ledgerType}
                 onChange={(e) =>
-                  setLedgerType(e.target.value as "all" | "INCOME" | "EXPENSE")
+                  setLedgerType(
+                    e.target.value as
+                      | "all"
+                      | "INCOME"
+                      | "EXPENSE"
+                      | "OWNER"
+                      | "TRANSFER"
+                  )
                 }
                 className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
               >
                 <option value="all">All</option>
                 <option value="INCOME">Income</option>
                 <option value="EXPENSE">Expense</option>
+                <option value="OWNER">Owner money</option>
+                <option value="TRANSFER">Transfers</option>
               </select>
             </FilterField>
             <FilterField label="Category">
