@@ -4,7 +4,19 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Banknote, CreditCard, Eye, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import {
+  Banknote,
+  CreditCard,
+  Eye,
+  Landmark,
+  Pencil,
+  Plus,
+  Search,
+  Smartphone,
+  Trash2,
+  Wallet,
+  X,
+} from "lucide-react";
 
 import { paymentAccountsKeys, usePaymentAccounts } from "@/hooks/usePaymentAccounts";
 import {
@@ -41,6 +53,38 @@ const EMPTY = {
 function inr(n: number) {
   return `₹${(n ?? 0).toLocaleString("en-IN")}`;
 }
+
+// Per-account-type colour + icon, so each card reads at a glance.
+const TYPE_THEME: Record<
+  string,
+  { chip: string; bar: string; icon: typeof Banknote }
+> = {
+  BANK: {
+    chip: "bg-sky-500/10 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400",
+    bar: "bg-sky-500",
+    icon: Landmark,
+  },
+  CASH: {
+    chip: "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400",
+    bar: "bg-emerald-500",
+    icon: Banknote,
+  },
+  CARD: {
+    chip: "bg-violet-500/10 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400",
+    bar: "bg-violet-500",
+    icon: CreditCard,
+  },
+  UPI: {
+    chip: "bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400",
+    bar: "bg-indigo-500",
+    icon: Smartphone,
+  },
+  OTHER: {
+    chip: "bg-slate-500/10 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300",
+    bar: "bg-slate-400",
+    icon: Wallet,
+  },
+};
 
 export default function PaymentAccountsPage() {
   const queryClient = useQueryClient();
@@ -399,41 +443,57 @@ export default function PaymentAccountsPage() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-          {filtered.map((a) => (
-            <div
-              key={a._id}
-              className="group flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-cine-primary/40 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60"
-            >
-              <div className="flex flex-1 items-start gap-3 p-4">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-cine-primary/10 text-cine-primary">
-                  {a.type === "CASH" ? (
-                    <Banknote className="h-5 w-5" />
-                  ) : (
-                    <CreditCard className="h-5 w-5" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={`/payment-accounts/${a._id}`}
-                      className="truncate text-base font-semibold text-slate-900 group-hover:text-cine-primary dark:text-slate-50"
+          {filtered.map((a) => {
+            const theme = TYPE_THEME[a.type] ?? TYPE_THEME.OTHER;
+            const Icon = theme.icon;
+            const subtitle =
+              a.bankName ||
+              a.upiId ||
+              a.accountNumber ||
+              a.notes ||
+              "";
+            return (
+              <div
+                key={a._id}
+                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60"
+              >
+                {/* type accent */}
+                <div className={`h-1 w-full ${theme.bar}`} />
+                <div className="flex flex-1 flex-col p-4">
+                  <div className="flex items-start gap-3">
+                    <span
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${theme.chip}`}
                     >
-                      {a.name}
-                    </Link>
-                    <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                      {a.type}
+                      <Icon className="h-5 w-5" />
                     </span>
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href={`/payment-accounts/${a._id}`}
+                        className="block truncate text-base font-semibold text-slate-900 transition group-hover:text-cine-primary dark:text-slate-50"
+                      >
+                        {a.name}
+                      </Link>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <span
+                          className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${theme.chip}`}
+                        >
+                          {a.type}
+                        </span>
+                        {subtitle && (
+                          <span className="truncate text-xs text-slate-500 dark:text-slate-400">
+                            {subtitle}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <p className="mt-1 truncate text-sm text-slate-600 dark:text-slate-300">
-                    {a.bankName || a.upiId || a.notes || "—"}
-                    {a.accountNumber ? ` · ${a.accountNumber}` : ""}
-                  </p>
-                  <div className="mt-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+
+                  <div className="mt-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                       Balance now
                     </p>
                     <p
-                      className={`text-xl font-bold tracking-tight ${
+                      className={`mt-0.5 text-2xl font-bold tracking-tight ${
                         (a.balance ?? 0) >= 0
                           ? "text-slate-900 dark:text-slate-50"
                           : "text-rose-600 dark:text-rose-400"
@@ -441,45 +501,45 @@ export default function PaymentAccountsPage() {
                     >
                       {inr(a.balance ?? 0)}
                     </p>
-                    {(a.moneyIn || a.moneyOut) && (
-                      <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-                        <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                          +{inr(a.moneyIn ?? 0)}
-                        </span>{" "}
-                        in ·{" "}
-                        <span className="font-medium text-rose-600 dark:text-rose-400">
-                          −{inr(a.moneyOut ?? 0)}
-                        </span>{" "}
-                        out
-                      </p>
-                    )}
+                    {(a.moneyIn || a.moneyOut) ? (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                          +{inr(a.moneyIn ?? 0)} in
+                        </span>
+                        <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+                          −{inr(a.moneyOut ?? 0)} out
+                        </span>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
+
+                {/* footer actions */}
+                <div className="flex items-center gap-1 border-t border-slate-100 px-3 py-2 dark:border-slate-800">
+                  <Link
+                    href={`/payment-accounts/${a._id}`}
+                    className="flex flex-1 items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-cine-primary dark:text-slate-300 dark:hover:bg-slate-800"
+                  >
+                    <Eye className="h-3.5 w-3.5" /> View
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => startEdit(a)}
+                    className="flex flex-1 items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-cine-primary dark:text-slate-300 dark:hover:bg-slate-800"
+                  >
+                    <Pencil className="h-3.5 w-3.5" /> Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingDelete(a)}
+                    className="flex flex-1 items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-medium text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Delete
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center justify-end gap-1.5 border-t border-slate-100 bg-slate-50/70 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-800/30">
-                <Link
-                  href={`/payment-accounts/${a._id}`}
-                  className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                >
-                  <Eye className="h-3 w-3" /> View
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => startEdit(a)}
-                  className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                >
-                  <Pencil className="h-3 w-3" /> Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPendingDelete(a)}
-                  className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
-                >
-                  <Trash2 className="h-3 w-3" /> Delete
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
