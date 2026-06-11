@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import { ServiceWorkerUpdater } from "@/components/layout/ServiceWorkerUpdater";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
@@ -38,6 +39,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <ServiceWorkerUpdater />
         <QueryProvider>{children}</QueryProvider>
         <Toaster richColors position="top-right" />
       </body>
