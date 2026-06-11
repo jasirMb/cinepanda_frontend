@@ -74,11 +74,32 @@ interface StmtRow {
   balance: number;
 }
 
+/** Account balance carried forward to `start` = opening balance + every
+ *  in/out before the period began. For "all time" (no start) it's just opening. */
+function carryBefore(
+  entries: LedgerEntryPopulated[],
+  openingBalance: number,
+  start: Date | null
+): number {
+  let carry = openingBalance;
+  if (start) {
+    for (const e of entries) {
+      if (new Date(e.entryDate).getTime() < start.getTime()) {
+        carry +=
+          (e.entryType === "INCOME" ? e.amount ?? 0 : 0) -
+          (e.entryType === "EXPENSE" ? e.amount ?? 0 : 0);
+      }
+    }
+  }
+  return carry;
+}
+
 function buildRows(
   entries: LedgerEntryPopulated[],
   start: Date | null,
   end: Date | null,
-  projectId: string
+  projectId: string,
+  openingSeed = 0
 ): StmtRow[] {
   const filtered = entries
     .filter((e) => {
@@ -100,7 +121,7 @@ function buildRows(
         new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime()
     );
 
-  let balance = 0;
+  let balance = openingSeed;
   return filtered.map((e) => {
     const debit = e.entryType === "EXPENSE" ? e.amount ?? 0 : 0;
     const credit = e.entryType === "INCOME" ? e.amount ?? 0 : 0;
@@ -158,10 +179,31 @@ export default function PaymentAccountStatementPage({
 
   const { start, end } = periodRange(period, from, to);
 
+  const openingBalance = account?.openingBalance ?? 0;
+
+  // Current balance across ALL time = opening + every in/out on this account.
+  const currentBalance = useMemo(
+    () => carryBefore(entries, openingBalance, null) +
+      entries.reduce(
+        (s, e) =>
+          s +
+          (e.entryType === "INCOME" ? e.amount ?? 0 : 0) -
+          (e.entryType === "EXPENSE" ? e.amount ?? 0 : 0),
+        0
+      ),
+    [entries, openingBalance]
+  );
+
+  // Balance carried into the selected period (seeds the statement's running balance).
+  const openingSeed = useMemo(
+    () => carryBefore(entries, openingBalance, start),
+    [entries, openingBalance, start]
+  );
+
   // On-page table rows (driven by the page filters).
   const rows = useMemo(
-    () => buildRows(entries, start, end, projectId),
-    [entries, start, end, projectId]
+    () => buildRows(entries, start, end, projectId, openingSeed),
+    [entries, start, end, projectId, openingSeed]
   );
   const totalIn = rows.reduce((s, r) => s + r.credit, 0);
   const totalOut = rows.reduce((s, r) => s + r.debit, 0);
@@ -204,7 +246,8 @@ export default function PaymentAccountStatementPage({
         entries,
         r.start,
         r.end,
-        dlgProject
+        dlgProject,
+        carryBefore(entries, openingBalance, r.start)
       ).map((row) => ({
         date: row.date,
         description: row.description,
@@ -291,6 +334,20 @@ export default function PaymentAccountStatementPage({
             )}
           </div>
         </div>
+        <div className="shrink-0 text-right">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+            Balance now
+          </p>
+          <p
+            className={`text-2xl font-bold tracking-tight ${
+              currentBalance >= 0
+                ? "text-slate-900 dark:text-slate-50"
+                : "text-rose-600 dark:text-rose-400"
+            }`}
+          >
+            {inr(currentBalance)}
+          </p>
+        </div>
       </div>
 
       {/* Filters */}
@@ -363,10 +420,12 @@ export default function PaymentAccountStatementPage({
             {page === 1 && (
               <tr className="border-b border-slate-100 text-xs italic text-slate-500 dark:border-slate-800/60 dark:text-slate-400">
                 <td className="px-4 py-2" />
-                <td className="px-4 py-2">Opening balance</td>
+                <td className="px-4 py-2">
+                  {period === "all" ? "Opening balance" : "Balance brought forward"}
+                </td>
                 <td className="px-4 py-2" />
                 <td className="px-4 py-2" />
-                <td className="px-4 py-2 text-right tabular-nums">{inr(0)}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{inr(openingSeed)}</td>
               </tr>
             )}
             {ledgerQuery.isLoading ? (

@@ -26,6 +26,12 @@ export interface PaymentAccount {
   cardNetwork?: string;
   cardLast4?: string;
   notes?: string;
+  /** Money already in the account when you started tracking. */
+  openingBalance?: number;
+  /** Computed on the list endpoint: openingBalance + moneyIn − moneyOut. */
+  balance?: number;
+  moneyIn?: number;
+  moneyOut?: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -50,6 +56,7 @@ export interface PaymentAccountPayload {
   cardNetwork?: string;
   cardLast4?: string;
   notes?: string;
+  openingBalance?: number;
 }
 
 export async function fetchPaymentAccounts(): Promise<PaymentAccountsListResponse> {

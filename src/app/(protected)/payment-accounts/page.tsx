@@ -25,6 +25,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 const EMPTY = {
   name: "",
   type: "BANK" as PaymentAccountType,
+  openingBalance: "",
   bankName: "",
   accountNumber: "",
   accountHolderName: "",
@@ -36,6 +37,10 @@ const EMPTY = {
   cardLast4: "",
   notes: "",
 };
+
+function inr(n: number) {
+  return `₹${(n ?? 0).toLocaleString("en-IN")}`;
+}
 
 export default function PaymentAccountsPage() {
   const queryClient = useQueryClient();
@@ -89,6 +94,7 @@ export default function PaymentAccountsPage() {
     setForm({
       name: a.name ?? "",
       type: a.type,
+      openingBalance: a.openingBalance != null ? String(a.openingBalance) : "",
       bankName: a.bankName ?? "",
       accountNumber: a.accountNumber ?? "",
       accountHolderName: a.accountHolderName ?? "",
@@ -113,6 +119,7 @@ export default function PaymentAccountsPage() {
     const payload: PaymentAccountPayload = {
       name: form.name.trim(),
       type: form.type,
+      openingBalance: form.openingBalance.trim() === "" ? 0 : Number(form.openingBalance),
       bankName: form.bankName.trim() || undefined,
       accountNumber: form.accountNumber.trim() || undefined,
       accountHolderName: form.accountHolderName.trim() || undefined,
@@ -138,6 +145,12 @@ export default function PaymentAccountsPage() {
         a.type.toLowerCase().includes(q)
     );
   }, [accounts, search]);
+
+  // Total money you currently have across every account.
+  const totalBalance = useMemo(
+    () => accounts.reduce((s, a) => s + (a.balance ?? 0), 0),
+    [accounts]
+  );
 
   if (query.isLoading) {
     return (
@@ -204,6 +217,20 @@ export default function PaymentAccountsPage() {
                   </option>
                 ))}
               </select>
+            </Field>
+            <Field label="Opening balance (₹)">
+              <Input
+                type="number"
+                placeholder="Money already in this account"
+                value={form.openingBalance}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, openingBalance: e.target.value }))
+                }
+              />
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                What&apos;s in the account right now. For a credit card use a
+                negative number for what you owe.
+              </p>
             </Field>
             {form.type === "BANK" && (
               <>
@@ -328,6 +355,33 @@ export default function PaymentAccountsPage() {
       )}
 
       {accounts.length > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-cine-primary/20 bg-cine-primary/5 px-5 py-4 dark:border-cine-primary/30 dark:bg-cine-primary/10">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cine-primary/15 text-cine-primary">
+              <Banknote className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Total money you have
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Across {accounts.length} account{accounts.length !== 1 ? "s" : ""}
+              </p>
+            </div>
+          </div>
+          <p
+            className={`text-2xl font-bold tracking-tight ${
+              totalBalance >= 0
+                ? "text-slate-900 dark:text-slate-50"
+                : "text-rose-600 dark:text-rose-400"
+            }`}
+          >
+            {inr(totalBalance)}
+          </p>
+        </div>
+      )}
+
+      {accounts.length > 0 && (
         <div className="relative max-w-md">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
@@ -374,6 +428,32 @@ export default function PaymentAccountsPage() {
                     {a.bankName || a.upiId || a.notes || "—"}
                     {a.accountNumber ? ` · ${a.accountNumber}` : ""}
                   </p>
+                  <div className="mt-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Balance now
+                    </p>
+                    <p
+                      className={`text-xl font-bold tracking-tight ${
+                        (a.balance ?? 0) >= 0
+                          ? "text-slate-900 dark:text-slate-50"
+                          : "text-rose-600 dark:text-rose-400"
+                      }`}
+                    >
+                      {inr(a.balance ?? 0)}
+                    </p>
+                    {(a.moneyIn || a.moneyOut) && (
+                      <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                        <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                          +{inr(a.moneyIn ?? 0)}
+                        </span>{" "}
+                        in ·{" "}
+                        <span className="font-medium text-rose-600 dark:text-rose-400">
+                          −{inr(a.moneyOut ?? 0)}
+                        </span>{" "}
+                        out
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center justify-end gap-1.5 border-t border-slate-100 bg-slate-50/70 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-800/30">
