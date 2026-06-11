@@ -69,6 +69,8 @@ interface StmtRow {
   _id: string;
   date: string;
   description: string;
+  /** The note typed on the entry — shown on a second line under the description. */
+  note: string;
   debit: number;
   credit: number;
   balance: number;
@@ -128,13 +130,19 @@ function buildRows(
     balance += credit - debit;
     const vendor = vendorOf(e.vendorId);
     const proj = projOf(e.projectId);
-    const desc =
-      (e.category?.replace(/_/g, " ") || "Uncategorised") +
-      (vendor ? ` · ${vendor.name}` : proj ? ` · ${proj.clientName}` : "");
+    // Main line: Category · who it was with. Note line: the entry's own description.
+    const description = [
+      e.category?.replace(/_/g, " ") || "Uncategorised",
+      vendor ? vendor.name : proj ? proj.clientName : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    const note = e.description?.trim() || "";
     return {
       _id: e._id,
       date: fmtDate(e.entryDate),
-      description: desc,
+      description,
+      note,
       debit,
       credit,
       balance,
@@ -250,7 +258,9 @@ export default function PaymentAccountStatementPage({
         carryBefore(entries, openingBalance, r.start)
       ).map((row) => ({
         date: row.date,
-        description: row.description,
+        description: row.note
+          ? `${row.description} · ${row.note}`
+          : row.description,
         debit: row.debit,
         credit: row.credit,
         balance: row.balance,
@@ -444,7 +454,16 @@ export default function PaymentAccountStatementPage({
               pagedRows.map((r) => (
                 <tr key={r._id} className="border-b border-slate-100 last:border-0 dark:border-slate-800/50">
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">{r.date}</td>
-                  <td className="px-4 py-3 text-slate-700 dark:text-slate-200">{r.description}</td>
+                  <td className="px-4 py-3">
+                    <p className="text-slate-700 dark:text-slate-200">
+                      {r.description}
+                    </p>
+                    {r.note && (
+                      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                        {r.note}
+                      </p>
+                    )}
+                  </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-red-600 dark:text-red-400">
                     {r.debit ? inr(r.debit) : ""}
                   </td>

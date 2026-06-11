@@ -79,16 +79,23 @@ export default function NewLedgerEntryPage() {
     nextDueDate: "",
     endDate: "",
     // Optional extra charge/fee on top of this entry (recorded as a separate expense).
-    feePercent: "",
+    feeMode: "percent" as "percent" | "amount",
+    feeValue: "",
     feeCategory: "BANK_CHARGES" as "BANK_CHARGES" | "TAXES",
   });
 
-  // Extra-charge preview: a % of the amount, rounded to paise.
+  // Extra charge: enter a % of the amount OR a fixed ₹ amount. The fee in rupees:
   const feeAmount = useMemo(() => {
-    const pct = Number(form.feePercent);
-    if (!(pct > 0) || !(form.amount > 0)) return 0;
-    return Math.round(((form.amount * pct) / 100) * 100) / 100;
-  }, [form.feePercent, form.amount]);
+    const v = Number(form.feeValue);
+    if (!(v > 0)) return 0;
+    if (form.feeMode === "amount") return Math.round(v * 100) / 100;
+    if (!(form.amount > 0)) return 0;
+    return Math.round(((form.amount * v) / 100) * 100) / 100;
+  }, [form.feeValue, form.feeMode, form.amount]);
+
+  // The fee as a % of the entry amount, so the other unit is always shown.
+  const feePctEquiv =
+    form.amount > 0 && feeAmount > 0 ? (feeAmount / form.amount) * 100 : 0;
 
   const createMutation = useMutation({
     mutationFn: async ({
@@ -184,9 +191,9 @@ export default function NewLedgerEntryPage() {
         entryType: "EXPENSE",
         category: form.feeCategory,
         amount: feeAmount,
-        description: `${form.feeCategory === "TAXES" ? "Tax" : "Fee"} ${form.feePercent}% on ${
-          form.description.trim() || form.category
-        }`,
+        description: `${form.feeCategory === "TAXES" ? "Tax" : "Fee"} ${
+          form.feeMode === "amount" ? `₹${feeAmount}` : `${form.feeValue}%`
+        } on ${form.description.trim() || form.category}`,
         entryDate: form.entryDate,
         paymentStatus: form.paymentStatus,
         paymentAccountId: form.paymentAccountId,
@@ -490,21 +497,41 @@ export default function NewLedgerEntryPage() {
             Extra charge / fee (optional)
           </p>
           <p className="mb-3 mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-            e.g. a 2% card charge. We record it as a separate expense on the same
-            account, so it counts as a real loss.
+            A <strong>%</strong> of the amount or a fixed <strong>₹</strong> amount.
+            Recorded as a separate expense on the same account.
           </p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Charge %">
-              <Input
-                type="number"
-                min={0}
-                step="0.01"
-                value={form.feePercent}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, feePercent: e.target.value }))
-                }
-                placeholder="e.g. 2"
-              />
+            <Field label="Charge">
+              <div className="flex gap-2">
+                <div className="flex h-9 shrink-0 items-center rounded-md border border-slate-200 p-0.5 dark:border-slate-700">
+                  {(["percent", "amount"] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, feeMode: m }))}
+                      className={`h-full rounded px-2.5 text-sm font-semibold transition ${
+                        form.feeMode === m
+                          ? "bg-cine-primary text-white shadow-sm"
+                          : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+                      }`}
+                    >
+                      {m === "percent" ? "%" : "₹"}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex-1">
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.feeValue}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, feeValue: e.target.value }))
+                    }
+                    placeholder={form.feeMode === "percent" ? "e.g. 2" : "e.g. 40"}
+                  />
+                </div>
+              </div>
             </Field>
             <Field label="Charge type">
               <Select
@@ -532,7 +559,8 @@ export default function NewLedgerEntryPage() {
               Fee:{" "}
               <span className="font-semibold text-red-600 dark:text-red-400">
                 ₹{feeAmount.toLocaleString("en-IN")}
-              </span>{" "}
+              </span>
+              {feePctEquiv > 0 ? ` (${feePctEquiv.toFixed(2)}% of the amount)` : ""}{" "}
               — added as a separate{" "}
               {form.feeCategory === "TAXES" ? "Taxes" : "Bank Charges"} expense.
             </p>
