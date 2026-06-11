@@ -52,6 +52,20 @@ export default function NewLedgerEntryPage() {
     searchParams.get("entryType") === "INCOME" ? "INCOME" : "EXPENSE";
   const preCategory = searchParams.get("category") ?? "";
 
+  // Heading reflects how you got here (Add my money / Take out vs a normal entry).
+  const isOwnerIn = preCategory === "OWNER_CONTRIBUTION";
+  const isOwnerOut = preCategory === "OWNER_WITHDRAWAL";
+  const pageHeading = isOwnerIn
+    ? "Add my money"
+    : isOwnerOut
+      ? "Take out money"
+      : "New Ledger Entry";
+  const pageSubheading = isOwnerIn
+    ? "Record money you put into the business (not counted in profit)."
+    : isOwnerOut
+      ? "Record money you take out for personal use (not counted in profit)."
+      : "Record a new income or expense entry.";
+
   const projectsQuery = useProjects();
   const projects = projectsQuery.data?.data ?? [];
   const customersQuery = useCustomers();
@@ -210,10 +224,10 @@ export default function NewLedgerEntryPage() {
     <div className="space-y-4">
       <div>
         <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
-          New Ledger Entry
+          {pageHeading}
         </h2>
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Record a new income or expense entry.
+          {pageSubheading}
         </p>
       </div>
 

@@ -324,70 +324,56 @@ export default function LedgerPage() {
         />
       </div>
 
-      {/* Owner money — quick glance on the Entries tab (the Summary tab shows a fuller card) */}
-      {hasOwnerMoney && tab === "entries" && (
-        <Link
-          href="/ledger/owner-money"
-          className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm shadow-sm transition hover:border-cine-primary/40 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:bg-slate-800/60"
-        >
-          <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
-            <PiggyBank className="h-4 w-4 text-cine-primary" />
-            Owner money
-            <span className="text-xs font-normal text-slate-400">
-              (not in profit)
-            </span>
-          </span>
-          {ownerContribution > 0 && (
-            <span className="text-slate-600 dark:text-slate-300">
-              Put in:{" "}
-              <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                +{formatINR(ownerContribution)}
+      {/* Owner money + fees/taxes — one combined glance widget (Entries tab) */}
+      {(hasOwnerMoney || hasFees) && tab === "entries" && (
+        <div className="flex flex-col divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900/60 sm:flex-row sm:divide-x sm:divide-y-0">
+          {hasOwnerMoney && (
+            <Link
+              href="/ledger/owner-money"
+              className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-sm transition hover:bg-slate-50 dark:hover:bg-slate-800/40"
+            >
+              <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
+                <PiggyBank className="h-4 w-4 text-cine-primary" />
+                Owner money
+                <span className="text-xs font-normal text-slate-400">
+                  (not in profit)
+                </span>
               </span>
-            </span>
+              {ownerContribution > 0 && (
+                <span className="text-slate-600 dark:text-slate-300">
+                  Put in:{" "}
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    +{formatINR(ownerContribution)}
+                  </span>
+                </span>
+              )}
+              {ownerWithdrawal > 0 && (
+                <span className="text-slate-600 dark:text-slate-300">
+                  Taken out:{" "}
+                  <span className="font-semibold text-red-600 dark:text-red-400">
+                    −{formatINR(ownerWithdrawal)}
+                  </span>
+                </span>
+              )}
+              <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-slate-400" />
+            </Link>
           )}
-          {ownerWithdrawal > 0 && (
-            <span className="text-slate-600 dark:text-slate-300">
-              Taken out:{" "}
+          {hasFees && (
+            <Link
+              href="/ledger/fees"
+              className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-sm transition hover:bg-slate-50 dark:hover:bg-slate-800/40"
+            >
+              <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
+                <Receipt className="h-4 w-4 text-amber-500" />
+                Lost to fees &amp; taxes
+              </span>
               <span className="font-semibold text-red-600 dark:text-red-400">
-                −{formatINR(ownerWithdrawal)}
+                −{formatINR(lostToFees.total)}
               </span>
-            </span>
+              <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-slate-400" />
+            </Link>
           )}
-          <span className="ml-auto flex items-center gap-0.5 text-xs font-medium text-cine-primary">
-            View all
-            <ChevronRight className="h-3.5 w-3.5" />
-          </span>
-        </Link>
-      )}
-
-      {/* Money lost to fees & taxes */}
-      {hasFees && tab === "entries" && (
-        <Link
-          href="/ledger/fees"
-          className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-2.5 text-sm transition hover:border-amber-300 hover:bg-amber-100/60 dark:border-amber-900/50 dark:bg-amber-950/20 dark:hover:bg-amber-900/30"
-        >
-          <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
-            <Receipt className="h-4 w-4 text-amber-500" />
-            Lost to fees &amp; taxes
-          </span>
-          <span className="font-semibold text-red-600 dark:text-red-400">
-            −{formatINR(lostToFees.total)}
-          </span>
-          {lostToFees.bankCharges > 0 && (
-            <span className="text-xs text-slate-500 dark:text-slate-400">
-              Bank/card charges {formatINR(lostToFees.bankCharges)}
-            </span>
-          )}
-          {lostToFees.taxes > 0 && (
-            <span className="text-xs text-slate-500 dark:text-slate-400">
-              Taxes {formatINR(lostToFees.taxes)}
-            </span>
-          )}
-          <span className="ml-auto flex items-center gap-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
-            View all
-            <ChevronRight className="h-3.5 w-3.5" />
-          </span>
-        </Link>
+        </div>
       )}
 
       {/* Tabs */}
