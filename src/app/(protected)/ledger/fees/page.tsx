@@ -176,13 +176,13 @@ export default function FeesPage() {
     <div className="space-y-5">
       {/* Header */}
       <div>
-        <Link
-          href="/ledger"
-          className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to ledger
-        </Link>
+        <div className="mb-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/ledger">
+              <ArrowLeft className="h-4 w-4" /> Back to ledger
+            </Link>
+          </Button>
+        </div>
         <h2 className="flex items-center gap-2.5 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">
             <Receipt className="h-5 w-5" />
