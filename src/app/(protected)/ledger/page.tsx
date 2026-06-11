@@ -312,7 +312,10 @@ export default function LedgerPage() {
 
       {/* Owner money — quick glance on the Entries tab (the Summary tab shows a fuller card) */}
       {hasOwnerMoney && tab === "entries" && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <Link
+          href="/ledger/owner-money"
+          className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm shadow-sm transition hover:border-cine-primary/40 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:bg-slate-800/60"
+        >
           <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
             <PiggyBank className="h-4 w-4 text-cine-primary" />
             Owner money
@@ -336,7 +339,11 @@ export default function LedgerPage() {
               </span>
             </span>
           )}
-        </div>
+          <span className="ml-auto flex items-center gap-0.5 text-xs font-medium text-cine-primary">
+            View all
+            <ChevronRight className="h-3.5 w-3.5" />
+          </span>
+        </Link>
       )}
 
       {/* Tabs */}
@@ -1278,6 +1285,13 @@ function OwnerMoneyCard({
             </p>
           </div>
         </div>
+        <Link
+          href="/ledger/owner-money"
+          className="flex shrink-0 items-center gap-0.5 text-xs font-medium text-cine-primary transition hover:underline"
+        >
+          View all
+          <ChevronRight className="h-3.5 w-3.5" />
+        </Link>
       </header>
       <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-3">
         <OwnerStat

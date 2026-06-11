@@ -143,6 +143,8 @@ export interface LedgerListQuery {
   approvalStatus?: ApprovalStatus;
   vendorId?: string;
   paymentAccountId?: string;
+  /** Filter by accounting type — e.g. "CAPITAL" for owner money, "TRANSFER" for transfers. */
+  accountingType?: AccountingType;
   /** 1-based page number. Omit (with limit) to fetch all entries. */
   page?: number;
   /** Page size. Omit to fetch all matching entries (statements, dashboards). */
