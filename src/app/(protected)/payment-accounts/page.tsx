@@ -13,7 +13,6 @@ import {
   Link2,
   Pencil,
   Plus,
-  QrCode,
   Search,
   Smartphone,
   Trash2,
@@ -55,20 +54,68 @@ const EMPTY = {
   notes: "",
 };
 
+// A small stylised QR glyph (three finder squares + data) for UPI cards.
+const QR_PATTERN = [
+  [1, 1, 1, 0, 1, 1, 1],
+  [1, 0, 1, 0, 1, 0, 1],
+  [1, 1, 1, 0, 1, 1, 1],
+  [0, 0, 0, 1, 0, 0, 0],
+  [1, 1, 1, 0, 1, 0, 1],
+  [1, 0, 1, 1, 0, 1, 0],
+  [1, 1, 1, 0, 1, 0, 1],
+];
+
+function QrGlyph() {
+  return (
+    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white p-1 shadow ring-1 ring-slate-200">
+      <span className="grid grid-cols-7 gap-[1px]">
+        {QR_PATTERN.flat().map((on, i) => (
+          <span
+            key={i}
+            className={`h-[2.5px] w-[2.5px] rounded-[0.5px] ${
+              on ? "bg-slate-900" : "bg-transparent"
+            }`}
+          />
+        ))}
+      </span>
+    </span>
+  );
+}
+
 function inr(n: number) {
   return `₹${(n ?? 0).toLocaleString("en-IN")}`;
 }
 
-// Per-account-type coloured header + icon, for the two-tone cards.
-const TYPE_THEME: Record<string, { header: string; icon: typeof Banknote }> = {
-  BANK: { header: "bg-gradient-to-r from-sky-600 to-blue-700", icon: Landmark },
+// Per-account-type avatar gradient + tinted type badge, like the quotation cards.
+const TYPE_THEME: Record<
+  string,
+  { grad: string; chip: string; icon: typeof Banknote }
+> = {
+  BANK: {
+    grad: "from-sky-500 to-blue-600",
+    chip: "bg-sky-500/10 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400",
+    icon: Landmark,
+  },
   CASH: {
-    header: "bg-gradient-to-r from-emerald-600 to-green-700",
+    grad: "from-emerald-500 to-teal-600",
+    chip: "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400",
     icon: Banknote,
   },
-  CARD: { header: "bg-gradient-to-r from-slate-700 to-slate-900", icon: CreditCard },
-  UPI: { header: "bg-gradient-to-r from-indigo-600 to-indigo-800", icon: Smartphone },
-  OTHER: { header: "bg-gradient-to-r from-slate-600 to-slate-800", icon: Wallet },
+  CARD: {
+    grad: "from-amber-500 to-orange-600",
+    chip: "bg-amber-500/10 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400",
+    icon: CreditCard,
+  },
+  UPI: {
+    grad: "from-indigo-500 to-indigo-700",
+    chip: "bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400",
+    icon: Smartphone,
+  },
+  OTHER: {
+    grad: "from-slate-500 to-slate-600",
+    chip: "bg-slate-500/10 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300",
+    icon: Wallet,
+  },
 };
 
 export default function PaymentAccountsPage() {
@@ -516,116 +563,94 @@ export default function PaymentAccountsPage() {
             return (
               <div
                 key={a._id}
-                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900/60 dark:ring-white/5"
+                className="group flex h-full gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-cine-primary/40 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700"
               >
-                {/* Coloured header */}
+                {/* round gradient avatar (quotation-card style) */}
                 <div
-                  className={`relative flex items-center justify-between gap-2 overflow-hidden p-4 text-white ${theme.header}`}
+                  className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white shadow-sm ${theme.grad}`}
                 >
-                  {/* glossy sheen + fine texture + soft glow for depth */}
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0"
-                    style={{
-                      background:
-                        "radial-gradient(120% 100% at 0% 0%, rgba(255,255,255,0.28), transparent 55%)",
-                    }}
-                  />
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0 opacity-[0.06]"
-                    style={{
-                      backgroundImage:
-                        "repeating-linear-gradient(135deg, #fff 0, #fff 1px, transparent 1px, transparent 6px)",
-                    }}
-                  />
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute -bottom-10 -right-6 h-24 w-24 rounded-full bg-white/10 blur-xl"
-                  />
-                  {/* cash: big ₹ watermark for a money feel */}
-                  {a.type === "CASH" && (
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute -right-1 -top-3 select-none text-7xl font-bold leading-none text-white/10"
-                    >
-                      ₹
-                    </span>
-                  )}
-                  <div className="relative flex min-w-0 items-center gap-2.5">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/20 ring-1 ring-white/25">
-                      <Icon className="h-5 w-5" />
-                    </span>
+                  <Icon className="h-6 w-6" />
+                </div>
+
+                <div className="flex min-w-0 flex-1 flex-col gap-3">
+                  {/* name · detail · type */}
+                  <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold leading-tight">
+                      <p className="truncate text-base font-semibold text-slate-900 dark:text-slate-50">
                         {a.name}
                       </p>
-                      <p className="truncate text-[11px] text-white/75">
+                      <p className="truncate text-xs text-slate-500 dark:text-slate-400">
                         {caption || a.type}
                       </p>
                     </div>
+                    <span
+                      className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${theme.chip}`}
+                    >
+                      {a.type}
+                    </span>
                   </div>
-                  <span className="relative shrink-0 rounded-md bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ring-1 ring-white/25">
-                    {a.type}
-                  </span>
-                </div>
 
-                {/* White body */}
-                <div className="flex flex-1 flex-col gap-2 p-4">
-                  {/* type motif, right-aligned on the body */}
-                  {a.type !== "OTHER" && (
-                    <div className="flex items-center justify-end gap-2">
-                      {(a.type === "CARD" || a.type === "BANK") && (
-                        <>
-                          <Wifi className="h-4 w-4 rotate-90 text-slate-400 dark:text-slate-500" />
-                          {/* glossy gold EMV chip */}
-                          <div className="relative h-7 w-9 overflow-hidden rounded-[5px] bg-gradient-to-br from-yellow-200 via-amber-300 to-amber-500 shadow-sm ring-1 ring-amber-500/40">
-                            <span className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/40 to-transparent opacity-60" />
-                            <span className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-amber-800/40" />
-                            <span className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-amber-800/40" />
-                            <span className="absolute left-[26%] top-[14%] h-[72%] w-px bg-amber-800/25" />
-                            <span className="absolute right-[26%] top-[14%] h-[72%] w-px bg-amber-800/25" />
-                            <span className="absolute left-1/2 top-1/2 h-2 w-3 -translate-x-1/2 -translate-y-1/2 rounded-[2px] border border-amber-800/30" />
-                          </div>
-                        </>
-                      )}
-                      {/* upi: QR sticker */}
-                      {a.type === "UPI" && (
-                        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-100 dark:ring-slate-300">
-                          <QrCode className="h-5 w-5 text-slate-800" />
-                        </span>
-                      )}
-                      {/* cash: gold ₹ coin */}
-                      {a.type === "CASH" && (
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 text-amber-900 shadow-sm ring-1 ring-amber-500/40">
-                          <IndianRupee className="h-3.5 w-3.5" />
-                        </span>
-                      )}
-                    </div>
-                  )}
+                  {/* Masked number / id (subtle) */}
                   {number && (
-                    <p className="font-mono text-sm tracking-wider text-slate-500 dark:text-slate-400">
+                    <p className="font-mono text-xs tracking-wider text-slate-400 dark:text-slate-500">
                       {number}
                     </p>
                   )}
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                      {a.linkedAccountName ? "Shared balance" : "Balance now"}
-                    </p>
-                    <p
-                      className={`text-2xl font-bold tracking-tight ${
-                        balance >= 0
-                          ? "text-slate-900 dark:text-slate-50"
-                          : "text-rose-600 dark:text-rose-400"
-                      }`}
-                    >
-                      {inr(balance)}
-                    </p>
-                    {a.linkedAccountName && (
-                      <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 dark:text-slate-500">
-                        <Link2 className="h-3 w-3" /> Linked to {a.linkedAccountName}
+
+                  {/* Balance + type motif */}
+                  <div className="flex items-end justify-between gap-2">
+                    <div className="min-w-0">
+                      {a.linkedAccountName ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-teal-600 ring-1 ring-teal-200/70 dark:bg-teal-950/40 dark:text-teal-300 dark:ring-teal-900/80">
+                          <Link2 className="h-2.5 w-2.5" /> Shared
+                        </span>
+                      ) : (
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                          Balance now
+                        </p>
+                      )}
+                      <p
+                        className={`mt-0.5 text-2xl font-bold tracking-tight ${
+                          a.linkedAccountName
+                            ? "text-teal-600 dark:text-teal-400"
+                            : balance >= 0
+                              ? "text-slate-900 dark:text-slate-50"
+                              : "text-rose-600 dark:text-rose-400"
+                        }`}
+                      >
+                        {inr(balance)}
                       </p>
-                    )}
+                      {a.linkedAccountName && (
+                        <p className="mt-0.5 truncate text-[11px] font-medium text-teal-600/80 dark:text-teal-400/80">
+                          Linked to {a.linkedAccountName}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* type motif */}
+                    <div className="shrink-0">
+                      {(a.type === "CARD" || a.type === "BANK") && (
+                        <div className="flex items-center gap-1.5">
+                          <Wifi className="h-4 w-4 rotate-90 text-amber-400/80 dark:text-amber-400/70" />
+                          {/* glossy gold EMV chip */}
+                          <div className="relative h-7 w-9 overflow-hidden rounded-md bg-gradient-to-br from-amber-200 via-yellow-300 to-amber-500 shadow ring-1 ring-amber-600/40">
+                            <span className="absolute inset-0 bg-gradient-to-tr from-white/50 via-transparent to-white/10" />
+                            <span className="absolute inset-[3px] rounded-[3px] border border-amber-700/30" />
+                            <span className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-amber-700/40" />
+                            <span className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-amber-700/40" />
+                            <span className="absolute left-1/2 top-1/2 h-2.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-[2px] bg-amber-100/70 ring-1 ring-amber-700/40" />
+                          </div>
+                        </div>
+                      )}
+                      {a.type === "UPI" && <QrGlyph />}
+                      {a.type === "CASH" && (
+                        <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-amber-200 via-yellow-400 to-amber-600 text-amber-900 shadow ring-1 ring-amber-600/50">
+                          <span className="absolute inset-[2px] rounded-full ring-1 ring-amber-700/30" />
+                          <span className="absolute inset-0 rounded-full bg-gradient-to-tr from-white/50 to-transparent" />
+                          <IndianRupee className="relative h-4 w-4" strokeWidth={2.5} />
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Actions */}
