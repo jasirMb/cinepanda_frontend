@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Banknote,
+  Cpu,
   CreditCard,
   Eye,
   IndianRupee,
@@ -66,18 +67,17 @@ const QR_PATTERN = [
 ];
 
 function QrGlyph() {
+  // Bare QR (no box) — the dot matrix itself, in a frosted sky tone.
   return (
-    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white p-1 shadow ring-1 ring-slate-200">
-      <span className="grid grid-cols-7 gap-[1px]">
-        {QR_PATTERN.flat().map((on, i) => (
-          <span
-            key={i}
-            className={`h-[2.5px] w-[2.5px] rounded-[0.5px] ${
-              on ? "bg-slate-900" : "bg-transparent"
-            }`}
-          />
-        ))}
-      </span>
+    <span className="grid grid-cols-7 gap-[1.5px]">
+      {QR_PATTERN.flat().map((on, i) => (
+        <span
+          key={i}
+          className={`h-[3px] w-[3px] rounded-[0.5px] ${
+            on ? "bg-sky-400" : "bg-transparent"
+          }`}
+        />
+      ))}
     </span>
   );
 }
@@ -627,28 +627,17 @@ export default function PaymentAccountsPage() {
                       )}
                     </div>
 
-                    {/* type motif */}
-                    <div className="shrink-0">
+                    {/* type motif — bare frosted icons, no box/border */}
+                    <div className="shrink-0 self-center text-sky-400/90">
                       {(a.type === "CARD" || a.type === "BANK") && (
                         <div className="flex items-center gap-1.5">
-                          <Wifi className="h-4 w-4 rotate-90 text-amber-400/80 dark:text-amber-400/70" />
-                          {/* glossy gold EMV chip */}
-                          <div className="relative h-7 w-9 overflow-hidden rounded-md bg-gradient-to-br from-amber-200 via-yellow-300 to-amber-500 shadow ring-1 ring-amber-600/40">
-                            <span className="absolute inset-0 bg-gradient-to-tr from-white/50 via-transparent to-white/10" />
-                            <span className="absolute inset-[3px] rounded-[3px] border border-amber-700/30" />
-                            <span className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-amber-700/40" />
-                            <span className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-amber-700/40" />
-                            <span className="absolute left-1/2 top-1/2 h-2.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-[2px] bg-amber-100/70 ring-1 ring-amber-700/40" />
-                          </div>
+                          <Wifi className="h-5 w-5 rotate-90" strokeWidth={2} />
+                          <Cpu className="h-6 w-6" strokeWidth={2} />
                         </div>
                       )}
                       {a.type === "UPI" && <QrGlyph />}
                       {a.type === "CASH" && (
-                        <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-amber-200 via-yellow-400 to-amber-600 text-amber-900 shadow ring-1 ring-amber-600/50">
-                          <span className="absolute inset-[2px] rounded-full ring-1 ring-amber-700/30" />
-                          <span className="absolute inset-0 rounded-full bg-gradient-to-tr from-white/50 to-transparent" />
-                          <IndianRupee className="relative h-4 w-4" strokeWidth={2.5} />
-                        </span>
+                        <IndianRupee className="h-8 w-8" strokeWidth={2.25} />
                       )}
                     </div>
                   </div>
