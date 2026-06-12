@@ -455,12 +455,33 @@ export default function PaymentAccountsPage() {
             return (
               <div
                 key={a._id}
-                className="group flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700"
+                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900/60 dark:ring-white/5"
               >
                 {/* Coloured header */}
                 <div
                   className={`relative flex items-center justify-between gap-2 overflow-hidden p-4 text-white ${theme.header}`}
                 >
+                  {/* glossy sheen + fine texture + soft glow for depth */}
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0"
+                    style={{
+                      background:
+                        "radial-gradient(120% 100% at 0% 0%, rgba(255,255,255,0.28), transparent 55%)",
+                    }}
+                  />
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 opacity-[0.06]"
+                    style={{
+                      backgroundImage:
+                        "repeating-linear-gradient(135deg, #fff 0, #fff 1px, transparent 1px, transparent 6px)",
+                    }}
+                  />
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute -bottom-10 -right-6 h-24 w-24 rounded-full bg-white/10 blur-xl"
+                  />
                   {/* cash: big ₹ watermark for a money feel */}
                   {a.type === "CASH" && (
                     <span
@@ -495,20 +516,27 @@ export default function PaymentAccountsPage() {
                     <div className="flex items-center justify-end gap-2">
                       {(a.type === "CARD" || a.type === "BANK") && (
                         <>
-                          <div className="relative h-6 w-8 overflow-hidden rounded-[4px] bg-gradient-to-br from-yellow-200 via-amber-300 to-yellow-500 ring-1 ring-amber-400/40">
+                          <Wifi className="h-4 w-4 rotate-90 text-slate-400 dark:text-slate-500" />
+                          {/* glossy gold EMV chip */}
+                          <div className="relative h-7 w-9 overflow-hidden rounded-[5px] bg-gradient-to-br from-yellow-200 via-amber-300 to-amber-500 shadow-sm ring-1 ring-amber-500/40">
+                            <span className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/40 to-transparent opacity-60" />
                             <span className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-amber-800/40" />
                             <span className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-amber-800/40" />
-                            <span className="absolute left-[25%] top-[18%] h-[64%] w-px bg-amber-800/25" />
-                            <span className="absolute right-[25%] top-[18%] h-[64%] w-px bg-amber-800/25" />
+                            <span className="absolute left-[26%] top-[14%] h-[72%] w-px bg-amber-800/25" />
+                            <span className="absolute right-[26%] top-[14%] h-[72%] w-px bg-amber-800/25" />
+                            <span className="absolute left-1/2 top-1/2 h-2 w-3 -translate-x-1/2 -translate-y-1/2 rounded-[2px] border border-amber-800/30" />
                           </div>
-                          <Wifi className="h-4 w-4 rotate-90 text-slate-400 dark:text-slate-500" />
                         </>
                       )}
+                      {/* upi: QR sticker */}
                       {a.type === "UPI" && (
-                        <QrCode className="h-6 w-6 text-slate-400 dark:text-slate-500" />
+                        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-white shadow-sm ring-1 ring-slate-200 dark:bg-slate-100 dark:ring-slate-300">
+                          <QrCode className="h-5 w-5 text-slate-800" />
+                        </span>
                       )}
+                      {/* cash: gold ₹ coin */}
                       {a.type === "CASH" && (
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-amber-500 text-amber-900 shadow-sm ring-1 ring-amber-500/40">
                           <IndianRupee className="h-3.5 w-3.5" />
                         </span>
                       )}
