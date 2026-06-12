@@ -5,8 +5,6 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowDownLeft,
-  ArrowUpRight,
   Banknote,
   CreditCard,
   Eye,
@@ -507,28 +505,6 @@ export default function PaymentAccountsPage() {
                     <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                       Balance now
                     </span>
-                  </div>
-
-                  {/* Money in / out */}
-                  <div className="space-y-1.5 text-sm text-slate-700 dark:text-slate-300">
-                    <p className="flex items-center gap-2">
-                      <ArrowDownLeft className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                      <span className="text-xs text-slate-500 dark:text-slate-400">
-                        Received:
-                      </span>
-                      <span className="text-emerald-600 dark:text-emerald-400">
-                        {inr(a.moneyIn ?? 0)}
-                      </span>
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-rose-500" />
-                      <span className="text-xs text-slate-500 dark:text-slate-400">
-                        Paid out:
-                      </span>
-                      <span className="text-rose-600 dark:text-rose-400">
-                        {inr(a.moneyOut ?? 0)}
-                      </span>
-                    </p>
                   </div>
 
                   {/* Footer */}
