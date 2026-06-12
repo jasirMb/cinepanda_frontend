@@ -8,7 +8,6 @@ import {
   Banknote,
   CreditCard,
   Eye,
-  IndianRupee,
   Landmark,
   Pencil,
   Plus,
@@ -16,6 +15,7 @@ import {
   Smartphone,
   Trash2,
   Wallet,
+  Wifi,
   X,
 } from "lucide-react";
 
@@ -55,35 +55,36 @@ function inr(n: number) {
   return `₹${(n ?? 0).toLocaleString("en-IN")}`;
 }
 
-// Per-account-type colour + icon, so each card reads at a glance.
+// Per-account-type gradient + icon, so each card looks like the real thing
+// (a credit card reads like a card, a bank like a bank card, etc.).
 const TYPE_THEME: Record<
   string,
-  { chip: string; bar: string; icon: typeof Banknote }
+  { gradient: string; icon: typeof Banknote; hasChip: boolean }
 > = {
   BANK: {
-    chip: "bg-sky-500/10 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400",
-    bar: "bg-sky-500",
+    gradient: "from-sky-700 via-blue-800 to-indigo-950",
     icon: Landmark,
+    hasChip: true,
   },
   CASH: {
-    chip: "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400",
-    bar: "bg-emerald-500",
+    gradient: "from-emerald-600 via-emerald-800 to-green-950",
     icon: Banknote,
+    hasChip: false,
   },
   CARD: {
-    chip: "bg-violet-500/10 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400",
-    bar: "bg-violet-500",
+    gradient: "from-neutral-700 via-zinc-800 to-neutral-950",
     icon: CreditCard,
+    hasChip: true,
   },
   UPI: {
-    chip: "bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400",
-    bar: "bg-indigo-500",
+    gradient: "from-violet-700 via-violet-900 to-slate-950",
     icon: Smartphone,
+    hasChip: false,
   },
   OTHER: {
-    chip: "bg-slate-500/10 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300",
-    bar: "bg-slate-400",
+    gradient: "from-slate-600 via-slate-700 to-slate-900",
     icon: Wallet,
+    hasChip: false,
   },
 };
 
@@ -447,89 +448,144 @@ export default function PaymentAccountsPage() {
           {filtered.map((a) => {
             const theme = TYPE_THEME[a.type] ?? TYPE_THEME.OTHER;
             const Icon = theme.icon;
-            const subtitle =
-              a.bankName ||
-              a.upiId ||
-              a.accountNumber ||
-              a.notes ||
-              "";
+            // The "card number" line, by type.
+            const number =
+              a.type === "CARD"
+                ? `••••  ••••  ••••  ${a.cardLast4 || "••••"}`
+                : a.type === "BANK"
+                  ? a.accountNumber
+                    ? `••••  ${a.accountNumber.slice(-4)}`
+                    : ""
+                  : a.type === "UPI"
+                    ? a.upiId || ""
+                    : "";
+            // Bottom-right caption (network / bank / app).
+            const caption =
+              a.type === "CARD"
+                ? a.cardNetwork || "Card"
+                : a.type === "BANK"
+                  ? a.bankName || "Bank"
+                  : a.type === "UPI"
+                    ? a.upiApp || "UPI"
+                    : a.type === "CASH"
+                      ? "Cash in hand"
+                      : a.notes || "";
+            const balance = a.balance ?? 0;
             return (
-              <div
-                key={a._id}
-                className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700"
-              >
+              <div key={a._id} className="group flex flex-col gap-2">
+                {/* Card face */}
                 <div
-                  aria-hidden
-                  className={`absolute left-0 top-0 h-full w-1 ${theme.bar}`}
-                />
-                <div className="flex flex-1 flex-col gap-3 p-4 pl-5">
-                  {/* Header */}
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${theme.chip}`}
+                  className={`relative flex aspect-[1.6/1] flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br p-5 text-white shadow-xl ring-1 ring-black/5 transition group-hover:-translate-y-0.5 group-hover:shadow-2xl ${theme.gradient}`}
+                >
+                  {/* glossy light sheen */}
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0"
+                    style={{
+                      background:
+                        "radial-gradient(120% 80% at 0% 0%, rgba(255,255,255,0.25), transparent 45%)",
+                    }}
+                  />
+                  {/* fine guilloché-style texture lines */}
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 opacity-[0.07]"
+                    style={{
+                      backgroundImage:
+                        "repeating-linear-gradient(135deg, #fff 0, #fff 1px, transparent 1px, transparent 7px)",
+                    }}
+                  />
+                  {/* big ₹ watermark on cash for a money feel */}
+                  {a.type === "CASH" && (
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute -right-1 -bottom-3 select-none text-[120px] font-bold leading-none text-white/10"
                     >
-                      <Icon className="h-5 w-5" />
+                      ₹
+                    </span>
+                  )}
+
+                  {/* Top: identity + contactless + chip */}
+                  <div className="relative flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15 ring-1 ring-white/20 backdrop-blur-sm">
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold leading-tight">
+                          {a.name}
+                        </p>
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-white/70">
+                          {a.type}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        href={`/payment-accounts/${a._id}`}
-                        className="block truncate text-base font-semibold text-slate-900 transition group-hover:text-cine-primary dark:text-slate-50"
+                    {theme.hasChip && (
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Wifi className="h-4 w-4 rotate-90 text-white/70" />
+                        <div className="relative h-7 w-9 overflow-hidden rounded-md bg-gradient-to-br from-yellow-100 via-amber-300 to-yellow-500 shadow-inner ring-1 ring-amber-200/40">
+                          <span className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-amber-800/30" />
+                          <span className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-amber-800/30" />
+                          <span className="absolute left-[24%] top-[16%] h-[68%] w-px bg-amber-800/20" />
+                          <span className="absolute right-[24%] top-[16%] h-[68%] w-px bg-amber-800/20" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Number / id — embossed */}
+                  <p
+                    className="relative truncate font-mono text-base font-medium tracking-[0.2em] text-white/95"
+                    style={{ textShadow: "0 1px 1px rgba(0,0,0,0.35)" }}
+                  >
+                    {number || caption}
+                  </p>
+
+                  {/* Bottom: balance + caption */}
+                  <div className="relative flex items-end justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[9px] uppercase tracking-[0.15em] text-white/60">
+                        Balance now
+                      </p>
+                      <p
+                        className={`truncate text-xl font-bold ${
+                          balance >= 0 ? "text-white" : "text-rose-200"
+                        }`}
+                        style={{ textShadow: "0 1px 1px rgba(0,0,0,0.25)" }}
                       >
-                        {a.name}
-                      </Link>
-                      <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                        {subtitle || "—"}
+                        {inr(balance)}
                       </p>
                     </div>
-                    <span
-                      className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-semibold ${theme.chip}`}
-                    >
-                      {a.type}
-                    </span>
+                    {number && caption && (
+                      <p className="max-w-[45%] truncate text-right text-sm font-semibold italic tracking-wide text-white/80">
+                        {caption}
+                      </p>
+                    )}
                   </div>
+                </div>
 
-                  {/* Balance */}
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p
-                      className={`inline-flex items-center gap-1 text-xl font-bold ${
-                        (a.balance ?? 0) >= 0
-                          ? "text-slate-900 dark:text-slate-50"
-                          : "text-rose-600 dark:text-rose-400"
-                      }`}
-                    >
-                      <IndianRupee className="h-4 w-4" />
-                      {(a.balance ?? 0).toLocaleString("en-IN", {
-                        maximumFractionDigits: 0,
-                      })}
-                    </p>
-                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                      Balance now
-                    </span>
-                  </div>
-
-                  {/* Footer */}
-                  <div className="mt-auto flex items-center justify-end gap-1.5 border-t border-slate-100 pt-3 dark:border-slate-800">
-                    <Link
-                      href={`/payment-accounts/${a._id}`}
-                      className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                    >
-                      <Eye className="h-3 w-3" /> View
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => startEdit(a)}
-                      className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                    >
-                      <Pencil className="h-3 w-3" /> Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPendingDelete(a)}
-                      className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
-                    >
-                      <Trash2 className="h-3 w-3" /> Delete
-                    </button>
-                  </div>
+                {/* Actions */}
+                <div className="flex items-center justify-center gap-1.5">
+                  <Link
+                    href={`/payment-accounts/${a._id}`}
+                    className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  >
+                    <Eye className="h-3 w-3" /> View
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => startEdit(a)}
+                    className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                  >
+                    <Pencil className="h-3 w-3" /> Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingDelete(a)}
+                    className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
+                  >
+                    <Trash2 className="h-3 w-3" /> Delete
+                  </button>
                 </div>
               </div>
             );
