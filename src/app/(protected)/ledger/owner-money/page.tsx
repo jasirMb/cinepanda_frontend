@@ -98,9 +98,20 @@ export default function OwnerMoneyPage() {
     {}
   );
 
-  // Date filter is applied server-side, so totals and list reflect it.
-  const ownerQuery = useLedger({ accountingType: "CAPITAL", ...dates });
-  const entries = useMemo(() => ownerQuery.data?.data ?? [], [ownerQuery.data]);
+  // Paginated owner-money list (server-side). The active tab narrows entryType
+  // (CAPITAL + INCOME = put in, CAPITAL + EXPENSE = taken out).
+  const viewEntryType =
+    view === "in" ? "INCOME" : view === "out" ? "EXPENSE" : undefined;
+  const listQuery = useLedger({
+    accountingType: "CAPITAL",
+    ...(viewEntryType ? { entryType: viewEntryType } : {}),
+    ...dates,
+    page,
+    limit: PAGE_SIZE,
+  });
+  const paged = listQuery.data?.data ?? [];
+  const total = listQuery.data?.total ?? 0;
+  const totalPages = listQuery.data?.totalPages ?? 1;
 
   // Company profit/loss for the same period (already excludes owner money & transfers).
   const summaryQuery = useLedgerSummary(dates);
@@ -124,9 +135,11 @@ export default function OwnerMoneyPage() {
   }, [summaryQuery.data]);
 
   // Money in hand = live balance across all your accounts (cash, bank, card…).
+  // Linked UPIs share their bank's balance, so skip them to avoid double-counting.
   const accounts = usePaymentAccounts().data?.data ?? [];
-  const moneyInHand = accounts.reduce((s, a) => s + (a.balance ?? 0), 0);
-  const accountCount = accounts.length;
+  const moneyAccounts = accounts.filter((a) => !a.linkedAccountId);
+  const moneyInHand = moneyAccounts.reduce((s, a) => s + (a.balance ?? 0), 0);
+  const accountCount = moneyAccounts.length;
 
   // Client collections — a current snapshot (project value vs paid), all-time.
   const overviewQuery = useProjectsOverview();
@@ -141,49 +154,26 @@ export default function OwnerMoneyPage() {
     setDates(periodDates(value));
   }
 
-  // Owner totals + counts always reflect every owner entry (not the view filter).
-  const { contribution, withdrawal, net, contributionCount, withdrawalCount } =
-    useMemo(() => {
-      let contribution = 0;
-      let withdrawal = 0;
-      let contributionCount = 0;
-      let withdrawalCount = 0;
-      for (const e of entries) {
-        if (e.entryType === "INCOME") {
-          contribution += e.amount;
-          contributionCount += 1;
-        } else if (e.entryType === "EXPENSE") {
-          withdrawal += e.amount;
-          withdrawalCount += 1;
-        }
-      }
-      return {
-        contribution,
-        withdrawal,
-        net: contribution - withdrawal,
-        contributionCount,
-        withdrawalCount,
-      };
-    }, [entries]);
+  // Owner totals + counts come from the server summary (every owner entry for
+  // the period), independent of the current page or tab.
+  const contribution = profitLoss?.ownerContribution ?? 0;
+  const withdrawal = profitLoss?.ownerWithdrawal ?? 0;
+  const net = contribution - withdrawal;
+  const { contributionCount, withdrawalCount } = useMemo(() => {
+    let ci = 0;
+    let wi = 0;
+    for (const c of summaryQuery.data?.data?.byCategory ?? []) {
+      if (c._id.category === "OWNER_CONTRIBUTION") ci = c.count;
+      else if (c._id.category === "OWNER_WITHDRAWAL") wi = c.count;
+    }
+    return { contributionCount: ci, withdrawalCount: wi };
+  }, [summaryQuery.data]);
+  const ownerCount = contributionCount + withdrawalCount;
 
-  const filtered = useMemo(() => {
-    if (view === "in") return entries.filter((e) => e.entryType === "INCOME");
-    if (view === "out") return entries.filter((e) => e.entryType === "EXPENSE");
-    return entries;
-  }, [entries, view]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paged = useMemo(
-    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [filtered, page]
-  );
-
+  // Reset to page 1 when the tab or date range changes.
   useEffect(() => {
     setPage(1);
   }, [view, dates.startDate, dates.endDate]);
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
 
   const deleteMutation = useMutation({
     mutationFn: deleteLedgerEntry,
@@ -292,7 +282,7 @@ export default function OwnerMoneyPage() {
             icon={<Scale className="h-5 w-5" />}
             label="My money in the business"
             value={fmtSigned(net)}
-            loading={ownerQuery.isLoading}
+            loading={summaryQuery.isLoading}
             footer={
               <div className="flex flex-wrap gap-2">
                 <Chip tone="success">▲ Put in {formatINR(contribution)}</Chip>
@@ -319,14 +309,14 @@ export default function OwnerMoneyPage() {
             icon={<PiggyBank className="h-5 w-5" />}
             label="Put in"
             value={`+${formatINR(contribution)}`}
-            loading={ownerQuery.isLoading}
+            loading={summaryQuery.isLoading}
           />
           <StatCard
             tone="danger"
             icon={<HandCoins className="h-5 w-5" />}
             label="Taken out"
             value={`−${formatINR(withdrawal)}`}
-            loading={ownerQuery.isLoading}
+            loading={summaryQuery.isLoading}
           />
         </div>
       </section>
@@ -426,7 +416,7 @@ export default function OwnerMoneyPage() {
           <div className="flex w-full gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800 sm:w-auto">
             <ViewTab
               label="All"
-              count={entries.length}
+              count={ownerCount}
               active={view === "all"}
               tone="primary"
               onClick={() => setView("all")}
@@ -449,10 +439,10 @@ export default function OwnerMoneyPage() {
         </div>
 
         <OwnerEntriesList
-          loading={ownerQuery.isLoading}
-          error={ownerQuery.isError}
+          loading={listQuery.isLoading}
+          error={listQuery.isError}
           entries={paged}
-          totalCount={filtered.length}
+          totalCount={total}
           page={page}
           totalPages={totalPages}
           pageSize={PAGE_SIZE}

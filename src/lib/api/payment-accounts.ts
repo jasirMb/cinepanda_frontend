@@ -100,3 +100,48 @@ export async function updatePaymentAccount(
 export async function deletePaymentAccount(id: string): Promise<void> {
   await api.delete(`/payment-accounts/${id}`);
 }
+
+// ─── Statement (paginated, with running balance computed server-side) ──────────
+
+export interface StatementQuery {
+  startDate?: string;
+  endDate?: string;
+  projectId?: string;
+  page?: number;
+  limit?: number;
+}
+
+/** One statement row: the ledger entry + the running balance after it. */
+export interface StatementRowApi {
+  entry: import("./ledger").LedgerEntryPopulated;
+  balance: number;
+}
+
+export interface AccountStatementResponse {
+  success: boolean;
+  account: PaymentAccount;
+  data: StatementRowApi[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  /** Current balance across all time (opening + every in/out). */
+  currentBalance: number;
+  openingBalance: number;
+  /** Balance carried into the selected period (opening + entries before it). */
+  broughtForward: number;
+  /** Money in / out within the selected period (all of it, not just the page). */
+  periodIn: number;
+  periodOut: number;
+}
+
+export async function fetchAccountStatement(
+  id: string,
+  params?: StatementQuery
+): Promise<AccountStatementResponse> {
+  const { data } = await api.get<AccountStatementResponse>(
+    `/payment-accounts/${id}/statement`,
+    { params }
+  );
+  return data;
+}

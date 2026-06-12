@@ -15,8 +15,13 @@ import {
   Link2,
 } from "lucide-react";
 
-import { usePaymentAccount, usePaymentAccounts } from "@/hooks/usePaymentAccounts";
-import { useLedger } from "@/hooks/useLedger";
+import {
+  usePaymentAccount,
+  usePaymentAccounts,
+  useAccountStatement,
+} from "@/hooks/usePaymentAccounts";
+import { fetchAccountStatement } from "@/lib/api/payment-accounts";
+import { useProjects } from "@/hooks/useProjects";
 import type { LedgerEntryPopulated } from "@/lib/api/ledger";
 import { downloadStatementPdf, type StatementRow } from "@/lib/statement-pdf";
 import { Button } from "@/components/ui/button";
@@ -66,89 +71,24 @@ function periodRange(period: Period, from: string, to: string) {
   return { start, end: now };
 }
 
-interface StmtRow {
-  _id: string;
-  date: string;
-  description: string;
-  /** The note typed on the entry — shown on a second line under the description. */
-  note: string;
-  debit: number;
-  credit: number;
-  balance: number;
-}
-
-/** Account balance carried forward to `start` = opening balance + every
- *  in/out before the period began. For "all time" (no start) it's just opening. */
-function carryBefore(
-  entries: LedgerEntryPopulated[],
-  openingBalance: number,
-  start: Date | null
-): number {
-  let carry = openingBalance;
-  if (start) {
-    for (const e of entries) {
-      if (new Date(e.entryDate).getTime() < start.getTime()) {
-        carry +=
-          (e.entryType === "INCOME" ? e.amount ?? 0 : 0) -
-          (e.entryType === "EXPENSE" ? e.amount ?? 0 : 0);
-      }
-    }
-  }
-  return carry;
-}
-
-function buildRows(
-  entries: LedgerEntryPopulated[],
-  start: Date | null,
-  end: Date | null,
-  projectId: string,
-  openingSeed = 0
-): StmtRow[] {
-  const filtered = entries
-    .filter((e) => {
-      const ts = new Date(e.entryDate).getTime();
-      if (start && ts < start.getTime()) return false;
-      if (end && ts > end.getTime()) return false;
-      if (projectId) {
-        const p = projOf(e.projectId);
-        if (projectId === "NONE") {
-          if (p) return false;
-        } else if (!p || p._id !== projectId) {
-          return false;
-        }
-      }
-      return true;
-    })
-    .sort(
-      (a, b) =>
-        new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime()
-    );
-
-  let balance = openingSeed;
-  return filtered.map((e) => {
-    const debit = e.entryType === "EXPENSE" ? e.amount ?? 0 : 0;
-    const credit = e.entryType === "INCOME" ? e.amount ?? 0 : 0;
-    balance += credit - debit;
-    const vendor = vendorOf(e.vendorId);
-    const proj = projOf(e.projectId);
-    // Main line: Category · who it was with. Note line: the entry's own description.
-    const description = [
-      e.category?.replace(/_/g, " ") || "Uncategorised",
-      vendor ? vendor.name : proj ? proj.clientName : "",
-    ]
-      .filter(Boolean)
-      .join(" · ");
-    const note = e.description?.trim() || "";
-    return {
-      _id: e._id,
-      date: fmtDate(e.entryDate),
-      description,
-      note,
-      debit,
-      credit,
-      balance,
-    };
-  });
+/** The columns a statement row shows, derived from one ledger entry. */
+function entryDisplay(e: LedgerEntryPopulated) {
+  const vendor = vendorOf(e.vendorId);
+  const proj = projOf(e.projectId);
+  // Main line: Category · who it was with. Note line: the entry's own description.
+  const description = [
+    e.category?.replace(/_/g, " ") || "Uncategorised",
+    vendor ? vendor.name : proj ? proj.clientName : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return {
+    date: fmtDate(e.entryDate),
+    description,
+    note: e.description?.trim() || "",
+    debit: e.entryType === "EXPENSE" ? e.amount ?? 0 : 0,
+    credit: e.entryType === "INCOME" ? e.amount ?? 0 : 0,
+  };
 }
 
 function periodLabelFor(period: Period, start: Date | null, end: Date | null): string {
@@ -181,75 +121,52 @@ export default function PaymentAccountStatementPage({
         : null,
     [allAccounts, account?.linkedAccountId]
   );
-  // A bank's statement includes entries made through its linked UPIs, so the
-  // running balance reconciles with the shared balance shown on the list.
-  const relatedIds = useMemo(
-    () => [id, ...linkedChildren.map((c) => c._id)].join(","),
-    [id, linkedChildren]
-  );
-
-  const ledgerQuery = useLedger({ paymentAccountId: relatedIds });
-  const entries = ledgerQuery.data?.data ?? [];
-
   const [period, setPeriod] = useState<Period>("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [projectId, setProjectId] = useState("");
   const [downloading, setDownloading] = useState(false);
-
-  // Distinct projects present in this account's entries (for the filter).
-  const projects = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const e of entries) {
-      const p = projOf(e.projectId);
-      if (p && !map.has(p._id)) map.set(p._id, p.clientName);
-    }
-    return Array.from(map, ([_id, name]) => ({ _id, name }));
-  }, [entries]);
+  const PER_PAGE = 15;
+  const [page, setPage] = useState(1);
 
   const { start, end } = periodRange(period, from, to);
 
-  const openingBalance = account?.openingBalance ?? 0;
+  // Server-paginated statement; the running balance is computed on the backend
+  // over every entry (incl. any linked UPIs), so each page stays correct.
+  const stmtQuery = useAccountStatement(id, {
+    startDate: start ? start.toISOString() : undefined,
+    endDate: end ? end.toISOString() : undefined,
+    projectId: projectId || undefined,
+    page,
+    limit: PER_PAGE,
+  });
+  const stmt = stmtQuery.data;
+  const displayRows = useMemo(
+    () =>
+      (stmt?.data ?? []).map((r) => ({
+        _id: r.entry._id,
+        ...entryDisplay(r.entry),
+        balance: r.balance,
+      })),
+    [stmt]
+  );
+  const total = stmt?.total ?? 0;
+  const pageCount = stmt?.totalPages ?? 1;
+  const currentBalance = stmt?.currentBalance ?? account?.openingBalance ?? 0;
+  const openingSeed = stmt?.broughtForward ?? account?.openingBalance ?? 0;
+  const totalIn = stmt?.periodIn ?? 0;
+  const totalOut = stmt?.periodOut ?? 0;
 
-  // Current balance across ALL time = opening + every in/out on this account.
-  const currentBalance = useMemo(
-    () => carryBefore(entries, openingBalance, null) +
-      entries.reduce(
-        (s, e) =>
-          s +
-          (e.entryType === "INCOME" ? e.amount ?? 0 : 0) -
-          (e.entryType === "EXPENSE" ? e.amount ?? 0 : 0),
-        0
-      ),
-    [entries, openingBalance]
+  // Project options for the filter — every project (the server filters by id).
+  const projectsList = useProjects().data?.data ?? [];
+  const projects = useMemo(
+    () => projectsList.map((p) => ({ _id: p._id, name: p.clientName })),
+    [projectsList]
   );
 
-  // Balance carried into the selected period (seeds the statement's running balance).
-  const openingSeed = useMemo(
-    () => carryBefore(entries, openingBalance, start),
-    [entries, openingBalance, start]
-  );
-
-  // On-page table rows (driven by the page filters).
-  const rows = useMemo(
-    () => buildRows(entries, start, end, projectId, openingSeed),
-    [entries, start, end, projectId, openingSeed]
-  );
-  const totalIn = rows.reduce((s, r) => s + r.credit, 0);
-  const totalOut = rows.reduce((s, r) => s + r.debit, 0);
-
-  // Pagination for the on-page table (running balance is precomputed over the
-  // full set, so slicing the display keeps each row's balance correct).
-  const PER_PAGE = 15;
-  const [page, setPage] = useState(1);
-  const pageCount = Math.max(1, Math.ceil(rows.length / PER_PAGE));
-  const pagedRows = rows.slice((page - 1) * PER_PAGE, page * PER_PAGE);
   useEffect(() => {
     setPage(1);
   }, [period, from, to, projectId]);
-  useEffect(() => {
-    if (page > pageCount) setPage(pageCount);
-  }, [page, pageCount]);
 
   // Download dialog — asks which period & project before generating the PDF.
   const [showDownload, setShowDownload] = useState(false);
@@ -272,21 +189,22 @@ export default function PaymentAccountStatementPage({
     setDownloading(true);
     try {
       const r = periodRange(dlgPeriod, dlgFrom, dlgTo);
-      const pdfRows: StatementRow[] = buildRows(
-        entries,
-        r.start,
-        r.end,
-        dlgProject,
-        carryBefore(entries, openingBalance, r.start)
-      ).map((row) => ({
-        date: row.date,
-        description: row.note
-          ? `${row.description} · ${row.note}`
-          : row.description,
-        debit: row.debit,
-        credit: row.credit,
-        balance: row.balance,
-      }));
+      const res = await fetchAccountStatement(id, {
+        startDate: r.start ? r.start.toISOString() : undefined,
+        endDate: r.end ? r.end.toISOString() : undefined,
+        projectId: dlgProject || undefined,
+        limit: 0, // all rows for the chosen period
+      });
+      const pdfRows: StatementRow[] = res.data.map((row) => {
+        const d = entryDisplay(row.entry);
+        return {
+          date: d.date,
+          description: d.note ? `${d.description} · ${d.note}` : d.description,
+          debit: d.debit,
+          credit: d.credit,
+          balance: row.balance,
+        };
+      });
       await downloadStatementPdf({
         account: {
           name: account.name,
@@ -489,20 +407,20 @@ export default function PaymentAccountStatementPage({
                 <td className="px-4 py-2 text-right tabular-nums">{inr(openingSeed)}</td>
               </tr>
             )}
-            {ledgerQuery.isLoading ? (
+            {stmtQuery.isLoading ? (
               <tr>
                 <td colSpan={5} className="p-4">
                   <Skeleton className="h-10 w-full rounded" />
                 </td>
               </tr>
-            ) : rows.length === 0 ? (
+            ) : total === 0 ? (
               <tr>
                 <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                   No transactions in this period.
                 </td>
               </tr>
             ) : (
-              pagedRows.map((r) => (
+              displayRows.map((r) => (
                 <tr key={r._id} className="border-b border-slate-100 last:border-0 dark:border-slate-800/50">
                   <td className="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">{r.date}</td>
                   <td className="px-4 py-3">
@@ -528,7 +446,7 @@ export default function PaymentAccountStatementPage({
               ))
             )}
           </tbody>
-          {rows.length > 0 && (
+          {total > 0 && (
             <tfoot>
               <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold dark:border-slate-700 dark:bg-slate-900/80">
                 <td className="px-4 py-3" />
@@ -542,10 +460,10 @@ export default function PaymentAccountStatementPage({
         </table>
       </div>
 
-      {rows.length > PER_PAGE && (
+      {total > PER_PAGE && (
         <div className="flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
           <span>
-            Page {page} of {pageCount} · {rows.length} transactions
+            Page {page} of {pageCount} · {total} transactions
           </span>
           <div className="flex items-center gap-1">
             <button

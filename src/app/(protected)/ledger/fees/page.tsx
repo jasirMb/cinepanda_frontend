@@ -19,7 +19,8 @@ import {
   Wallet,
 } from "lucide-react";
 
-import { ledgerKeys, useLedger } from "@/hooks/useLedger";
+import { ledgerKeys, useLedger, useLedgerSummary } from "@/hooks/useLedger";
+import { useProjects } from "@/hooks/useProjects";
 import {
   deleteLedgerEntry,
   type LedgerEntryPopulated,
@@ -91,41 +92,44 @@ export default function FeesPage() {
   );
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  const baseParams = { ...dates, ...(projectId ? { projectId } : {}) };
-  const bankQ = useLedger({ category: "BANK_CHARGES", ...baseParams });
-  const taxQ = useLedger({ category: "TAXES", ...baseParams });
+  // Effective project filter: a URL ?projectId scopes the whole page; otherwise
+  // the in-page dropdown drives it ("" = all · "NONE" = general · an id).
+  const effProject = projectId ?? (projectFilter || undefined);
+  const projectParam = effProject ? { projectId: effProject } : {};
 
-  const bankEntries = useMemo(() => bankQ.data?.data ?? [], [bankQ.data]);
-  const taxEntries = useMemo(() => taxQ.data?.data ?? [], [taxQ.data]);
-
-  const entries = useMemo(
-    () =>
-      [...bankEntries, ...taxEntries].sort(
-        (a, b) =>
-          new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime()
-      ),
-    [bankEntries, taxEntries]
-  );
-
-  const loading = bankQ.isLoading || taxQ.isLoading;
-  const error = bankQ.isError || taxQ.isError;
-
-  // Entries after the project filter — the summary cards + tab counts reflect this scope.
-  const scoped = useMemo(() => {
-    if (!projectFilter) return entries;
-    return entries.filter((e) => {
-      const p = e.projectId;
-      const hasProject = p && typeof p === "object";
-      if (projectFilter === "NONE") return !hasProject;
-      return Boolean(hasProject && p._id === projectFilter);
-    });
-  }, [entries, projectFilter]);
-
-  const scopedBank = scoped.filter((e) => e.category === "BANK_CHARGES");
-  const scopedTax = scoped.filter((e) => e.category === "TAXES");
-  const bankTotal = scopedBank.reduce((s, e) => s + e.amount, 0);
-  const taxTotal = scopedTax.reduce((s, e) => s + e.amount, 0);
+  // Summary drives the totals + tab counts (server aggregation over all matches).
+  const summaryQuery = useLedgerSummary({ ...dates, ...projectParam });
+  const { bankTotal, taxTotal, bankCount, taxCount } = useMemo(() => {
+    let bt = 0;
+    let tt = 0;
+    let bc = 0;
+    let tc = 0;
+    for (const c of summaryQuery.data?.data?.byCategory ?? []) {
+      if (c._id.category === "BANK_CHARGES") {
+        bt = c.total;
+        bc = c.count;
+      } else if (c._id.category === "TAXES") {
+        tt = c.total;
+        tc = c.count;
+      }
+    }
+    return { bankTotal: bt, taxTotal: tt, bankCount: bc, taxCount: tc };
+  }, [summaryQuery.data]);
   const total = bankTotal + taxTotal;
+  const allCount = bankCount + taxCount;
+
+  // Paginated list for the active tab (server-side).
+  const viewCategory = view === "all" ? "BANK_CHARGES,TAXES" : view;
+  const listQuery = useLedger({
+    category: viewCategory,
+    ...dates,
+    ...projectParam,
+    page,
+    limit: PAGE_SIZE,
+  });
+  const paged = listQuery.data?.data ?? [];
+  const listTotal = listQuery.data?.total ?? 0;
+  const totalPages = listQuery.data?.totalPages ?? 1;
 
   function handlePeriodChange(value: LedgerPeriod) {
     setPeriod(value);
@@ -133,35 +137,17 @@ export default function FeesPage() {
     setDates(periodDates(value));
   }
 
-  // Distinct projects present in the fee entries (for the project filter).
-  const projectOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const e of entries) {
-      const p = e.projectId;
-      if (p && typeof p === "object" && !map.has(p._id)) {
-        map.set(p._id, p.clientName);
-      }
-    }
-    return Array.from(map, ([_id, name]) => ({ _id, name }));
-  }, [entries]);
-
-  const filtered = useMemo(() => {
-    if (view === "all") return scoped;
-    return scoped.filter((e) => e.category === view);
-  }, [scoped, view]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paged = useMemo(
-    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [filtered, page]
+  // Project options for the dropdown — every project (the server filters by id).
+  const projectsList = useProjects().data?.data ?? [];
+  const projectOptions = useMemo(
+    () => projectsList.map((p) => ({ _id: p._id, name: p.clientName })),
+    [projectsList]
   );
 
+  // Reset to page 1 whenever the tab, project or period changes.
   useEffect(() => {
     setPage(1);
   }, [view, projectFilter, dates.startDate, dates.endDate]);
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
 
   const deleteMutation = useMutation({
     mutationFn: deleteLedgerEntry,
@@ -260,19 +246,19 @@ export default function FeesPage() {
           label="Total lost"
           value={`−${formatINR(total)}`}
           icon={<Receipt className="h-5 w-5" />}
-          loading={loading}
+          loading={summaryQuery.isLoading}
         />
         <FeeStat
           label="Bank / card charges"
           value={`−${formatINR(bankTotal)}`}
           icon={<CreditCard className="h-5 w-5" />}
-          loading={loading}
+          loading={summaryQuery.isLoading}
         />
         <FeeStat
           label="Taxes"
           value={`−${formatINR(taxTotal)}`}
           icon={<Percent className="h-5 w-5" />}
-          loading={loading}
+          loading={summaryQuery.isLoading}
         />
       </div>
 
@@ -285,19 +271,19 @@ export default function FeesPage() {
           <div className="flex w-full gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800 sm:w-auto">
             <ViewTab
               label="All"
-              count={scoped.length}
+              count={allCount}
               active={view === "all"}
               onClick={() => setView("all")}
             />
             <ViewTab
               label="Charges"
-              count={scopedBank.length}
+              count={bankCount}
               active={view === "BANK_CHARGES"}
               onClick={() => setView("BANK_CHARGES")}
             />
             <ViewTab
               label="Taxes"
-              count={scopedTax.length}
+              count={taxCount}
               active={view === "TAXES"}
               onClick={() => setView("TAXES")}
             />
@@ -305,10 +291,10 @@ export default function FeesPage() {
         </div>
 
         <FeeList
-          loading={loading}
-          error={error}
+          loading={listQuery.isLoading}
+          error={listQuery.isError}
           entries={paged}
-          totalCount={filtered.length}
+          totalCount={listTotal}
           page={page}
           totalPages={totalPages}
           pageSize={PAGE_SIZE}
