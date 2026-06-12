@@ -25,6 +25,10 @@ export interface PaymentAccount {
   upiApp?: string;
   cardNetwork?: string;
   cardLast4?: string;
+  /** For a UPI linked to a bank: the bank account id it draws from. */
+  linkedAccountId?: string | null;
+  /** Computed on the list endpoint: the linked bank's name. */
+  linkedAccountName?: string | null;
   notes?: string;
   /** Money already in the account when you started tracking. */
   openingBalance?: number;
@@ -55,6 +59,7 @@ export interface PaymentAccountPayload {
   upiApp?: string;
   cardNetwork?: string;
   cardLast4?: string;
+  linkedAccountId?: string | null;
   notes?: string;
   openingBalance?: number;
 }

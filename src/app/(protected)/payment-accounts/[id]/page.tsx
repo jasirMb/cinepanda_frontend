@@ -12,9 +12,10 @@ import {
   ChevronRight,
   CreditCard,
   Download,
+  Link2,
 } from "lucide-react";
 
-import { usePaymentAccount } from "@/hooks/usePaymentAccounts";
+import { usePaymentAccount, usePaymentAccounts } from "@/hooks/usePaymentAccounts";
 import { useLedger } from "@/hooks/useLedger";
 import type { LedgerEntryPopulated } from "@/lib/api/ledger";
 import { downloadStatementPdf, type StatementRow } from "@/lib/statement-pdf";
@@ -166,7 +167,28 @@ export default function PaymentAccountStatementPage({
   const accountQuery = usePaymentAccount(id);
   const account = accountQuery.data;
 
-  const ledgerQuery = useLedger({ paymentAccountId: id });
+  const allAccounts = usePaymentAccounts().data?.data ?? [];
+  // Linked UPIs that draw from this account (when this account is a bank).
+  const linkedChildren = useMemo(
+    () => allAccounts.filter((a) => a.linkedAccountId === id),
+    [allAccounts, id]
+  );
+  // When this account is itself a UPI linked to a bank, that bank.
+  const linkedParent = useMemo(
+    () =>
+      account?.linkedAccountId
+        ? allAccounts.find((a) => a._id === account.linkedAccountId) ?? null
+        : null,
+    [allAccounts, account?.linkedAccountId]
+  );
+  // A bank's statement includes entries made through its linked UPIs, so the
+  // running balance reconciles with the shared balance shown on the list.
+  const relatedIds = useMemo(
+    () => [id, ...linkedChildren.map((c) => c._id)].join(","),
+    [id, linkedChildren]
+  );
+
+  const ledgerQuery = useLedger({ paymentAccountId: relatedIds });
   const entries = ledgerQuery.data?.data ?? [];
 
   const [period, setPeriod] = useState<Period>("all");
@@ -315,6 +337,35 @@ export default function PaymentAccountStatementPage({
   return (
     <div className="space-y-4">
       <BackLink />
+
+      {/* Linked-account note */}
+      {(linkedParent || linkedChildren.length > 0) && (
+        <div className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-200">
+          <Link2 className="mt-0.5 h-4 w-4 shrink-0" />
+          {linkedParent ? (
+            <p>
+              This UPI is linked to{" "}
+              <Link
+                href={`/payment-accounts/${linkedParent._id}`}
+                className="font-semibold underline"
+              >
+                {linkedParent.name}
+              </Link>
+              . The balance is shared with the bank — the entries below are the
+              ones made through this UPI.
+            </p>
+          ) : (
+            <p>
+              Balance and statement include linked UPI
+              {linkedChildren.length > 1 ? "s" : ""}:{" "}
+              <span className="font-semibold">
+                {linkedChildren.map((c) => c.name).join(", ")}
+              </span>
+              .
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-start gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">

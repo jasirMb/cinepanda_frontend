@@ -10,6 +10,7 @@ import {
   Eye,
   IndianRupee,
   Landmark,
+  Link2,
   Pencil,
   Plus,
   QrCode,
@@ -50,6 +51,7 @@ const EMPTY = {
   upiApp: "",
   cardNetwork: "",
   cardLast4: "",
+  linkedAccountId: "",
   notes: "",
 };
 
@@ -131,6 +133,7 @@ export default function PaymentAccountsPage() {
       upiApp: a.upiApp ?? "",
       cardNetwork: a.cardNetwork ?? "",
       cardLast4: a.cardLast4 ?? "",
+      linkedAccountId: a.linkedAccountId ?? "",
       notes: a.notes ?? "",
     });
     setEditingId(a._id);
@@ -143,10 +146,16 @@ export default function PaymentAccountsPage() {
       toast.error("Name is required");
       return;
     }
+    const isLinkedUpi = form.type === "UPI" && !!form.linkedAccountId;
     const payload: PaymentAccountPayload = {
       name: form.name.trim(),
       type: form.type,
-      openingBalance: form.openingBalance.trim() === "" ? 0 : Number(form.openingBalance),
+      // A linked UPI shares the bank's balance — no opening balance of its own.
+      openingBalance: isLinkedUpi
+        ? 0
+        : form.openingBalance.trim() === ""
+          ? 0
+          : Number(form.openingBalance),
       bankName: form.bankName.trim() || undefined,
       accountNumber: form.accountNumber.trim() || undefined,
       accountHolderName: form.accountHolderName.trim() || undefined,
@@ -156,11 +165,20 @@ export default function PaymentAccountsPage() {
       upiApp: form.upiApp.trim() || undefined,
       cardNetwork: form.cardNetwork.trim() || undefined,
       cardLast4: form.cardLast4.trim() || undefined,
+      // Only a UPI links to a bank; clear it otherwise.
+      linkedAccountId:
+        form.type === "UPI" ? form.linkedAccountId || null : null,
       notes: form.notes.trim() || undefined,
     };
     if (editingId) updateMutation.mutate({ id: editingId, payload });
     else createMutation.mutate(payload);
   }
+
+  // Banks a UPI can be linked to (its money lives in the bank).
+  const bankAccounts = useMemo(
+    () => accounts.filter((a) => a.type === "BANK" && a._id !== editingId),
+    [accounts, editingId]
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -173,10 +191,16 @@ export default function PaymentAccountsPage() {
     );
   }, [accounts, search]);
 
-  // Total money you currently have across every account.
-  const totalBalance = useMemo(
-    () => accounts.reduce((s, a) => s + (a.balance ?? 0), 0),
+  // Total money you currently have. Linked accounts (e.g. a UPI linked to a
+  // bank) share the bank's balance, so skip them to avoid double-counting.
+  const moneyAccounts = useMemo(
+    () => accounts.filter((a) => !a.linkedAccountId),
     [accounts]
+  );
+  const moneyAccountCount = moneyAccounts.length;
+  const totalBalance = useMemo(
+    () => moneyAccounts.reduce((s, a) => s + (a.balance ?? 0), 0),
+    [moneyAccounts]
   );
 
   if (query.isLoading) {
@@ -245,20 +269,32 @@ export default function PaymentAccountsPage() {
                 ))}
               </select>
             </Field>
-            <Field label="Opening balance (₹)">
-              <Input
-                type="number"
-                placeholder="Money already in this account"
-                value={form.openingBalance}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, openingBalance: e.target.value }))
-                }
-              />
-              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                What&apos;s in the account right now. For a credit card use a
-                negative number for what you owe.
-              </p>
-            </Field>
+            {form.type === "UPI" && form.linkedAccountId ? (
+              <Field label="Opening balance (₹)">
+                <div className="flex h-9 items-center rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+                  Shared with the linked bank
+                </div>
+                <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                  A linked UPI uses the bank&apos;s balance, so it has no opening
+                  balance of its own.
+                </p>
+              </Field>
+            ) : (
+              <Field label="Opening balance (₹)">
+                <Input
+                  type="number"
+                  placeholder="Money already in this account"
+                  value={form.openingBalance}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, openingBalance: e.target.value }))
+                  }
+                />
+                <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                  What&apos;s in the account right now. For a credit card use a
+                  negative number for what you owe.
+                </p>
+              </Field>
+            )}
             {form.type === "BANK" && (
               <>
                 <Field label="Bank name">
@@ -331,6 +367,27 @@ export default function PaymentAccountsPage() {
                     ))}
                   </select>
                 </Field>
+                <Field label="Linked bank account">
+                  <select
+                    value={form.linkedAccountId}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, linkedAccountId: e.target.value }))
+                    }
+                    className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                  >
+                    <option value="">Not linked (own balance)</option>
+                    {bankAccounts.map((b) => (
+                      <option key={b._id} value={b._id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    {bankAccounts.length === 0
+                      ? "Tip: add a bank account first, then link this UPI to it."
+                      : "If this UPI draws from a bank (e.g. GPay → HDFC), link it so the money is counted in that bank, not twice."}
+                  </p>
+                </Field>
               </>
             )}
             {form.type === "CARD" && (
@@ -392,7 +449,11 @@ export default function PaymentAccountsPage() {
                 Total money you have
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Across {accounts.length} account{accounts.length !== 1 ? "s" : ""}
+                Across {moneyAccountCount} account
+                {moneyAccountCount !== 1 ? "s" : ""}
+                {accounts.length !== moneyAccountCount
+                  ? ` · ${accounts.length - moneyAccountCount} linked`
+                  : ""}
               </p>
             </div>
           </div>
@@ -549,7 +610,7 @@ export default function PaymentAccountsPage() {
                   )}
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                      Balance now
+                      {a.linkedAccountName ? "Shared balance" : "Balance now"}
                     </p>
                     <p
                       className={`text-2xl font-bold tracking-tight ${
@@ -560,6 +621,11 @@ export default function PaymentAccountsPage() {
                     >
                       {inr(balance)}
                     </p>
+                    {a.linkedAccountName && (
+                      <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 dark:text-slate-500">
+                        <Link2 className="h-3 w-3" /> Linked to {a.linkedAccountName}
+                      </p>
+                    )}
                   </div>
 
                   {/* Actions */}
