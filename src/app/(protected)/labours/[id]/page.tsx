@@ -64,6 +64,38 @@ const PAYMENT_METHODS: { value: string; label: string }[] = [
   { value: "OTHER", label: "Other" },
 ];
 
+// Method ↔ account-type mapping, so picking a method filters the accounts
+// (and picking an account sets the method) like the ledger. null = no filter.
+function methodForType(type: string): string {
+  switch (type) {
+    case "BANK":
+      return "BANK_TRANSFER";
+    case "CASH":
+      return "CASH";
+    case "UPI":
+      return "UPI";
+    case "CARD":
+      return "CARD";
+    default:
+      return "OTHER";
+  }
+}
+function accountTypeForMethod(method: string): string | null {
+  switch (method) {
+    case "BANK_TRANSFER":
+    case "CHEQUE":
+      return "BANK";
+    case "CASH":
+      return "CASH";
+    case "UPI":
+      return "UPI";
+    case "CARD":
+      return "CARD";
+    default:
+      return null;
+  }
+}
+
 const EMPTY = {
   projectId: "",
   workDate: todayISO(),
@@ -99,6 +131,11 @@ export default function LabourDetailPage({
   const [pendingDelete, setPendingDelete] = useState<LabourWorkLog | null>(null);
 
   const payAccounts = usePaymentAccounts().data?.data ?? [];
+  // "Paid from" options filtered to match the selected method.
+  const accountType = accountTypeForMethod(form.paymentMethod);
+  const visibleAccounts = accountType
+    ? payAccounts.filter((a) => a.type === accountType)
+    : payAccounts;
 
   // Default the rate to the labour's daily wage once it loads.
   useEffect(() => {
@@ -525,35 +562,53 @@ export default function LabourDetailPage({
                 </Field>
               </div>
             </div>
-            <Field label="Paid from (account) *">
-              <select
-                value={form.paymentAccountId}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, paymentAccountId: e.target.value }))
-                }
-                className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-                required
-              >
-                <option value="">Select account…</option>
-                {payAccounts.map((acc) => (
-                  <option key={acc._id} value={acc._id}>
-                    {acc.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
             <Field label="Payment type">
               <select
                 value={form.paymentMethod}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, paymentMethod: e.target.value }))
-                }
+                onChange={(e) => {
+                  const method = e.target.value;
+                  const t = accountTypeForMethod(method);
+                  setForm((f) => {
+                    const acc = payAccounts.find(
+                      (a) => a._id === f.paymentAccountId
+                    );
+                    const keep = !t || !f.paymentAccountId || acc?.type === t;
+                    return {
+                      ...f,
+                      paymentMethod: method,
+                      paymentAccountId: keep ? f.paymentAccountId : "",
+                    };
+                  });
+                }}
                 className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
               >
                 <option value="">Method…</option>
                 {PAYMENT_METHODS.map((m) => (
                   <option key={m.value} value={m.value}>
                     {m.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Paid from (account) *">
+              <select
+                value={form.paymentAccountId}
+                onChange={(e) => {
+                  const accId = e.target.value;
+                  const acc = payAccounts.find((a) => a._id === accId);
+                  setForm((f) => ({
+                    ...f,
+                    paymentAccountId: accId,
+                    paymentMethod: acc ? methodForType(acc.type) : f.paymentMethod,
+                  }));
+                }}
+                className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                required
+              >
+                <option value="">Select account…</option>
+                {visibleAccounts.map((acc) => (
+                  <option key={acc._id} value={acc._id}>
+                    {acc.name}
                   </option>
                 ))}
               </select>

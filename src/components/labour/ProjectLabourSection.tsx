@@ -49,6 +49,39 @@ const PAYMENT_METHODS: { value: string; label: string }[] = [
   { value: "OTHER", label: "Other" },
 ];
 
+// The payment method an account type implies, and vice-versa — so picking a
+// method filters the accounts (and picking an account sets the method), like
+// the ledger form. null = no filter (show all accounts).
+function methodForType(type: string): string {
+  switch (type) {
+    case "BANK":
+      return "BANK_TRANSFER";
+    case "CASH":
+      return "CASH";
+    case "UPI":
+      return "UPI";
+    case "CARD":
+      return "CARD";
+    default:
+      return "OTHER";
+  }
+}
+function accountTypeForMethod(method: string): string | null {
+  switch (method) {
+    case "BANK_TRANSFER":
+    case "CHEQUE":
+      return "BANK";
+    case "CASH":
+      return "CASH";
+    case "UPI":
+      return "UPI";
+    case "CARD":
+      return "CARD";
+    default:
+      return null;
+  }
+}
+
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -358,8 +391,28 @@ export function ProjectLabourSection({
   const [logMethod, setLogMethod] = useState("");
   const [pendingSession, setPendingSession] = useState<LabourWorkLog | null>(null);
 
-  // Accounts the salary can be paid from (cash/bank/etc.).
-  const payAccounts = usePaymentAccounts().data?.data ?? [];
+  // Accounts the salary can be paid from (cash/bank/etc.), filtered to match
+  // the selected payment method — exactly like the ledger's "Paid through".
+  const allPayAccounts = usePaymentAccounts().data?.data ?? [];
+  const logAccountType = accountTypeForMethod(logMethod);
+  const payAccounts = logAccountType
+    ? allPayAccounts.filter((a) => a.type === logAccountType)
+    : allPayAccounts;
+
+  function handleLogMethodChange(method: string) {
+    setLogMethod(method);
+    // Clear the account if it no longer matches the method's type.
+    const t = accountTypeForMethod(method);
+    if (t && logAccountId) {
+      const acc = allPayAccounts.find((a) => a._id === logAccountId);
+      if (acc && acc.type !== t) setLogAccountId("");
+    }
+  }
+  function handleLogAccountChange(accId: string) {
+    setLogAccountId(accId);
+    const acc = allPayAccounts.find((a) => a._id === accId);
+    if (acc) setLogMethod(methodForType(acc.type));
+  }
 
   function toggleExpand(entry: ProjectLabour) {
     const lid = entry.labourId._id;
@@ -465,9 +518,9 @@ export function ProjectLabourSection({
         onLogRateChange={setLogRate}
         accounts={payAccounts}
         logAccountId={logAccountId}
-        onLogAccountChange={setLogAccountId}
+        onLogAccountChange={handleLogAccountChange}
         logMethod={logMethod}
-        onLogMethodChange={setLogMethod}
+        onLogMethodChange={handleLogMethodChange}
         onLog={() => handleLog(entry.labourId._id)}
         logging={logMutation.isPending}
         onRemove={() => setPendingRemove(entry)}
@@ -1037,21 +1090,6 @@ function LabourEntryCard({
                 />
               </label>
               <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-                Paid from *
-                <select
-                  value={logAccountId}
-                  onChange={(e) => onLogAccountChange(e.target.value)}
-                  className="h-7 w-40 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-                >
-                  <option value="">Select account…</option>
-                  {accounts.map((acc) => (
-                    <option key={acc._id} value={acc._id}>
-                      {acc.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                 Type
                 <select
                   value={logMethod}
@@ -1062,6 +1100,21 @@ function LabourEntryCard({
                   {PAYMENT_METHODS.map((m) => (
                     <option key={m.value} value={m.value}>
                       {m.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                Paid from *
+                <select
+                  value={logAccountId}
+                  onChange={(e) => onLogAccountChange(e.target.value)}
+                  className="h-7 w-40 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                >
+                  <option value="">Select account…</option>
+                  {accounts.map((acc) => (
+                    <option key={acc._id} value={acc._id}>
+                      {acc.name}
                     </option>
                   ))}
                 </select>
