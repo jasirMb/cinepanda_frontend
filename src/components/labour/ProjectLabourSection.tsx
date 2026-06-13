@@ -19,6 +19,7 @@ import {
 
 import { useLabours } from "@/hooks/useLabours";
 import { useGroups } from "@/hooks/useGroups";
+import { usePaymentAccounts } from "@/hooks/usePaymentAccounts";
 import { useLabourWorkLogs, workLogKeys } from "@/hooks/useLabourWorkLogs";
 import { projectsKeys } from "@/hooks/useProjects";
 import {
@@ -344,7 +345,11 @@ export function ProjectLabourSection({
   const [logDate, setLogDate] = useState(todayISO());
   const [logDays, setLogDays] = useState("1");
   const [logRate, setLogRate] = useState("");
+  const [logAccountId, setLogAccountId] = useState("");
   const [pendingSession, setPendingSession] = useState<LabourWorkLog | null>(null);
+
+  // Accounts the salary can be paid from (cash/bank/etc.).
+  const payAccounts = usePaymentAccounts().data?.data ?? [];
 
   function toggleExpand(entry: ProjectLabour) {
     const lid = entry.labourId._id;
@@ -365,13 +370,19 @@ export function ProjectLabourSection({
   }
 
   const logMutation = useMutation({
-    mutationFn: (vars: { labourId: string; days: number; rate: number }) =>
+    mutationFn: (vars: {
+      labourId: string;
+      days: number;
+      rate: number;
+      paymentAccountId: string;
+    }) =>
       createWorkLog({
         labourId: vars.labourId,
         projectId,
         workDate: logDate,
         days: vars.days,
         rate: vars.rate,
+        paymentAccountId: vars.paymentAccountId,
       }),
     onSuccess: () => {
       invalidateSessions();
@@ -403,7 +414,16 @@ export function ProjectLabourSection({
       toast.error("Enter a valid rate");
       return;
     }
-    logMutation.mutate({ labourId, days: d, rate: r });
+    if (!logAccountId) {
+      toast.error("Select which account you paid the salary from");
+      return;
+    }
+    logMutation.mutate({
+      labourId,
+      days: d,
+      rate: r,
+      paymentAccountId: logAccountId,
+    });
   }
 
   const hasGroupSections = groupSections.some((s) => s.entries.length > 0);
@@ -430,6 +450,9 @@ export function ProjectLabourSection({
         onLogDaysChange={setLogDays}
         logRate={logRate}
         onLogRateChange={setLogRate}
+        accounts={payAccounts}
+        logAccountId={logAccountId}
+        onLogAccountChange={setLogAccountId}
         onLog={() => handleLog(entry.labourId._id)}
         logging={logMutation.isPending}
         onRemove={() => setPendingRemove(entry)}
@@ -781,6 +804,9 @@ function LabourEntryCard({
   onLogDaysChange,
   logRate,
   onLogRateChange,
+  accounts,
+  logAccountId,
+  onLogAccountChange,
   onLog,
   logging,
   onRemove,
@@ -804,6 +830,9 @@ function LabourEntryCard({
   onLogDaysChange: (v: string) => void;
   logRate: string;
   onLogRateChange: (v: string) => void;
+  accounts: { _id: string; name: string }[];
+  logAccountId: string;
+  onLogAccountChange: (v: string) => void;
   onLog: () => void;
   logging: boolean;
   onRemove: () => void;
@@ -987,6 +1016,21 @@ function LabourEntryCard({
                   onChange={(e) => onLogRateChange(e.target.value)}
                   className="h-7 w-24 text-xs"
                 />
+              </label>
+              <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                Paid from *
+                <select
+                  value={logAccountId}
+                  onChange={(e) => onLogAccountChange(e.target.value)}
+                  className="h-7 w-40 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                >
+                  <option value="">Select account…</option>
+                  {accounts.map((acc) => (
+                    <option key={acc._id} value={acc._id}>
+                      {acc.name}
+                    </option>
+                  ))}
+                </select>
               </label>
               <Button
                 size="sm"

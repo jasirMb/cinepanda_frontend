@@ -22,6 +22,7 @@ import {
 
 import { useLabour, useLabourMemberships } from "@/hooks/useLabours";
 import { useProjects } from "@/hooks/useProjects";
+import { usePaymentAccounts } from "@/hooks/usePaymentAccounts";
 import { useLabourWorkLogs, workLogKeys } from "@/hooks/useLabourWorkLogs";
 import {
   createWorkLog,
@@ -60,6 +61,7 @@ const EMPTY = {
   sessionLabel: "",
   days: "1",
   rate: "",
+  paymentAccountId: "",
   notes: "",
 };
 
@@ -85,6 +87,8 @@ export default function LabourDetailPage({
   const [form, setForm] = useState(EMPTY);
   const [showSessionForm, setShowSessionForm] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<LabourWorkLog | null>(null);
+
+  const payAccounts = usePaymentAccounts().data?.data ?? [];
 
   // Default the rate to the labour's daily wage once it loads.
   useEffect(() => {
@@ -207,6 +211,10 @@ export default function LabourDetailPage({
       toast.error("Enter a valid rate");
       return;
     }
+    if (!form.paymentAccountId) {
+      toast.error("Select which account you paid the salary from");
+      return;
+    }
     createMutation.mutate({
       labourId: id,
       projectId: form.projectId,
@@ -214,6 +222,7 @@ export default function LabourDetailPage({
       sessionLabel: form.sessionLabel.trim() || undefined,
       days,
       rate,
+      paymentAccountId: form.paymentAccountId,
       notes: form.notes.trim() || undefined,
     });
   }
@@ -505,6 +514,23 @@ export default function LabourDetailPage({
                 </Field>
               </div>
             </div>
+            <Field label="Paid from (account) *">
+              <select
+                value={form.paymentAccountId}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, paymentAccountId: e.target.value }))
+                }
+                className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                required
+              >
+                <option value="">Select account…</option>
+                {payAccounts.map((acc) => (
+                  <option key={acc._id} value={acc._id}>
+                    {acc.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
             <Field label="Notes">
               <Input
                 placeholder="Optional"

@@ -29,6 +29,7 @@ export function LedgerLabourSession({
   projectId,
   workDate,
   amount,
+  paymentAccountId,
   onLogged,
 }: {
   projectId: string;
@@ -36,6 +37,8 @@ export function LedgerLabourSession({
   workDate?: string;
   /** Per-day rate — taken from the ledger entry's Amount field. */
   amount?: number;
+  /** Account the salary is paid from — taken from the form's "Paid through". */
+  paymentAccountId?: string;
   onLogged?: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -81,6 +84,10 @@ export function LedgerLabourSession({
       toast.error("Set the Amount above — it's used as the rate");
       return;
     }
+    if (!paymentAccountId) {
+      toast.error("Pick a “Paid through” account above first");
+      return;
+    }
     mutation.mutate({
       labourId,
       projectId,
@@ -88,6 +95,7 @@ export function LedgerLabourSession({
       days: d,
       rate,
       sessionLabel: sessionLabel.trim() || undefined,
+      paymentAccountId,
     });
   }
 

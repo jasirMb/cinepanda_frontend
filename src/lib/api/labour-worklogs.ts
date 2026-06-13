@@ -28,6 +28,9 @@ export interface LabourWorkLog {
   rate: number;
   amount: number;
   notes?: string;
+  /** Account the salary was paid from (populated to {_id,name} on reads). */
+  paymentAccountId?: { _id: string; name: string; type?: string } | string | null;
+  paymentMethod?: string;
   ledgerEntryId?: string;
   createdAt: string;
   updatedAt: string;
@@ -47,6 +50,9 @@ export interface WorkLogPayload {
   days: number;
   rate: number;
   notes?: string;
+  /** Required — which account the salary is paid from. */
+  paymentAccountId: string;
+  paymentMethod?: string;
 }
 
 export interface WorkLogQuery {

@@ -501,6 +501,7 @@ export default function NewLedgerEntryPage() {
               projectId={form.projectId}
               workDate={form.entryDate}
               amount={form.amount}
+              paymentAccountId={form.paymentAccountId}
               onLogged={() => router.push("/ledger")}
             />
           )}
