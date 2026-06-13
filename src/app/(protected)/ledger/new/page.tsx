@@ -111,6 +111,13 @@ export default function NewLedgerEntryPage() {
   const feePctEquiv =
     form.amount > 0 && feeAmount > 0 ? (feeAmount / form.amount) * 100 : 0;
 
+  // Turns true after a submit attempt — required fields then show a red outline.
+  const [triedSubmit, setTriedSubmit] = useState(false);
+  const errDescription = triedSubmit && !form.description.trim();
+  const errAmount = triedSubmit && form.amount <= 0;
+  const errCategory = triedSubmit && !form.category.trim();
+  const errAccount = triedSubmit && !form.paymentAccountId;
+
   const createMutation = useMutation({
     mutationFn: async ({
       main,
@@ -158,6 +165,7 @@ export default function NewLedgerEntryPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setTriedSubmit(true);
     if (!form.category.trim() || !form.description.trim() || !form.entryDate) {
       toast.error("Please fill in all required fields");
       return;
@@ -278,22 +286,32 @@ export default function NewLedgerEntryPage() {
                 setForm((f) => ({ ...f, amount: Number(e.target.value) }))
               }
               placeholder="0"
-              required
+              aria-invalid={errAmount}
             />
+            {errAmount && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                Enter an amount greater than 0.
+              </p>
+            )}
           </Field>
         </div>
 
         <Field label="Description *">
           <textarea
-            className="flex w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 dark:border-slate-800 dark:bg-slate-950 dark:ring-offset-slate-950 dark:placeholder:text-slate-400 dark:focus-visible:ring-slate-300"
+            className="flex w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 aria-[invalid=true]:border-red-500 aria-[invalid=true]:ring-1 aria-[invalid=true]:ring-red-500 dark:border-slate-800 dark:bg-slate-950 dark:ring-offset-slate-950 dark:placeholder:text-slate-400 dark:focus-visible:ring-slate-300"
             rows={3}
             value={form.description}
             onChange={(e) =>
               setForm((f) => ({ ...f, description: e.target.value }))
             }
             placeholder="Description of the transaction"
-            required
+            aria-invalid={errDescription}
           />
+          {errDescription && (
+            <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+              Description is required.
+            </p>
+          )}
         </Field>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -390,7 +408,7 @@ export default function NewLedgerEntryPage() {
                 }));
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger aria-invalid={errAccount}>
                 <SelectValue placeholder="Select account" />
               </SelectTrigger>
               <SelectContent>
@@ -407,6 +425,11 @@ export default function NewLedgerEntryPage() {
                 )}
               </SelectContent>
             </Select>
+            {errAccount && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                Choose the account it was paid through.
+              </p>
+            )}
             {selectedAccount && (
               <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
                 {accountDetail(selectedAccount)}
