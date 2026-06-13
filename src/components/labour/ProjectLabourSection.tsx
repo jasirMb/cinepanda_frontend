@@ -40,6 +40,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
+const PAYMENT_METHODS: { value: string; label: string }[] = [
+  { value: "CASH", label: "Cash" },
+  { value: "BANK_TRANSFER", label: "Bank transfer" },
+  { value: "UPI", label: "UPI" },
+  { value: "CARD", label: "Card" },
+  { value: "CHEQUE", label: "Cheque" },
+  { value: "OTHER", label: "Other" },
+];
+
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -346,6 +355,7 @@ export function ProjectLabourSection({
   const [logDays, setLogDays] = useState("1");
   const [logRate, setLogRate] = useState("");
   const [logAccountId, setLogAccountId] = useState("");
+  const [logMethod, setLogMethod] = useState("");
   const [pendingSession, setPendingSession] = useState<LabourWorkLog | null>(null);
 
   // Accounts the salary can be paid from (cash/bank/etc.).
@@ -375,6 +385,7 @@ export function ProjectLabourSection({
       days: number;
       rate: number;
       paymentAccountId: string;
+      paymentMethod?: string;
     }) =>
       createWorkLog({
         labourId: vars.labourId,
@@ -383,6 +394,7 @@ export function ProjectLabourSection({
         days: vars.days,
         rate: vars.rate,
         paymentAccountId: vars.paymentAccountId,
+        paymentMethod: vars.paymentMethod || undefined,
       }),
     onSuccess: () => {
       invalidateSessions();
@@ -423,6 +435,7 @@ export function ProjectLabourSection({
       days: d,
       rate: r,
       paymentAccountId: logAccountId,
+      paymentMethod: logMethod || undefined,
     });
   }
 
@@ -453,6 +466,8 @@ export function ProjectLabourSection({
         accounts={payAccounts}
         logAccountId={logAccountId}
         onLogAccountChange={setLogAccountId}
+        logMethod={logMethod}
+        onLogMethodChange={setLogMethod}
         onLog={() => handleLog(entry.labourId._id)}
         logging={logMutation.isPending}
         onRemove={() => setPendingRemove(entry)}
@@ -807,6 +822,8 @@ function LabourEntryCard({
   accounts,
   logAccountId,
   onLogAccountChange,
+  logMethod,
+  onLogMethodChange,
   onLog,
   logging,
   onRemove,
@@ -833,6 +850,8 @@ function LabourEntryCard({
   accounts: { _id: string; name: string }[];
   logAccountId: string;
   onLogAccountChange: (v: string) => void;
+  logMethod: string;
+  onLogMethodChange: (v: string) => void;
   onLog: () => void;
   logging: boolean;
   onRemove: () => void;
@@ -1028,6 +1047,21 @@ function LabourEntryCard({
                   {accounts.map((acc) => (
                     <option key={acc._id} value={acc._id}>
                       {acc.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                Type
+                <select
+                  value={logMethod}
+                  onChange={(e) => onLogMethodChange(e.target.value)}
+                  className="h-7 w-32 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                >
+                  <option value="">Method…</option>
+                  {PAYMENT_METHODS.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
                     </option>
                   ))}
                 </select>

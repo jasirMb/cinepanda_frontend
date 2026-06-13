@@ -502,6 +502,7 @@ export default function NewLedgerEntryPage() {
               workDate={form.entryDate}
               amount={form.amount}
               paymentAccountId={form.paymentAccountId}
+              paymentMethod={form.paymentMethod || undefined}
               onLogged={() => router.push("/ledger")}
             />
           )}

@@ -30,6 +30,7 @@ export function LedgerLabourSession({
   workDate,
   amount,
   paymentAccountId,
+  paymentMethod,
   onLogged,
 }: {
   projectId: string;
@@ -39,6 +40,8 @@ export function LedgerLabourSession({
   amount?: number;
   /** Account the salary is paid from — taken from the form's "Paid through". */
   paymentAccountId?: string;
+  /** Payment method — taken from the form's method field. */
+  paymentMethod?: string;
   onLogged?: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -96,6 +99,7 @@ export function LedgerLabourSession({
       rate,
       sessionLabel: sessionLabel.trim() || undefined,
       paymentAccountId,
+      paymentMethod: paymentMethod || undefined,
     });
   }
 

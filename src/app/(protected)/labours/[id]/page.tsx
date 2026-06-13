@@ -55,6 +55,15 @@ function projId(p: WorkLogProjectRef | string | null): string {
   return typeof p === "string" ? p : p._id;
 }
 
+const PAYMENT_METHODS: { value: string; label: string }[] = [
+  { value: "CASH", label: "Cash" },
+  { value: "BANK_TRANSFER", label: "Bank transfer" },
+  { value: "UPI", label: "UPI" },
+  { value: "CARD", label: "Card" },
+  { value: "CHEQUE", label: "Cheque" },
+  { value: "OTHER", label: "Other" },
+];
+
 const EMPTY = {
   projectId: "",
   workDate: todayISO(),
@@ -62,6 +71,7 @@ const EMPTY = {
   days: "1",
   rate: "",
   paymentAccountId: "",
+  paymentMethod: "",
   notes: "",
 };
 
@@ -223,6 +233,7 @@ export default function LabourDetailPage({
       days,
       rate,
       paymentAccountId: form.paymentAccountId,
+      paymentMethod: form.paymentMethod || undefined,
       notes: form.notes.trim() || undefined,
     });
   }
@@ -527,6 +538,22 @@ export default function LabourDetailPage({
                 {payAccounts.map((acc) => (
                   <option key={acc._id} value={acc._id}>
                     {acc.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Payment type">
+              <select
+                value={form.paymentMethod}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, paymentMethod: e.target.value }))
+                }
+                className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+              >
+                <option value="">Method…</option>
+                {PAYMENT_METHODS.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
                   </option>
                 ))}
               </select>
