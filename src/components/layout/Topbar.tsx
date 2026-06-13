@@ -101,6 +101,15 @@ const ROUTE_META: { match: (p: string) => boolean; meta: PageMeta }[] = [
   },
 
   {
+    match: (p) => p.startsWith("/staff/settings"),
+    meta: { title: "Staff Settings", subtitle: "Holidays & weekly offs" },
+  },
+  {
+    match: (p) => p.startsWith("/staff"),
+    meta: { title: "Staff", subtitle: "Team, attendance & salary" },
+  },
+
+  {
     match: (p) => p.startsWith("/vendors"),
     meta: { title: "Vendors", subtitle: "Suppliers & payees" },
   },
