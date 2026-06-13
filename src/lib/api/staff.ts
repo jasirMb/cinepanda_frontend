@@ -13,8 +13,12 @@ export interface Staff {
   name: string;
   designation?: string;
   monthlySalary?: number;
+  /** Day of the month (1–31) the salary is due. */
+  salaryDay?: number;
   phone?: string;
   joiningDate?: string;
+  avatarUrl?: string;
+  avatarKey?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -24,8 +28,11 @@ export interface StaffPayload {
   name: string;
   designation?: string;
   monthlySalary?: number;
+  salaryDay?: number;
   phone?: string;
   joiningDate?: string;
+  avatarUrl?: string;
+  avatarKey?: string;
 }
 
 export interface AttendanceRecord {

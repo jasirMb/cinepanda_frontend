@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -10,8 +10,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
-  IdCard,
+  ImagePlus,
   IndianRupee,
+  Loader2,
   Pencil,
   Plus,
   Settings,
@@ -28,6 +29,8 @@ import {
   type StaffPayload,
   type StaffOverview,
 } from "@/lib/api/staff";
+import { uploadFile, deleteFile } from "@/lib/api/files";
+import { compressImageToLimit } from "@/lib/compress-image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -42,12 +45,62 @@ function inr(n: number) {
   return `₹${(n ?? 0).toLocaleString("en-IN")}`;
 }
 
+const AVATAR_PALETTE = [
+  "from-violet-500 to-fuchsia-500",
+  "from-sky-500 to-indigo-500",
+  "from-emerald-500 to-teal-500",
+  "from-amber-500 to-orange-500",
+  "from-rose-500 to-pink-500",
+  "from-cyan-500 to-blue-500",
+];
+function getInitials(name: string) {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  );
+}
+function avatarColor(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length];
+}
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024; // 5 MB
+
+/** With an ordinal suffix, e.g. 1 → "1st", 2 → "2nd". */
+function ordinal(n: number) {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+/**
+ * Whether the salary for {year, month} is due to be paid by now —
+ * past months are always due; the current month becomes due once the
+ * salary day has passed (or immediately if no day is set); future months never.
+ */
+function salaryDue(year: number, month: number, salaryDay?: number): boolean {
+  const now = new Date();
+  const cy = now.getUTCFullYear();
+  const cm = now.getUTCMonth() + 1;
+  const cd = now.getUTCDate();
+  if (year < cy || (year === cy && month < cm)) return true;
+  if (year === cy && month === cm) return !salaryDay || cd >= salaryDay;
+  return false;
+}
+
 const EMPTY = {
   name: "",
   designation: "",
   monthlySalary: "",
+  salaryDay: "",
   phone: "",
   joiningDate: "",
+  avatarUrl: "",
+  avatarKey: "",
 };
 
 export default function StaffPage() {
@@ -69,11 +122,52 @@ export default function StaffPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [pendingDelete, setPendingDelete] = useState<Staff | null>(null);
+  const avatarFileRef = useRef<HTMLInputElement>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   function reset() {
     setForm(EMPTY);
     setEditingId(null);
     setShowForm(false);
+  }
+
+  async function handleAvatarFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file.");
+      return;
+    }
+    let toUpload = file;
+    if (file.size > MAX_AVATAR_BYTES) {
+      try {
+        toUpload = await compressImageToLimit(file, MAX_AVATAR_BYTES);
+        toast.info("Image was over 5 MB — compressed it before uploading.");
+      } catch {
+        toast.error("Image is too large. Please pick one under 5 MB.");
+        return;
+      }
+    }
+    const previousKey = form.avatarKey;
+    setUploadingAvatar(true);
+    try {
+      const uploaded = await uploadFile(toUpload, "avatars");
+      setForm((f) => ({ ...f, avatarUrl: uploaded.fileUrl, avatarKey: uploaded.key }));
+      if (previousKey && previousKey !== uploaded.key) {
+        deleteFile(previousKey).catch(() => {});
+      }
+    } catch {
+      toast.error("Failed to upload photo");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
+  function handleRemoveAvatar() {
+    const key = form.avatarKey;
+    setForm((f) => ({ ...f, avatarUrl: "", avatarKey: "" }));
+    if (key) deleteFile(key).catch(() => {});
   }
 
   function invalidate() {
@@ -116,8 +210,11 @@ export default function StaffPage() {
       name: s.name ?? "",
       designation: s.designation ?? "",
       monthlySalary: s.monthlySalary != null ? String(s.monthlySalary) : "",
+      salaryDay: s.salaryDay != null ? String(s.salaryDay) : "",
       phone: s.phone ?? "",
       joiningDate: s.joiningDate ? s.joiningDate.slice(0, 10) : "",
+      avatarUrl: s.avatarUrl ?? "",
+      avatarKey: s.avatarKey ?? "",
     });
     setEditingId(s._id);
     setShowForm(true);
@@ -129,13 +226,21 @@ export default function StaffPage() {
       toast.error("Name is required");
       return;
     }
+    const day = form.salaryDay.trim() === "" ? undefined : Number(form.salaryDay);
+    if (day !== undefined && (Number.isNaN(day) || day < 1 || day > 31)) {
+      toast.error("Salary day must be between 1 and 31");
+      return;
+    }
     const payload: StaffPayload = {
       name: form.name.trim(),
       designation: form.designation.trim() || undefined,
       monthlySalary:
         form.monthlySalary.trim() === "" ? 0 : Number(form.monthlySalary),
+      salaryDay: day,
       phone: form.phone.trim() || undefined,
       joiningDate: form.joiningDate || undefined,
+      avatarUrl: form.avatarUrl || undefined,
+      avatarKey: form.avatarKey || undefined,
     };
     if (editingId) updateMutation.mutate({ id: editingId, payload });
     else createMutation.mutate(payload);
@@ -222,6 +327,64 @@ export default function StaffPage() {
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
             {editingId ? "Edit staff" : "New staff"}
           </h3>
+
+          {/* Profile photo */}
+          <div className="flex items-center gap-4">
+            <div className="relative h-16 w-16 shrink-0">
+              <div
+                className={`flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br text-lg font-semibold text-white ${avatarColor(
+                  form.name || "?"
+                )}`}
+              >
+                {form.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={form.avatarUrl}
+                    alt="Staff photo"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  getInitials(form.name || "?")
+                )}
+              </div>
+              {uploadingAvatar && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => avatarFileRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="h-7 px-3 text-xs"
+              >
+                <ImagePlus className="mr-1.5 h-3 w-3" />
+                {form.avatarUrl ? "Change photo" : "Upload photo"}
+              </Button>
+              {form.avatarUrl && (
+                <button
+                  type="button"
+                  onClick={handleRemoveAvatar}
+                  disabled={uploadingAvatar}
+                  className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-red-600 disabled:opacity-50 dark:text-slate-400"
+                >
+                  <Trash2 className="h-3 w-3" /> Remove
+                </button>
+              )}
+            </div>
+            <input
+              ref={avatarFileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="hidden"
+              onChange={handleAvatarFile}
+            />
+          </div>
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Name *">
               <Input
@@ -248,6 +411,18 @@ export default function StaffPage() {
                   setForm((f) => ({ ...f, monthlySalary: e.target.value }))
                 }
                 placeholder="e.g. 30000"
+              />
+            </Field>
+            <Field label="Salary day (1–31)">
+              <Input
+                type="number"
+                min={1}
+                max={31}
+                value={form.salaryDay}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, salaryDay: e.target.value }))
+                }
+                placeholder="e.g. 1 (paid on the 1st)"
               />
             </Field>
             <Field label="Phone">
@@ -299,8 +474,21 @@ export default function StaffPage() {
                 className="group flex h-full flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-cine-primary/40 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700"
               >
                 <div className="flex items-start gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cine-primary to-indigo-600 text-white shadow-sm">
-                    <IdCard className="h-5 w-5" />
+                  <div
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br text-sm font-semibold text-white shadow-sm ${
+                      s.avatarUrl ? "" : avatarColor(s.name || "?")
+                    }`}
+                  >
+                    {s.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={s.avatarUrl}
+                        alt={s.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      getInitials(s.name || "?")
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <Link
@@ -311,6 +499,7 @@ export default function StaffPage() {
                     </Link>
                     <p className="truncate text-xs text-slate-500 dark:text-slate-400">
                       {s.designation || "—"}
+                      {s.salaryDay ? ` · pays on the ${ordinal(s.salaryDay)}` : ""}
                     </p>
                   </div>
                   <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
@@ -348,11 +537,13 @@ export default function StaffPage() {
                           </p>
                         </div>
                       </div>
-                      {!ov.paid && (ov.earned ?? 0) > 0 && (
-                        <span className="mt-2 inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                          <AlertTriangle className="h-3 w-3" /> Need to pay salary
-                        </span>
-                      )}
+                      {!ov.paid &&
+                        (ov.earned ?? 0) > 0 &&
+                        salaryDue(year, month, s.salaryDay) && (
+                          <span className="mt-2 inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                            <AlertTriangle className="h-3 w-3" /> Need to pay salary
+                          </span>
+                        )}
                     </>
                   )}
                 </div>

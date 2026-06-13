@@ -69,6 +69,20 @@ function inr(n: number) {
 function pad(n: number) {
   return String(n).padStart(2, "0");
 }
+function ordinal(n: number) {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+function salaryDue(year: number, month: number, salaryDay?: number): boolean {
+  const d = new Date();
+  const cy = d.getUTCFullYear();
+  const cm = d.getUTCMonth() + 1;
+  const cd = d.getUTCDate();
+  if (year < cy || (year === cy && month < cm)) return true;
+  if (year === cy && month === cm) return !salaryDay || cd >= salaryDay;
+  return false;
+}
 function fmtDateISO(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", {
     day: "2-digit",
@@ -333,8 +347,17 @@ export default function StaffDetailPage({
 
       {/* Header */}
       <div className="flex items-start gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cine-primary to-indigo-600 text-white shadow-sm">
-          <IdCard className="h-6 w-6" />
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-cine-primary to-indigo-600 text-white shadow-sm">
+          {staff.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={staff.avatarUrl}
+              alt={staff.name}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <IdCard className="h-6 w-6" />
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-xl font-bold text-slate-900 dark:text-slate-50">
@@ -352,6 +375,11 @@ export default function StaffDetailPage({
           <p className="text-lg font-bold text-slate-900 dark:text-slate-50">
             {inr(staff.monthlySalary ?? 0)}
           </p>
+          {staff.salaryDay ? (
+            <p className="text-[11px] text-slate-400">
+              Due on the {ordinal(staff.salaryDay)}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -446,10 +474,15 @@ export default function StaffDetailPage({
             <AlertTriangle className="h-6 w-6 shrink-0 text-amber-500" />
             <div>
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                Need to pay salary — {MONTHS[month - 1]} {year}
+                {salaryDue(year, month, staff.salaryDay)
+                  ? `Need to pay salary — ${MONTHS[month - 1]} ${year}`
+                  : `Salary not paid yet — ${MONTHS[month - 1]} ${year}`}
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {inr(overview?.earned ?? 0)} earned this month
+                {staff.salaryDay
+                  ? ` · due on the ${ordinal(staff.salaryDay)}`
+                  : ""}
               </p>
             </div>
           </div>
