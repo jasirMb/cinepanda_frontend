@@ -13,6 +13,7 @@ import {
   ChevronRight,
   IdCard,
   Plus,
+  Trash2,
   Wallet,
 } from "lucide-react";
 
@@ -34,6 +35,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 const PAYMENT_METHODS: { value: string; label: string }[] = [
   { value: "CASH", label: "Cash" },
@@ -101,8 +107,13 @@ const STATUS_META: Record<
   ABSENT: { label: "Absent", short: "A", cls: "bg-rose-500 text-white" },
   PAID_LEAVE: { label: "Paid leave", short: "L", cls: "bg-sky-500 text-white" },
 };
-// Clicking a day cycles through these.
-const CYCLE: (AttendanceStatus | "")[] = ["", "PRESENT", "HALF_DAY", "ABSENT", "PAID_LEAVE"];
+// Order the statuses appear in the day's popup menu.
+const STATUS_ORDER: AttendanceStatus[] = [
+  "PRESENT",
+  "HALF_DAY",
+  "ABSENT",
+  "PAID_LEAVE",
+];
 
 function isHoliday(
   year: number,
@@ -159,6 +170,11 @@ export default function StaffDetailPage({
   // "Add overtime for a day" control (for normal working days).
   const [otDay, setOtDay] = useState("");
   const [otHours, setOtHours] = useState("");
+
+  // Per-day attendance popup menu (which day is open + its inline overtime input).
+  const [menuDay, setMenuDay] = useState<number | null>(null);
+  const [menuOt, setMenuOt] = useState(false);
+  const [menuHours, setMenuHours] = useState("");
 
   // Map day-of-month → status.
   const statusByDay = useMemo(() => {
@@ -247,16 +263,36 @@ export default function StaffDetailPage({
     });
   }
 
-  function cycleDay(day: number, holiday: boolean) {
-    const current = statusByDay.get(day) ?? "";
+  // Open/close a day's popup menu, resetting its inline overtime sub-state.
+  function openMenu(day: number) {
+    const rec = monthQuery.data?.attendance.find(
+      (r) => new Date(r.date).getUTCDate() === day
+    );
+    setMenuDay(day);
+    setMenuOt(false);
+    setMenuHours(rec?.overtimeHours != null ? String(rec.overtimeHours) : "");
+  }
+
+  // Set a day's status straight from the menu, then close it.
+  function pickStatus(day: number, status: AttendanceStatus | "") {
     const date = `${year}-${pad(month)}-${pad(day)}`;
-    if (holiday) {
-      // Holidays: a simple worked / not-worked toggle (overtime).
-      mark.mutate({ date, status: current === "PRESENT" ? "" : "PRESENT" });
+    mark.mutate({ date, status });
+    setMenuDay(null);
+  }
+
+  // Mark the day worked + save its overtime hours from the menu.
+  function pickOvertime(day: number) {
+    const n = Number(menuHours);
+    if (!(n > 0)) {
+      toast.error("Enter overtime hours");
       return;
     }
-    const next = CYCLE[(CYCLE.indexOf(current) + 1) % CYCLE.length];
-    mark.mutate({ date, status: next });
+    const date = `${year}-${pad(month)}-${pad(day)}`;
+    const current = statusByDay.get(day);
+    const status: AttendanceStatus =
+      current === "HALF_DAY" ? "HALF_DAY" : "PRESENT";
+    mark.mutate({ date, status, overtimeHours: n, overtimePay: null });
+    setMenuDay(null);
   }
 
   // Day-rate = a normal day's pay; the fallback for holiday work with no hours.
@@ -345,6 +381,21 @@ export default function StaffDetailPage({
     const num = trimmed === "" ? null : Number(trimmed);
     if (num !== null && (Number.isNaN(num) || num < 0)) return;
     mark.mutate({ date, status, overtimePay: num });
+  }
+
+  // Remove a day's overtime. For a holiday-worked day the overtime IS the work,
+  // so un-mark the day; for a normal day keep its status and just drop the OT.
+  function deleteOvertime(
+    day: number,
+    holiday: boolean,
+    status: AttendanceStatus
+  ) {
+    const date = `${year}-${pad(month)}-${pad(day)}`;
+    if (holiday) {
+      mark.mutate({ date, status: "" });
+    } else {
+      mark.mutate({ date, status, overtimeHours: null, overtimePay: null });
+    }
   }
 
   // Every day of the month from the 1st up to today (no future days) that doesn't
@@ -682,7 +733,7 @@ export default function StaffDetailPage({
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 lg:w-[480px] lg:shrink-0">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-            Attendance — tap a day to cycle
+            Attendance — tap a day to mark
           </h3>
           <div className="flex flex-wrap items-center gap-2 text-[11px]">
             {(Object.keys(STATUS_META) as AttendanceStatus[]).map((s) => (
@@ -723,44 +774,168 @@ export default function StaffDetailPage({
             const dateStr = `${year}-${pad(month)}-${pad(day)}`;
             const isToday = dateStr === todayStr;
             const isFuture = dateStr > todayStr;
-            return (
-              <button
-                key={day}
-                type="button"
-                disabled={mark.isPending || isFuture}
-                onClick={() => cycleDay(day, holiday)}
-                className={`flex aspect-square flex-col items-center justify-center rounded-lg border text-xs transition ${
-                  isToday ? "ring-2 ring-cine-primary/50" : ""
-                } ${
-                  isFuture
-                    ? "cursor-not-allowed border-slate-100 bg-slate-50/60 text-slate-300 dark:border-slate-800/60 dark:bg-slate-900/30 dark:text-slate-700"
-                    : holidayWorked
-                      ? "border-transparent bg-violet-500 text-white hover:opacity-90"
-                      : holiday
-                        ? "border-dashed border-slate-200 bg-slate-50 text-slate-400 hover:border-violet-400 hover:text-violet-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-600"
-                        : meta
-                          ? `border-transparent ${meta.cls} hover:opacity-90`
-                          : "border-slate-200 bg-white text-slate-600 hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
-                }`}
-                title={
-                  isFuture
-                    ? "Future date — can't mark yet"
-                    : holidayWorked
-                      ? "Holiday work (overtime)"
-                      : holiday
-                        ? "Holiday / weekly off — tap if worked"
-                        : meta
-                          ? meta.label
-                          : "Not marked"
-                }
-              >
+            const cellClass = `flex aspect-square w-full flex-col items-center justify-center rounded-lg border text-xs transition ${
+              isToday ? "ring-2 ring-cine-primary/50" : ""
+            } ${
+              isFuture
+                ? "cursor-not-allowed border-slate-100 bg-slate-50/60 text-slate-300 dark:border-slate-800/60 dark:bg-slate-900/30 dark:text-slate-700"
+                : holidayWorked
+                  ? "border-transparent bg-violet-500 text-white hover:opacity-90"
+                  : holiday
+                    ? "border-dashed border-slate-200 bg-slate-50 text-slate-400 hover:border-violet-400 hover:text-violet-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-600"
+                    : meta
+                      ? `border-transparent ${meta.cls} hover:opacity-90`
+                      : "border-slate-200 bg-white text-slate-600 hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+            }`;
+            const cellInner = (
+              <>
                 <span className="font-semibold">{day}</span>
                 {holidayWorked ? (
                   <span className="text-[10px] font-bold">OT</span>
                 ) : (
                   meta && <span className="text-[10px] font-bold">{meta.short}</span>
                 )}
-              </button>
+              </>
+            );
+
+            if (isFuture) {
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  disabled
+                  className={cellClass}
+                  title="Future date — can't mark yet"
+                >
+                  {cellInner}
+                </button>
+              );
+            }
+
+            return (
+              <Popover
+                key={day}
+                open={menuDay === day}
+                onOpenChange={(o) =>
+                  o
+                    ? openMenu(day)
+                    : setMenuDay((cur) => (cur === day ? null : cur))
+                }
+              >
+                <PopoverTrigger asChild>
+                  <button type="button" className={cellClass}>
+                    {cellInner}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="center" className="w-56 p-2">
+                  <p className="px-1 pb-1.5 text-xs font-semibold text-slate-900 dark:text-slate-50">
+                    {MONTHS[month - 1].slice(0, 3)} {day}, {year}
+                    <span className="ml-1 font-normal text-slate-400">
+                      {WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()]}
+                    </span>
+                    {holiday && (
+                      <span className="ml-1.5 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+                        Holiday
+                      </span>
+                    )}
+                  </p>
+
+                  {/* Status options (a holiday only supports "worked") */}
+                  <div className="space-y-0.5">
+                    {(holiday ? (["PRESENT"] as AttendanceStatus[]) : STATUS_ORDER).map(
+                      (s) => {
+                        const active = status === s;
+                        return (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => pickStatus(day, s)}
+                            className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition hover:bg-slate-100 dark:hover:bg-slate-800 ${
+                              active
+                                ? "bg-slate-100 font-semibold dark:bg-slate-800"
+                                : ""
+                            }`}
+                          >
+                            <span
+                              className={`h-2.5 w-2.5 rounded-full ${STATUS_META[s].cls}`}
+                            />
+                            {holiday ? "Worked (holiday)" : STATUS_META[s].label}
+                            {active && (
+                              <CheckCircle2 className="ml-auto h-3.5 w-3.5 text-cine-primary" />
+                            )}
+                          </button>
+                        );
+                      }
+                    )}
+                  </div>
+
+                  <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+
+                  {/* Overtime — mark present + enter hours inline */}
+                  {!menuOt ? (
+                    <button
+                      type="button"
+                      onClick={() => setMenuOt(true)}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-violet-700 transition hover:bg-violet-50 dark:text-violet-300 dark:hover:bg-violet-950/30"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Overtime
+                    </button>
+                  ) : (
+                    <div className="rounded-md bg-violet-50 p-2 dark:bg-violet-950/30">
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.5"
+                          autoFocus
+                          value={menuHours}
+                          onChange={(e) => setMenuHours(e.target.value)}
+                          placeholder={holiday ? String(stdHours) : "0"}
+                          className="h-8 w-16 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                        />
+                        <span className="text-xs text-slate-500">hrs</span>
+                        <span className="ml-auto text-sm font-semibold text-violet-700 dark:text-violet-300">
+                          {inr(Math.round((Number(menuHours) || 0) * otRate))}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[10px] text-slate-400">
+                        × ₹{otRate.toLocaleString("en-IN")}/hr · marks the day present
+                      </p>
+                      <div className="mt-1.5 flex justify-end gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => setMenuOt(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => pickOvertime(day)}
+                        >
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Clear */}
+                  {status && (
+                    <button
+                      type="button"
+                      onClick={() => pickStatus(day, "")}
+                      className="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                    >
+                      <span className="flex h-2.5 w-2.5 items-center justify-center text-slate-400">
+                        ×
+                      </span>
+                      Clear
+                    </button>
+                  )}
+                </PopoverContent>
+              </Popover>
             );
           })}
         </div>
@@ -830,6 +1005,15 @@ export default function StaffDetailPage({
                     title="Pay for this day — leave blank to use hours × rate"
                     className="h-8 w-20 rounded-md border border-slate-200 bg-white px-2 text-sm font-semibold text-violet-700 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-violet-300"
                   />
+                  <button
+                    type="button"
+                    onClick={() => deleteOvertime(day, holiday, rec.status)}
+                    title={holiday ? "Remove holiday work" : "Remove overtime"}
+                    aria-label="Delete overtime"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               </li>
             ))}
