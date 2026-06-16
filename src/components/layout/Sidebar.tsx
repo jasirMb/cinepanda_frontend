@@ -147,32 +147,42 @@ export function Sidebar() {
           showExpanded ? "px-5" : "justify-center px-0"
         )}
       >
-        <div className="relative shrink-0">
-          <div
-            aria-hidden
-            className="absolute inset-0 rounded-xl bg-cine-primary/30 blur-md"
-          />
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-white/10 to-white/0 p-1.5 ring-1 ring-white/10">
-            <Image
-              src="/cinepanda-logo.png"
-              alt="Cinepanda logo"
-              width={32}
-              height={32}
-              priority
-              className="drop-shadow-[0_2px_8px_rgba(48,118,161,0.55)]"
+        <Link
+          href="/dashboard"
+          onClick={closeMobile}
+          title="Go to dashboard"
+          className={clsx(
+            "flex min-w-0 items-center gap-3 rounded-lg transition hover:opacity-90",
+            showExpanded && "flex-1"
+          )}
+        >
+          <div className="relative shrink-0">
+            <div
+              aria-hidden
+              className="absolute inset-0 rounded-xl bg-cine-primary/30 blur-md"
             />
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-white/10 to-white/0 p-1.5 ring-1 ring-white/10">
+              <Image
+                src="/cinepanda-logo.png"
+                alt="Cinepanda logo"
+                width={32}
+                height={32}
+                priority
+                className="drop-shadow-[0_2px_8px_rgba(48,118,161,0.55)]"
+              />
+            </div>
           </div>
-        </div>
-        {showExpanded && (
-          <div className="min-w-0 flex-1 leading-tight">
-            <p className="truncate text-base font-semibold tracking-tight text-white">
-              Cinepanda
-            </p>
-            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-cine-primary">
-              Entertainment
-            </p>
-          </div>
-        )}
+          {showExpanded && (
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="truncate text-base font-semibold tracking-tight text-white">
+                Cinepanda
+              </p>
+              <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-cine-primary">
+                Entertainment
+              </p>
+            </div>
+          )}
+        </Link>
         <button
           type="button"
           onClick={closeMobile}

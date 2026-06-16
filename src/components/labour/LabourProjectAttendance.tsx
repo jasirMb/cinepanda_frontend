@@ -28,6 +28,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
+import { formatDate } from "@/lib/format-date";
 import {
   Popover,
   PopoverContent,
@@ -87,17 +88,6 @@ function inr(n: number) {
 function pad(n: number) {
   return String(n).padStart(2, "0");
 }
-function fmtDateISO(iso: string) {
-  return new Date(iso).toLocaleDateString("en-IN", {
-    day: "2-digit", month: "short", year: "numeric",
-  });
-}
-/** dd/mm/yyyy from a YYYY-MM-DD or ISO string. */
-function fmtDMY(iso: string) {
-  const d = iso.slice(0, 10).split("-");
-  return d.length === 3 ? `${d[2]}/${d[1]}/${d[0]}` : iso;
-}
-
 export function LabourProjectAttendance({
   labourId,
   projectId,
@@ -415,7 +405,7 @@ export function LabourProjectAttendance({
                 {periods
                   .map(
                     (p) =>
-                      `${fmtDMY(p.start)}–${fmtDMY(p.end)}${p.rate != null ? ` @ ${inr(p.rate)}` : ""}`
+                      `${formatDate(p.start)}–${formatDate(p.end)}${p.rate != null ? ` @ ${inr(p.rate)}` : ""}`
                   )
                   .join(", ")}
               </span>
@@ -460,7 +450,7 @@ export function LabourProjectAttendance({
         {periods.length > 0 && (
           <p className="mb-2 text-[11px] text-slate-500 dark:text-slate-400">
             Work dates:{" "}
-            {periods.map((p) => `${fmtDMY(p.start)} → ${fmtDMY(p.end)}`).join("  ·  ")}{" "}
+            {periods.map((p) => `${formatDate(p.start)} → ${formatDate(p.end)}`).join("  ·  ")}{" "}
             (other days are locked)
           </p>
         )}
@@ -649,7 +639,7 @@ export function LabourProjectAttendance({
           </label>
           <label className="flex flex-col gap-1 text-xs font-medium text-slate-700 dark:text-slate-300">
             Paid date
-            <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+            <DatePicker value={payDate} onChange={setPayDate} placeholder="Pick a date" className="h-9" />
           </label>
           <div className="flex justify-end gap-2 sm:col-span-4">
             <Button variant="outline" size="sm" onClick={() => setShowPay(false)}>Cancel</Button>
@@ -668,7 +658,7 @@ export function LabourProjectAttendance({
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
                   <span className="font-semibold text-slate-800 dark:text-slate-100">{inr(p.amount)}</span>
                   {typeof p.paymentAccountId === "object" && p.paymentAccountId ? ` · ${p.paymentAccountId.name}` : ""}
-                  {` · ${fmtDateISO(p.paidDate)}`}
+                  {` · ${formatDate(p.paidDate)}`}
                 </span>
                 <button type="button" onClick={() => deletePayMutation.mutate(p._id)}
                   className="rounded-md px-2 py-0.5 font-medium text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40">

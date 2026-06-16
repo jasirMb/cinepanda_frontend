@@ -39,6 +39,7 @@ import {
 import { GroupAvatar } from "@/components/groups/GroupAvatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const PAYMENT_METHODS: { value: string; label: string }[] = [
@@ -1226,10 +1227,10 @@ function LabourEntryCard({
             <div className="flex flex-wrap items-end gap-2">
               <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                 Date
-                <Input
-                  type="date"
+                <DatePicker
                   value={logDate}
-                  onChange={(e) => onLogDateChange(e.target.value)}
+                  onChange={onLogDateChange}
+                  placeholder="Pick a date"
                   className="h-7 w-36 text-xs"
                 />
               </label>

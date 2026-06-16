@@ -36,6 +36,8 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProjectFilter } from "@/components/ui/project-filter";
+import { DatePicker } from "@/components/ui/date-picker";
+import { formatDate } from "@/lib/format-date";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -326,7 +328,7 @@ export default function LabourDetailPage({
     return entries.filter((e) => {
       if (logProject && e.pid !== logProject) return false;
       if (!q) return true;
-      const date = new Date(e.date).toLocaleDateString().toLowerCase();
+      const date = formatDate(e.date).toLowerCase();
       return (
         e.projectName.toLowerCase().includes(q) ||
         (e.sessionLabel ?? "").toLowerCase().includes(q) ||
@@ -605,7 +607,7 @@ export default function LabourDetailPage({
                     >
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                         <Field label="Date *">
-                          <Input type="date" value={form.workDate} onChange={(e) => setForm((f) => ({ ...f, workDate: e.target.value }))} />
+                          <DatePicker value={form.workDate} onChange={(v) => setForm((f) => ({ ...f, workDate: v }))} placeholder="Pick a date" />
                         </Field>
                         <Field label="Days *">
                           <Input type="number" min={0} step="0.5" value={form.days} onChange={(e) => setForm((f) => ({ ...f, days: e.target.value }))} />
@@ -763,7 +765,7 @@ export default function LabourDetailPage({
                     </div>
                     <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                       <CalendarDays className="h-3 w-3" />
-                      {new Date(e.date).toLocaleDateString()}
+                      {formatDate(e.date)}
                       <span className="text-slate-300 dark:text-slate-600">•</span>
                       {isAtt ? `Settled${e.account ? ` · ${e.account}` : ""}` : `${e.days} day(s) × ${inr(e.rate ?? 0)}`}
                     </p>

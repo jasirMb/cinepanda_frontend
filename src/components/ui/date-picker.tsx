@@ -41,9 +41,11 @@ export function DatePicker({
         >
           <CalendarIcon className="mr-2 h-4 w-4" />
           {date
-            ? `${String(date.getDate()).padStart(2, "0")}/${String(
-                date.getMonth() + 1
-              ).padStart(2, "0")}/${date.getFullYear()}`
+            ? date.toLocaleDateString("en-IN", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })
             : placeholder}
         </Button>
       </PopoverTrigger>
