@@ -315,8 +315,10 @@ export function LabourProjectAttendance({
         <Stat label="Owed (total)" value={inr(summary?.owed ?? 0)} tone="emerald" />
       </div>
 
-      {/* Calendar */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+      {/* Calendar + side panel — two columns on desktop, like the staff page */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        {/* Calendar */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 lg:w-[480px] lg:shrink-0">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
             <button type="button" onClick={() => shiftMonth(-1)} aria-label="Previous month" className="flex h-7 w-7 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
@@ -435,10 +437,11 @@ export function LabourProjectAttendance({
             );
           })}
         </div>
-      </div>
+        </div>
 
-      {/* Pay / dues — styled like the staff salary banner */}
-      {(summary?.outstanding ?? 0) > 0 ? (
+        <div className="flex-1 space-y-4 lg:min-w-0">
+        {/* Pay / dues — styled like the staff salary banner */}
+        {(summary?.outstanding ?? 0) > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/20">
           <div className="flex items-center gap-3">
             <AlertTriangle className="h-6 w-6 shrink-0 text-amber-500" />
@@ -529,6 +532,8 @@ export function LabourProjectAttendance({
           </ul>
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }
