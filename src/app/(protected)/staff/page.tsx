@@ -83,18 +83,24 @@ function ordinal(n: number) {
 }
 
 /**
- * Whether the salary for {year, month} is due to be paid by now —
- * past months are always due; the current month becomes due once the
- * salary day has passed (or immediately if no day is set); future months never.
+ * Salary is paid in arrears: a month's salary is credited on `salaryDay` of the
+ * NEXT month (e.g. May's salary is due 1 Jun). It's "due" once that date passes.
  */
 function salaryDue(year: number, month: number, salaryDay?: number): boolean {
+  const day = salaryDay && salaryDay >= 1 ? salaryDay : 1;
+  let dy = year;
+  let dm = month + 1;
+  if (dm > 12) {
+    dm = 1;
+    dy += 1;
+  }
+  const lastDay = new Date(Date.UTC(dy, dm, 0)).getUTCDate();
+  const credit = new Date(Date.UTC(dy, dm - 1, Math.min(day, lastDay)));
   const now = new Date();
-  const cy = now.getUTCFullYear();
-  const cm = now.getUTCMonth() + 1;
-  const cd = now.getUTCDate();
-  if (year < cy || (year === cy && month < cm)) return true;
-  if (year === cy && month === cm) return !salaryDay || cd >= salaryDay;
-  return false;
+  const today = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  );
+  return today >= credit;
 }
 
 const EMPTY = {
@@ -125,6 +131,17 @@ export default function StaffPage() {
     for (const o of overviewQuery.data?.data ?? []) m.set(o.staff._id, o);
     return m;
   }, [overviewQuery.data]);
+
+  // Previous month — salary is paid in arrears, so the prior month's unpaid
+  // salary is the one that's actually due now. Surface it on each card.
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
+  const prevOverviewQuery = useStaffOverview(prevYear, prevMonth);
+  const prevById = useMemo(() => {
+    const m = new Map<string, StaffOverview>();
+    for (const o of prevOverviewQuery.data?.data ?? []) m.set(o.staff._id, o);
+    return m;
+  }, [prevOverviewQuery.data]);
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -523,6 +540,12 @@ export default function StaffPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {staff.map((s) => {
             const ov = overviewById.get(s._id);
+            const prevOv = prevById.get(s._id);
+            const prevPending =
+              !!prevOv &&
+              !prevOv.paid &&
+              (prevOv.earned ?? 0) > 0 &&
+              salaryDue(prevYear, prevMonth, s.salaryDay);
             return (
               <div
                 key={s._id}
@@ -554,7 +577,9 @@ export default function StaffPage() {
                     </Link>
                     <p className="truncate text-xs text-slate-500 dark:text-slate-400">
                       {s.designation || "—"}
-                      {s.salaryDay ? ` · pays on the ${ordinal(s.salaryDay)}` : ""}
+                      {s.salaryDay
+                        ? ` · paid the ${ordinal(s.salaryDay)} of next month`
+                        : ""}
                     </p>
                   </div>
                   <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
@@ -592,13 +617,25 @@ export default function StaffPage() {
                           </p>
                         </div>
                       </div>
-                      {!ov.paid &&
-                        (ov.earned ?? 0) > 0 &&
-                        salaryDue(year, month, s.salaryDay) && (
-                          <span className="mt-2 inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                            <AlertTriangle className="h-3 w-3" /> Need to pay salary
-                          </span>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {prevPending && (
+                          <Link
+                            href={`/staff/${s._id}`}
+                            title={`${MONTHS[prevMonth - 1]} ${prevYear} salary is due and unpaid`}
+                            className="inline-flex items-center gap-1 rounded-md bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700 transition hover:bg-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:hover:bg-rose-900/50"
+                          >
+                            <AlertTriangle className="h-3 w-3" />
+                            {MONTHS[prevMonth - 1]} pending · {inr(prevOv!.earned)}
+                          </Link>
                         )}
+                        {!ov.paid &&
+                          (ov.earned ?? 0) > 0 &&
+                          salaryDue(year, month, s.salaryDay) && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                              <AlertTriangle className="h-3 w-3" /> Need to pay salary
+                            </span>
+                          )}
+                      </div>
                     </>
                   )}
                 </div>

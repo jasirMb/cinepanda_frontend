@@ -35,6 +35,7 @@ import {
 } from "@/lib/api/staff";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Popover,
@@ -64,6 +65,21 @@ function methodForType(type?: string): string {
       return "";
   }
 }
+function accountTypeForMethod(method: string): string | null {
+  switch (method) {
+    case "BANK_TRANSFER":
+    case "CHEQUE":
+      return "BANK";
+    case "CASH":
+      return "CASH";
+    case "UPI":
+      return "UPI";
+    case "CARD":
+      return "CARD";
+    default:
+      return null;
+  }
+}
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -82,14 +98,27 @@ function ordinal(n: number) {
   const v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
+// Salary is paid in arrears: a month's salary is credited on `salaryDay` of the
+// NEXT month (e.g. May's salary is due 1 Jun). Returns the credit Date.
+function salaryCreditDate(year: number, month: number, salaryDay?: number): Date {
+  const day = salaryDay && salaryDay >= 1 ? salaryDay : 1;
+  let dy = year;
+  let dm = month + 1; // month is 1-based; due in the following month
+  if (dm > 12) {
+    dm = 1;
+    dy += 1;
+  }
+  // Clamp the day to the due month's length.
+  const lastDay = new Date(Date.UTC(dy, dm, 0)).getUTCDate();
+  return new Date(Date.UTC(dy, dm - 1, Math.min(day, lastDay)));
+}
 function salaryDue(year: number, month: number, salaryDay?: number): boolean {
-  const d = new Date();
-  const cy = d.getUTCFullYear();
-  const cm = d.getUTCMonth() + 1;
-  const cd = d.getUTCDate();
-  if (year < cy || (year === cy && month < cm)) return true;
-  if (year === cy && month === cm) return !salaryDay || cd >= salaryDay;
-  return false;
+  const credit = salaryCreditDate(year, month, salaryDay);
+  const now = new Date();
+  const today = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  );
+  return today >= credit;
 }
 function fmtDateISO(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", {
@@ -161,6 +190,17 @@ export default function StaffDetailPage({
   const salaryPayment = monthQuery.data?.salaryPayment ?? null;
   const paid = !!salaryPayment;
   const accounts = usePaymentAccounts().data?.data ?? [];
+
+  // Staff aren't owed salary for months before they joined. Compare the viewed
+  // month against the joining month (a join part-way through a month still
+  // counts as employed that month).
+  const employedThisMonth = (() => {
+    if (!staff?.joiningDate) return true;
+    const j = new Date(staff.joiningDate);
+    const joinYM = j.getUTCFullYear() * 12 + j.getUTCMonth();
+    const viewYM = year * 12 + (month - 1);
+    return viewYM >= joinYM;
+  })();
 
   const [showPayForm, setShowPayForm] = useState(false);
   const [payAmount, setPayAmount] = useState("");
@@ -552,7 +592,7 @@ export default function StaffDetailPage({
           </p>
           {staff.salaryDay ? (
             <p className="text-[11px] text-slate-400">
-              Due on the {ordinal(staff.salaryDay)}
+              Paid the {ordinal(staff.salaryDay)} of next month
             </p>
           ) : null}
         </div>
@@ -610,7 +650,21 @@ export default function StaffDetailPage({
       </div>
 
       {/* Salary — paid status / pay action */}
-      {paid && salaryPayment ? (
+      {!employedThisMonth ? (
+        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/40">
+          <IdCard className="h-6 w-6 shrink-0 text-slate-400" />
+          <div>
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              Not employed in {MONTHS[month - 1]} {year}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {staff?.joiningDate
+                ? `Joined ${fmtDateISO(staff.joiningDate)} — no salary due before then.`
+                : "No salary due before the joining date."}
+            </p>
+          </div>
+        </div>
+      ) : paid && salaryPayment ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/20">
           <div className="flex items-center gap-3">
             <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600 dark:text-emerald-400" />
@@ -654,10 +708,8 @@ export default function StaffDetailPage({
                   : `Salary not paid yet — ${MONTHS[month - 1]} ${year}`}
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {inr(overview?.earned ?? 0)} earned this month
-                {staff.salaryDay
-                  ? ` · due on the ${ordinal(staff.salaryDay)}`
-                  : ""}
+                {inr(overview?.earned ?? 0)} earned this month · credited{" "}
+                {fmtDateISO(salaryCreditDate(year, month, staff.salaryDay).toISOString())}
               </p>
             </div>
           </div>
@@ -670,7 +722,7 @@ export default function StaffDetailPage({
       )}
 
       {/* Pay salary form */}
-      {showPayForm && !paid && (
+      {showPayForm && !paid && employedThisMonth && (
         <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
             Pay salary — {MONTHS[month - 1]} {year}
@@ -686,29 +738,19 @@ export default function StaffDetailPage({
               />
             </label>
             <label className="flex flex-col gap-1 text-xs font-medium text-slate-700 dark:text-slate-300">
-              Paid from *
-              <select
-                value={payAccountId}
-                onChange={(e) => {
-                  const a = accounts.find((x: any) => x._id === e.target.value);
-                  setPayAccountId(e.target.value);
-                  if (a) setPayMethod(methodForType(a.type));
-                }}
-                className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-              >
-                <option value="">Select account…</option>
-                {accounts.map((a: any) => (
-                  <option key={a._id} value={a._id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs font-medium text-slate-700 dark:text-slate-300">
               Type
               <select
                 value={payMethod}
-                onChange={(e) => setPayMethod(e.target.value)}
+                onChange={(e) => {
+                  const method = e.target.value;
+                  setPayMethod(method);
+                  // Drop the account if it no longer matches the new type.
+                  const t = accountTypeForMethod(method);
+                  if (t && payAccountId) {
+                    const acc = accounts.find((a: any) => a._id === payAccountId);
+                    if (acc && acc.type !== t) setPayAccountId("");
+                  }
+                }}
                 className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
               >
                 <option value="">Method…</option>
@@ -720,12 +762,34 @@ export default function StaffDetailPage({
               </select>
             </label>
             <label className="flex flex-col gap-1 text-xs font-medium text-slate-700 dark:text-slate-300">
+              Paid from *
+              <select
+                value={payAccountId}
+                onChange={(e) => {
+                  const a = accounts.find((x: any) => x._id === e.target.value);
+                  setPayAccountId(e.target.value);
+                  if (a) setPayMethod(methodForType(a.type));
+                }}
+                className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+              >
+                <option value="">
+                  {payMethod ? "Select account…" : "Pick a type first…"}
+                </option>
+                {(accountTypeForMethod(payMethod)
+                  ? accounts.filter(
+                      (a: any) => a.type === accountTypeForMethod(payMethod)
+                    )
+                  : accounts
+                ).map((a: any) => (
+                  <option key={a._id} value={a._id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-medium text-slate-700 dark:text-slate-300">
               Paid date
-              <Input
-                type="date"
-                value={payDate}
-                onChange={(e) => setPayDate(e.target.value)}
-              />
+              <DatePicker value={payDate} onChange={setPayDate} placeholder="Pick a date" />
             </label>
           </div>
           <div className="flex justify-end gap-2">
