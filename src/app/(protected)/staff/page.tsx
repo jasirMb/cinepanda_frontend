@@ -20,7 +20,12 @@ import {
   Wallet,
 } from "lucide-react";
 
-import { staffKeys, useStaff, useStaffOverview } from "@/hooks/useStaff";
+import {
+  staffKeys,
+  useStaff,
+  useStaffOverview,
+  useHolidaySettings,
+} from "@/hooks/useStaff";
 import {
   createStaff,
   updateStaff,
@@ -97,6 +102,8 @@ const EMPTY = {
   designation: "",
   monthlySalary: "",
   salaryDay: "",
+  workHours: "",
+  overtimeRate: "",
   phone: "",
   joiningDate: "",
   avatarUrl: "",
@@ -111,6 +118,7 @@ export default function StaffPage() {
 
   const staffQuery = useStaff();
   const staff = staffQuery.data ?? [];
+  const settings = useHolidaySettings().data;
   const overviewQuery = useStaffOverview(year, month);
   const overviewById = useMemo(() => {
     const m = new Map<string, StaffOverview>();
@@ -211,6 +219,8 @@ export default function StaffPage() {
       designation: s.designation ?? "",
       monthlySalary: s.monthlySalary != null ? String(s.monthlySalary) : "",
       salaryDay: s.salaryDay != null ? String(s.salaryDay) : "",
+      workHours: s.workHours != null ? String(s.workHours) : "",
+      overtimeRate: s.overtimeRate != null ? String(s.overtimeRate) : "",
       phone: s.phone ?? "",
       joiningDate: s.joiningDate ? s.joiningDate.slice(0, 10) : "",
       avatarUrl: s.avatarUrl ?? "",
@@ -231,12 +241,30 @@ export default function StaffPage() {
       toast.error("Salary day must be between 1 and 31");
       return;
     }
+    // null clears the override so the staff member falls back to the global default.
+    const workHours =
+      form.workHours.trim() === "" ? null : Number(form.workHours);
+    if (workHours !== null && (Number.isNaN(workHours) || workHours < 0)) {
+      toast.error("Working hours can't be negative");
+      return;
+    }
+    const overtimeRate =
+      form.overtimeRate.trim() === "" ? null : Number(form.overtimeRate);
+    if (
+      overtimeRate !== null &&
+      (Number.isNaN(overtimeRate) || overtimeRate < 0)
+    ) {
+      toast.error("Overtime rate can't be negative");
+      return;
+    }
     const payload: StaffPayload = {
       name: form.name.trim(),
       designation: form.designation.trim() || undefined,
       monthlySalary:
         form.monthlySalary.trim() === "" ? 0 : Number(form.monthlySalary),
       salaryDay: day,
+      workHours,
+      overtimeRate,
       phone: form.phone.trim() || undefined,
       joiningDate: form.joiningDate || undefined,
       avatarUrl: form.avatarUrl || undefined,
@@ -275,7 +303,7 @@ export default function StaffPage() {
         <div className="flex flex-wrap gap-2">
           <Link href="/staff/settings">
             <Button variant="outline" className="gap-1.5">
-              <Settings className="h-4 w-4" /> Holiday settings
+              <Settings className="h-4 w-4" /> Settings
             </Button>
           </Link>
           <Button
@@ -423,6 +451,33 @@ export default function StaffPage() {
                   setForm((f) => ({ ...f, salaryDay: e.target.value }))
                 }
                 placeholder="e.g. 1 (paid on the 1st)"
+              />
+            </Field>
+            <Field label="Working hours / day">
+              <Input
+                type="number"
+                min={0}
+                step="0.5"
+                value={form.workHours}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, workHours: e.target.value }))
+                }
+                placeholder={`Default — ${settings?.standardWorkHours ?? 8}h`}
+              />
+            </Field>
+            <Field label="Overtime rate (₹ / hour)">
+              <Input
+                type="number"
+                min={0}
+                value={form.overtimeRate}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, overtimeRate: e.target.value }))
+                }
+                placeholder={
+                  (settings?.overtimeRate ?? 0) > 0
+                    ? `Default — ₹${settings?.overtimeRate}/hr`
+                    : "Auto from salary"
+                }
               />
             </Field>
             <Field label="Phone">

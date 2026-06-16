@@ -15,6 +15,10 @@ export interface Staff {
   monthlySalary?: number;
   /** Day of the month (1–31) the salary is due. */
   salaryDay?: number;
+  /** Override for standard working hours/day (else the global default). */
+  workHours?: number;
+  /** Override for overtime pay per hour (else the global default). */
+  overtimeRate?: number;
   phone?: string;
   joiningDate?: string;
   avatarUrl?: string;
@@ -29,6 +33,10 @@ export interface StaffPayload {
   designation?: string;
   monthlySalary?: number;
   salaryDay?: number;
+  /** null clears the override → falls back to the global default. */
+  workHours?: number | null;
+  /** null clears the override → falls back to the global default. */
+  overtimeRate?: number | null;
   phone?: string;
   joiningDate?: string;
   avatarUrl?: string;
@@ -40,7 +48,9 @@ export interface AttendanceRecord {
   staffId: string;
   date: string;
   status: AttendanceStatus;
-  /** Extra/overtime pay (holiday default = day-rate, working day = manual bonus). */
+  /** Overtime hours worked this day (pay = hours × effective rate). */
+  overtimeHours?: number;
+  /** Manual flat overtime pay (overrides hours × rate; holiday default = day-rate). */
   overtimePay?: number;
   /** Reason note (why absent / on leave / half-day). */
   note?: string;
@@ -63,10 +73,14 @@ export interface StaffOverview {
   paidDays: number;
   /** Days worked on a holiday/weekly-off. */
   holidayWorked: number;
-  /** Extra pay for holiday work. */
+  /** Extra pay for overtime hours + holiday work. */
   overtimeEarned: number;
   /** Total = pro-rated base + overtime. */
   earned: number;
+  /** Effective standard working hours/day. */
+  standardWorkHours: number;
+  /** Effective overtime pay per hour. */
+  overtimeRate: number;
   /** Whether this month's salary has been marked paid. */
   paid: boolean;
 }
@@ -103,6 +117,10 @@ export interface HolidaySettings {
   saturdayOff: boolean;
   secondSaturdayOff: boolean;
   customHolidays: CustomHoliday[];
+  /** Default standard working hours/day (per-staff overridable). */
+  standardWorkHours: number;
+  /** Default overtime pay per hour (per-staff overridable). */
+  overtimeRate: number;
 }
 
 /* ────────────────────────────────────────────  Staff  ───────────────────── */
@@ -171,11 +189,13 @@ export async function markAttendance(
   date: string,
   status: AttendanceStatus | "",
   overtimePay?: number | null,
-  note?: string | null
+  note?: string | null,
+  overtimeHours?: number | null
 ): Promise<AttendanceRecord | null> {
   const body: Record<string, unknown> = { date, status };
   if (overtimePay !== undefined) body.overtimePay = overtimePay;
   if (note !== undefined) body.note = note;
+  if (overtimeHours !== undefined) body.overtimeHours = overtimeHours;
   const { data } = await api.post<{
     success: boolean;
     data: AttendanceRecord | null;

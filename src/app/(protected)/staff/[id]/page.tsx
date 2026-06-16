@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   IdCard,
+  Plus,
   Wallet,
 } from "lucide-react";
 
@@ -155,6 +156,10 @@ export default function StaffDetailPage({
   const [payMethod, setPayMethod] = useState("");
   const [payDate, setPayDate] = useState("");
 
+  // "Add overtime for a day" control (for normal working days).
+  const [otDay, setOtDay] = useState("");
+  const [otHours, setOtHours] = useState("");
+
   // Map day-of-month → status.
   const statusByDay = useMemo(() => {
     const m = new Map<number, AttendanceStatus>();
@@ -170,7 +175,16 @@ export default function StaffDetailPage({
       status: AttendanceStatus | "";
       overtimePay?: number | null;
       note?: string | null;
-    }) => markAttendance(id, vars.date, vars.status, vars.overtimePay, vars.note),
+      overtimeHours?: number | null;
+    }) =>
+      markAttendance(
+        id,
+        vars.date,
+        vars.status,
+        vars.overtimePay,
+        vars.note,
+        vars.overtimeHours
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: staffKeys.all });
     },
@@ -245,13 +259,33 @@ export default function StaffDetailPage({
     mark.mutate({ date, status: next });
   }
 
-  // Day-rate = a normal day's pay; the default for holiday/overtime work.
+  // Day-rate = a normal day's pay; the fallback for holiday work with no hours.
   const dayRate =
     overview && overview.workingDays > 0
       ? Math.round((staff?.monthlySalary ?? 0) / overview.workingDays)
       : 0;
 
-  // Days that earn overtime: holiday work + working days with a manual bonus.
+  // Effective working hours / overtime rate (staff override, else global default).
+  const otRate =
+    overview?.overtimeRate ??
+    staff?.overtimeRate ??
+    settings?.overtimeRate ??
+    0;
+  const stdHours =
+    overview?.standardWorkHours ??
+    staff?.workHours ??
+    settings?.standardWorkHours ??
+    8;
+
+  // Pay shown for an overtime day: a manual price override wins, else hours × rate,
+  // else (for a holiday) a normal day's wage.
+  function overtimePayFor(rec: AttendanceRecord, holiday: boolean): number {
+    if (rec.overtimePay != null) return rec.overtimePay;
+    if (rec.overtimeHours != null) return Math.round(rec.overtimeHours * otRate);
+    return holiday ? dayRate : 0;
+  }
+
+  // Days that earn overtime: holiday work + working days with logged overtime.
   const overtimeDays = useMemo(() => {
     const out: { day: number; rec: AttendanceRecord; holiday: boolean }[] = [];
     for (const r of monthQuery.data?.attendance ?? []) {
@@ -260,7 +294,7 @@ export default function StaffDetailPage({
       const worked = r.status === "PRESENT" || r.status === "HALF_DAY";
       if (
         (holiday && r.status === "PRESENT") ||
-        (!holiday && worked && r.overtimePay != null)
+        (!holiday && worked && (r.overtimeHours != null || r.overtimePay != null))
       )
         out.push({ day, rec: r, holiday });
     }
@@ -281,12 +315,68 @@ export default function StaffDetailPage({
     return out.sort((a, b) => a.day - b.day);
   }, [monthQuery.data]);
 
-  function savePay(day: number, value: string) {
+  function saveOvertimeHours(
+    day: number,
+    status: AttendanceStatus,
+    value: string
+  ) {
     const date = `${year}-${pad(month)}-${pad(day)}`;
     const trimmed = value.trim();
     const num = trimmed === "" ? null : Number(trimmed);
     if (num !== null && (Number.isNaN(num) || num < 0)) return;
-    mark.mutate({ date, status: "PRESENT", overtimePay: num });
+    // Setting hours recomputes pay (hours × rate) → drop any manual price override.
+    // Clearing hours leaves a price override untouched.
+    mark.mutate({
+      date,
+      status,
+      overtimeHours: num,
+      ...(num !== null ? { overtimePay: null } : {}),
+    });
+  }
+
+  // Manual price override for a day's overtime (₹). null clears it → back to hours × rate.
+  function saveOvertimePrice(
+    day: number,
+    status: AttendanceStatus,
+    value: string
+  ) {
+    const date = `${year}-${pad(month)}-${pad(day)}`;
+    const trimmed = value.trim();
+    const num = trimmed === "" ? null : Number(trimmed);
+    if (num !== null && (Number.isNaN(num) || num < 0)) return;
+    mark.mutate({ date, status, overtimePay: num });
+  }
+
+  // Worked days (not holidays) that don't have overtime logged yet — selectable
+  // in the "add overtime" control so any working day can earn overtime.
+  const addableDays = useMemo(() => {
+    const already = new Set(overtimeDays.map((o) => o.day));
+    const out: { day: number; status: AttendanceStatus }[] = [];
+    for (const r of monthQuery.data?.attendance ?? []) {
+      const day = new Date(r.date).getUTCDate();
+      const holiday = isHoliday(year, month - 1, day, settings);
+      const worked = r.status === "PRESENT" || r.status === "HALF_DAY";
+      if (!holiday && worked && !already.has(day))
+        out.push({ day, status: r.status });
+    }
+    return out.sort((a, b) => a.day - b.day);
+  }, [monthQuery.data, overtimeDays, settings, year, month]);
+
+  function addOvertime() {
+    if (!otDay) {
+      toast.error("Pick a day");
+      return;
+    }
+    const hrs = Number(otHours);
+    if (!(hrs > 0)) {
+      toast.error("Enter overtime hours");
+      return;
+    }
+    const rec = addableDays.find((d) => d.day === Number(otDay));
+    if (!rec) return;
+    saveOvertimeHours(rec.day, rec.status, otHours);
+    setOtDay("");
+    setOtHours("");
   }
 
   function saveNote(day: number, status: AttendanceStatus, value: string) {
@@ -366,6 +456,12 @@ export default function StaffDetailPage({
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {staff.designation || "—"}
             {staff.phone ? ` · ${staff.phone}` : ""}
+          </p>
+          <p className="mt-0.5 text-xs text-slate-400">
+            {stdHours}h/day · overtime ₹{otRate.toLocaleString("en-IN")}/hr
+            {staff.workHours != null || staff.overtimeRate != null ? (
+              <span className="ml-1 text-violet-500">· custom</span>
+            ) : null}
           </p>
         </div>
         <div className="shrink-0 text-right">
@@ -658,20 +754,25 @@ export default function StaffDetailPage({
         </div>
         </div>
 
-        {(overtimeDays.length > 0 || leaveDays.length > 0) && (
+        {(overtimeDays.length > 0 ||
+          addableDays.length > 0 ||
+          leaveDays.length > 0) && (
           <div className="flex-1 space-y-5 lg:min-w-0">
 
-      {/* Holiday / overtime pay — amounts for the holidays you marked worked */}
-      {overtimeDays.length > 0 && (
+      {/* Overtime — hours worked beyond a normal day, paid at the overtime rate */}
+      {(overtimeDays.length > 0 || addableDays.length > 0) && (
         <div className="rounded-2xl border border-violet-200 bg-violet-50/50 p-4 shadow-sm dark:border-violet-900/50 dark:bg-violet-950/20">
           <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-            Holiday / overtime pay
+            Overtime
           </h3>
           <p className="mb-3 mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-            Tap a holiday on the calendar to log it here. Leave the amount blank to
-            pay a normal day&apos;s wage (₹{dayRate.toLocaleString("en-IN")}), or type
-            a custom amount.
+            Pay = hours × ₹{otRate.toLocaleString("en-IN")}/hr — that&apos;s a day&apos;s
+            wage ₹{dayRate.toLocaleString("en-IN")} ÷ {stdHours}h
+            {staff.overtimeRate != null ? " (manual rate)" : ""}. Edit the ₹ box to set
+            a custom amount for a day. On a holiday, leave hours blank to pay a full day
+            (₹{dayRate.toLocaleString("en-IN")}).
           </p>
+          {overtimeDays.length > 0 && (
           <ul className="divide-y divide-violet-100 dark:divide-violet-900/40">
             {overtimeDays.map(({ day, rec, holiday }) => (
               <li
@@ -689,21 +790,80 @@ export default function StaffDetailPage({
                     </span>
                   )}
                 </span>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
+                  <input
+                    key={`h-${day}-${rec.overtimeHours ?? "def"}`}
+                    type="number"
+                    min={0}
+                    step="0.5"
+                    defaultValue={rec.overtimeHours ?? ""}
+                    placeholder={holiday ? String(stdHours) : "0"}
+                    onBlur={(e) =>
+                      saveOvertimeHours(day, rec.status, e.target.value)
+                    }
+                    className="h-8 w-14 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                  />
+                  <span className="text-xs text-slate-400">hrs</span>
+                  <span className="text-slate-300 dark:text-slate-600">·</span>
                   <span className="text-sm text-slate-400">₹</span>
                   <input
-                    key={`${day}-${rec.overtimePay ?? "def"}`}
+                    key={`p-${day}-${rec.overtimePay ?? "x"}-${rec.overtimeHours ?? "x"}`}
                     type="number"
                     min={0}
                     defaultValue={rec.overtimePay ?? ""}
-                    placeholder={holiday ? String(dayRate) : "0"}
-                    onBlur={(e) => savePay(day, e.target.value)}
-                    className="h-8 w-28 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                    placeholder={String(overtimePayFor(rec, holiday))}
+                    onBlur={(e) =>
+                      saveOvertimePrice(day, rec.status, e.target.value)
+                    }
+                    title="Pay for this day — leave blank to use hours × rate"
+                    className="h-8 w-20 rounded-md border border-slate-200 bg-white px-2 text-sm font-semibold text-violet-700 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-violet-300"
                   />
                 </div>
               </li>
             ))}
           </ul>
+          )}
+          {addableDays.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-violet-100 pt-3 dark:border-violet-900/40">
+              <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                Add overtime — day
+                <select
+                  value={otDay}
+                  onChange={(e) => setOtDay(e.target.value)}
+                  className="h-8 w-36 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                >
+                  <option value="">Pick a day…</option>
+                  {addableDays.map(({ day }) => (
+                    <option key={day} value={day}>
+                      {MONTHS[month - 1].slice(0, 3)} {day} (
+                      {WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()]}
+                      )
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                Hours
+                <input
+                  type="number"
+                  min={0}
+                  step="0.5"
+                  value={otHours}
+                  onChange={(e) => setOtHours(e.target.value)}
+                  placeholder="e.g. 2"
+                  className="h-8 w-20 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                />
+              </label>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-8 gap-1"
+                onClick={addOvertime}
+              >
+                <Plus className="h-4 w-4" /> Add
+              </Button>
+            </div>
+          )}
         </div>
       )}
 

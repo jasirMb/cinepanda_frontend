@@ -27,6 +27,8 @@ export default function StaffSettingsPage() {
   const [sundayOff, setSundayOff] = useState(true);
   const [saturdayOff, setSaturdayOff] = useState(false);
   const [secondSaturdayOff, setSecondSaturdayOff] = useState(false);
+  const [standardWorkHours, setStandardWorkHours] = useState("8");
+  const [overtimeRate, setOvertimeRate] = useState("0");
   const [holidays, setHolidays] = useState<{ date: string; label?: string }[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -39,6 +41,8 @@ export default function StaffSettingsPage() {
       setSundayOff(s.sundayOff);
       setSaturdayOff(s.saturdayOff);
       setSecondSaturdayOff(s.secondSaturdayOff);
+      setStandardWorkHours(String(s.standardWorkHours ?? 8));
+      setOvertimeRate(String(s.overtimeRate ?? 0));
       setHolidays(
         (s.customHolidays || []).map((h) => ({
           date: h.date.slice(0, 10),
@@ -55,12 +59,15 @@ export default function StaffSettingsPage() {
         sundayOff,
         saturdayOff,
         secondSaturdayOff,
+        standardWorkHours:
+          standardWorkHours.trim() === "" ? 0 : Number(standardWorkHours),
+        overtimeRate: overtimeRate.trim() === "" ? 0 : Number(overtimeRate),
         customHolidays: holidays as CustomHoliday[],
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: staffKeys.holidays });
       queryClient.invalidateQueries({ queryKey: staffKeys.all });
-      toast.success("Holiday settings saved");
+      toast.success("Settings saved");
     },
     onError: () => toast.error("Failed to save settings"),
   });
@@ -104,12 +111,50 @@ export default function StaffSettingsPage() {
 
       <div>
         <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
-          Holiday settings
+          Staff settings
         </h2>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          These decide which days count as <strong>working days</strong> when
-          working out staff attendance and salary.
+          Defaults used to work out staff attendance, salary and overtime. Each
+          staff member can override the working hours and overtime rate.
         </p>
+      </div>
+
+      {/* Working hours & overtime */}
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+            Working hours &amp; overtime
+          </h3>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            The standard full day&apos;s hours, plus an optional flat overtime rate.
+            Leave the overtime rate at <strong>0</strong> to auto-calculate it from
+            each person&apos;s salary (a day&apos;s wage ÷ working hours). Staff can
+            override either value.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="flex flex-col gap-1 text-xs font-medium text-slate-700 dark:text-slate-300">
+            Standard working hours / day
+            <Input
+              type="number"
+              min={0}
+              step="0.5"
+              value={standardWorkHours}
+              onChange={(e) => setStandardWorkHours(e.target.value)}
+              placeholder="e.g. 8"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium text-slate-700 dark:text-slate-300">
+            Overtime rate (₹ / hour)
+            <Input
+              type="number"
+              min={0}
+              value={overtimeRate}
+              onChange={(e) => setOvertimeRate(e.target.value)}
+              placeholder="0 = auto from salary"
+            />
+          </label>
+        </div>
       </div>
 
       {/* Weekly offs */}
