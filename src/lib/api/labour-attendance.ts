@@ -26,8 +26,7 @@ export interface LabourAttendanceSummary {
   projectName?: string;
   plannedDays?: number;
   totalAmount?: number;
-  startDate?: string;
-  endDate?: string;
+  workPeriods?: { startDate: string; endDate: string }[];
   workedDays: number;
   owed: number;
   paid: number;

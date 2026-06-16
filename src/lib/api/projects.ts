@@ -82,9 +82,11 @@ export interface ProjectLabour {
   plannedDays?: number;
   /** Total agreed amount; per-day rate = totalAmount ÷ plannedDays. */
   totalAmount?: number;
-  /** Work timeline (which day to which day). */
+  /** Legacy single work timeline. */
   startDate?: string;
   endDate?: string;
+  /** Multiple work periods (sections). */
+  workPeriods?: { startDate: string; endDate: string }[];
 }
 
 export interface ProjectsListResponse {
@@ -194,6 +196,7 @@ export async function addProjectLabour(
     totalAmount?: number | null;
     startDate?: string | null;
     endDate?: string | null;
+    workPeriods?: { startDate: string; endDate: string }[];
   }
 ): Promise<ProjectPopulated> {
   const { data } = await api.post<ProjectDetailResponse>(

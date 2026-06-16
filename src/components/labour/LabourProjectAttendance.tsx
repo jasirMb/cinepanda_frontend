@@ -8,6 +8,8 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Plus,
+  Trash2,
   Wallet,
 } from "lucide-react";
 
@@ -53,6 +55,16 @@ function methodForType(type?: string): string {
     default: return "";
   }
 }
+function accountTypeForMethod(method: string): string | null {
+  switch (method) {
+    case "BANK_TRANSFER":
+    case "CHEQUE": return "BANK";
+    case "CASH": return "CASH";
+    case "UPI": return "UPI";
+    case "CARD": return "CARD";
+    default: return null;
+  }
+}
 
 const STATUS_META: Record<
   LabourAttendanceStatus,
@@ -79,6 +91,11 @@ function fmtDateISO(iso: string) {
     day: "2-digit", month: "short", year: "numeric",
   });
 }
+/** dd/mm/yyyy from a YYYY-MM-DD or ISO string. */
+function fmtDMY(iso: string) {
+  const d = iso.slice(0, 10).split("-");
+  return d.length === 3 ? `${d[2]}/${d[1]}/${d[0]}` : iso;
+}
 
 export function LabourProjectAttendance({
   labourId,
@@ -103,12 +120,14 @@ export function LabourProjectAttendance({
   const statusByDay = useMemo(() => {
     const status = new Map<number, LabourAttendanceStatus>();
     const extra = new Map<number, number | undefined>();
+    const note = new Map<number, string | undefined>();
     for (const r of records) {
       const d = new Date(r.date).getUTCDate();
       status.set(d, r.status);
       extra.set(d, r.overtimeExtra);
+      note.set(d, r.note);
     }
-    return { status, extra };
+    return { status, extra, note };
   }, [records]);
 
   // This month's per-status counts (like the staff overview cards).
@@ -118,13 +137,31 @@ export function LabourProjectAttendance({
     return c;
   }, [records]);
 
-  // Assignment work timeline (YYYY-MM-DD bounds). A day outside it isn't markable.
-  const startStr = summary?.startDate ? summary.startDate.slice(0, 10) : "";
-  const endStr = summary?.endDate ? summary.endDate.slice(0, 10) : "";
+  // Days marked LEAVE / ABSENT this month (for the reasons card).
+  const leaveDays = useMemo(() => {
+    const out: { day: number; status: LabourAttendanceStatus; note?: string }[] = [];
+    for (const r of records) {
+      if (r.status === "LEAVE" || r.status === "ABSENT")
+        out.push({ day: new Date(r.date).getUTCDate(), status: r.status, note: r.note });
+    }
+    return out.sort((a, b) => a.day - b.day);
+  }, [records]);
+
+  // Effective work periods (YYYY-MM-DD ranges). A day outside ALL of them is locked.
+  const periods = useMemo(
+    () =>
+      (summary?.workPeriods ?? []).map((p) => ({
+        start: p.startDate.slice(0, 10),
+        end: p.endDate.slice(0, 10),
+      })),
+    [summary?.workPeriods]
+  );
   function inRange(dateStr: string): boolean {
-    if (startStr && dateStr < startStr) return false;
-    if (endStr && dateStr > endStr) return false;
-    return true;
+    if (!periods.length) return true;
+    return periods.some(
+      (p) =>
+        (!p.start || dateStr >= p.start) && (!p.end || dateStr <= p.end)
+    );
   }
 
   function invalidate() {
@@ -136,22 +173,36 @@ export function LabourProjectAttendance({
   // ── Assignment editor (total + planned days → rate) ───────────────────────
   const [editTotal, setEditTotal] = useState("");
   const [editPlanned, setEditPlanned] = useState("");
-  const [editStart, setEditStart] = useState("");
-  const [editEnd, setEditEnd] = useState("");
+  const [editPeriods, setEditPeriods] = useState<{ start: string; end: string }[]>([]);
   useEffect(() => {
     setEditTotal(summary?.totalAmount != null ? String(summary.totalAmount) : "");
     setEditPlanned(summary?.plannedDays != null ? String(summary.plannedDays) : "");
-    setEditStart(summary?.startDate ? summary.startDate.slice(0, 10) : "");
-    setEditEnd(summary?.endDate ? summary.endDate.slice(0, 10) : "");
-  }, [summary?.totalAmount, summary?.plannedDays, summary?.startDate, summary?.endDate]);
+    setEditPeriods(
+      (summary?.workPeriods ?? []).map((p) => ({
+        start: p.startDate.slice(0, 10),
+        end: p.endDate.slice(0, 10),
+      }))
+    );
+  }, [summary?.totalAmount, summary?.plannedDays, summary?.workPeriods]);
+
+  function setPeriodField(i: number, key: "start" | "end", val: string) {
+    setEditPeriods((ps) => ps.map((p, idx) => (idx === i ? { ...p, [key]: val } : p)));
+  }
+  function addPeriod() {
+    setEditPeriods((ps) => [...ps, { start: "", end: "" }]);
+  }
+  function removePeriod(i: number) {
+    setEditPeriods((ps) => ps.filter((_, idx) => idx !== i));
+  }
 
   const assignMutation = useMutation({
     mutationFn: () =>
       addProjectLabour(projectId, labourId, {
         totalAmount: editTotal.trim() === "" ? null : Number(editTotal),
         plannedDays: editPlanned.trim() === "" ? null : Number(editPlanned),
-        startDate: editStart.trim() === "" ? null : editStart,
-        endDate: editEnd.trim() === "" ? null : editEnd,
+        workPeriods: editPeriods
+          .filter((p) => p.start && p.end)
+          .map((p) => ({ startDate: p.start, endDate: p.end })),
       }),
     onSuccess: () => {
       invalidate();
@@ -174,13 +225,21 @@ export function LabourProjectAttendance({
       date: string;
       status: LabourAttendanceStatus | "";
       overtimeExtra?: number | null;
+      note?: string | null;
     }) =>
       markLabourAttendance(labourId, projectId, vars.date, vars.status, {
         overtimeExtra: vars.overtimeExtra,
+        note: vars.note,
       }),
     onSuccess: () => invalidate(),
     onError: () => toast.error("Failed to mark attendance"),
   });
+
+  function saveNote(day: number, status: LabourAttendanceStatus, value: string) {
+    const date = `${year}-${pad(month)}-${pad(day)}`;
+    const note = value.trim() === "" ? null : value.trim();
+    markMutation.mutate({ date, status, note });
+  }
 
   function openMenu(day: number) {
     setMenuDay(day);
@@ -278,31 +337,60 @@ export function LabourProjectAttendance({
 
   return (
     <div className="space-y-4">
-      {/* Assignment: total + planned days → rate */}
-      <div className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-        <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-          Total amount (₹)
-          <Input type="number" min={0} value={editTotal} onChange={(e) => setEditTotal(e.target.value)} placeholder="e.g. 10000" className="h-8 w-32 text-xs" />
-        </label>
-        <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-          Planned days
-          <Input type="number" min={0} value={editPlanned} onChange={(e) => setEditPlanned(e.target.value)} placeholder="e.g. 10" className="h-8 w-24 text-xs" />
-        </label>
-        <div className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-          Rate / day
-          <span className="flex h-8 items-center font-semibold text-slate-800 dark:text-slate-100">{inr(previewRate)}</span>
+      {/* Assignment: total + planned days + work periods (multiple sections) */}
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+            Total amount (₹)
+            <Input type="number" min={0} value={editTotal} onChange={(e) => setEditTotal(e.target.value)} placeholder="e.g. 10000" className="h-8 w-32 text-xs" />
+          </label>
+          <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+            Planned days
+            <Input type="number" min={0} value={editPlanned} onChange={(e) => setEditPlanned(e.target.value)} placeholder="e.g. 10" className="h-8 w-24 text-xs" />
+          </label>
+          <div className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+            Rate / day
+            <span className="flex h-8 items-center font-semibold text-slate-800 dark:text-slate-100">{inr(previewRate)}</span>
+          </div>
+          <Button size="sm" className="ml-auto h-8" onClick={() => assignMutation.mutate()} disabled={assignMutation.isPending}>
+            {assignMutation.isPending ? "Saving…" : "Save"}
+          </Button>
         </div>
-        <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-          From
-          <Input type="date" value={editStart} onChange={(e) => setEditStart(e.target.value)} className="h-8 w-36 text-xs" />
-        </label>
-        <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-          To
-          <Input type="date" value={editEnd} min={editStart || undefined} onChange={(e) => setEditEnd(e.target.value)} className="h-8 w-36 text-xs" />
-        </label>
-        <Button size="sm" variant="outline" className="h-8" onClick={() => assignMutation.mutate()} disabled={assignMutation.isPending}>
-          {assignMutation.isPending ? "Saving…" : "Save"}
-        </Button>
+
+        <div className="border-t border-slate-100 pt-2.5 dark:border-slate-800">
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            Work periods (which days are worked)
+          </p>
+          <div className="space-y-1.5">
+            {editPeriods.map((p, i) => (
+              <div key={i} className="flex flex-wrap items-end gap-2">
+                <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                  From
+                  <Input type="date" value={p.start} onChange={(e) => setPeriodField(i, "start", e.target.value)} className="h-8 w-36 text-xs" />
+                </label>
+                <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                  To
+                  <Input type="date" value={p.end} min={p.start || undefined} onChange={(e) => setPeriodField(i, "end", e.target.value)} className="h-8 w-36 text-xs" />
+                </label>
+                <button type="button" onClick={() => removePeriod(i)} aria-label="Remove period" className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+            <Button type="button" size="sm" variant="outline" className="h-8 gap-1" onClick={addPeriod}>
+              <Plus className="h-4 w-4" /> Add period
+            </Button>
+          </div>
+          <p className="mt-1.5 text-[10px] text-slate-400">
+            e.g. 01/05 → 10/06, then 01/09 → 20/09. Days outside every period are
+            locked. Leave empty to allow any past day.{" "}
+            {periods.length > 0 && (
+              <span className="text-slate-500 dark:text-slate-400">
+                Now: {periods.map((p) => `${fmtDMY(p.start)}–${fmtDMY(p.end)}`).join(", ")}
+              </span>
+            )}
+          </p>
+        </div>
       </div>
 
       {/* Overview stats (this month) + owed — mirrors the staff overview cards */}
@@ -338,10 +426,11 @@ export function LabourProjectAttendance({
             ))}
           </div>
         </div>
-        {(startStr || endStr) && (
+        {periods.length > 0 && (
           <p className="mb-2 text-[11px] text-slate-500 dark:text-slate-400">
-            Work dates: {startStr ? fmtDateISO(startStr) : "—"} →{" "}
-            {endStr ? fmtDateISO(endStr) : "—"} (other days are locked)
+            Work dates:{" "}
+            {periods.map((p) => `${fmtDMY(p.start)} → ${fmtDMY(p.end)}`).join("  ·  ")}{" "}
+            (other days are locked)
           </p>
         )}
 
@@ -485,19 +574,45 @@ export function LabourProjectAttendance({
             <Input type="number" min={0} value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
           </label>
           <label className="flex flex-col gap-1 text-xs font-medium text-slate-700 dark:text-slate-300">
-            Paid from *
-            <select value={payAccountId} onChange={(e) => { const a = accounts.find((x: any) => x._id === e.target.value); setPayAccountId(e.target.value); if (a) setPayMethod(methodForType(a.type)); }}
-              className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50">
-              <option value="">Select account…</option>
-              {accounts.map((a: any) => (<option key={a._id} value={a._id}>{a.name}</option>))}
+            Type
+            <select
+              value={payMethod}
+              onChange={(e) => {
+                const method = e.target.value;
+                setPayMethod(method);
+                // Clear the account if it no longer matches the new type.
+                const t = accountTypeForMethod(method);
+                if (t && payAccountId) {
+                  const acc = accounts.find((a: any) => a._id === payAccountId);
+                  if (acc && acc.type !== t) setPayAccountId("");
+                }
+              }}
+              className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+            >
+              <option value="">Method…</option>
+              {PAYMENT_METHODS.map((m) => (<option key={m.value} value={m.value}>{m.label}</option>))}
             </select>
           </label>
           <label className="flex flex-col gap-1 text-xs font-medium text-slate-700 dark:text-slate-300">
-            Type
-            <select value={payMethod} onChange={(e) => setPayMethod(e.target.value)}
-              className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50">
-              <option value="">Method…</option>
-              {PAYMENT_METHODS.map((m) => (<option key={m.value} value={m.value}>{m.label}</option>))}
+            Paid from *
+            <select
+              value={payAccountId}
+              onChange={(e) => {
+                const a = accounts.find((x: any) => x._id === e.target.value);
+                setPayAccountId(e.target.value);
+                if (a) setPayMethod(methodForType(a.type));
+              }}
+              className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+            >
+              <option value="">
+                {payMethod ? "Select account…" : "Pick a type first…"}
+              </option>
+              {(accountTypeForMethod(payMethod)
+                ? accounts.filter((a: any) => a.type === accountTypeForMethod(payMethod))
+                : accounts
+              ).map((a: any) => (
+                <option key={a._id} value={a._id}>{a.name}</option>
+              ))}
             </select>
           </label>
           <label className="flex flex-col gap-1 text-xs font-medium text-slate-700 dark:text-slate-300">
@@ -527,6 +642,35 @@ export function LabourProjectAttendance({
                   className="rounded-md px-2 py-0.5 font-medium text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40">
                   Undo
                 </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {leaveDays.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+            Leave &amp; absence reasons
+          </h4>
+          <ul className="mt-2 divide-y divide-slate-100 dark:divide-slate-800">
+            {leaveDays.map(({ day, status, note }) => (
+              <li key={day} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <span className="flex items-center gap-2 text-sm">
+                  <span className={`h-2.5 w-2.5 rounded-full ${STATUS_META[status].cls}`} />
+                  <span className="font-medium text-slate-800 dark:text-slate-100">
+                    {MONTHS[month - 1].slice(0, 3)} {day}
+                  </span>
+                  <span className="text-xs text-slate-400">{STATUS_META[status].label}</span>
+                </span>
+                <input
+                  key={`${day}-${note ?? "n"}`}
+                  type="text"
+                  defaultValue={note ?? ""}
+                  placeholder="Reason (optional)"
+                  onBlur={(e) => saveNote(day, status, e.target.value)}
+                  className="h-8 w-full max-w-[220px] rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                />
               </li>
             ))}
           </ul>
