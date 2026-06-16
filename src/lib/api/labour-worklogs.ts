@@ -16,6 +16,9 @@ export interface WorkLogProjectRef {
   serviceType?: string;
 }
 
+export const WORK_SHIFTS = ["MORNING", "EVENING", "NIGHT"] as const;
+export type WorkShift = (typeof WORK_SHIFTS)[number];
+
 export interface LabourWorkLog {
   _id: string;
   labourId: WorkLogLabourRef | string;
@@ -24,8 +27,14 @@ export interface LabourWorkLog {
   projectId: WorkLogProjectRef | string | null;
   workDate: string;
   sessionLabel?: string;
+  /** Shifts worked that day (3 = full day). */
+  shifts?: WorkShift[];
+  /** Hours worked that day (alternative to shifts). */
+  hours?: number;
   days: number;
   rate: number;
+  /** Extra / bonus pay on top of days × rate. */
+  extra?: number;
   amount: number;
   notes?: string;
   /** Account the salary was paid from (populated to {_id,name} on reads). */
@@ -47,8 +56,12 @@ export interface WorkLogPayload {
   projectId: string;
   workDate: string;
   sessionLabel?: string;
-  days: number;
+  /** Shifts worked, or hours — the server derives the day fraction. */
+  shifts?: WorkShift[];
+  hours?: number;
+  days?: number;
   rate: number;
+  extra?: number;
   notes?: string;
   /** Required — which account the salary is paid from. */
   paymentAccountId: string;

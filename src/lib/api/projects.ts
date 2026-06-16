@@ -78,6 +78,10 @@ export interface ProjectLabourInfo {
 export interface ProjectLabour {
   labourId: ProjectLabourInfo;
   charge: number;
+  /** Planned number of days assigned on this project (optional). */
+  plannedDays?: number;
+  /** Total agreed amount; per-day rate = totalAmount ÷ plannedDays. */
+  totalAmount?: number;
 }
 
 export interface ProjectsListResponse {
@@ -174,15 +178,22 @@ export async function deleteProject(id: string): Promise<MutationResponse> {
   return data;
 }
 
-/** Add a labour (with its per-project charge) to a project, or update the charge. */
+/**
+ * Add a labour to a project, or update only the provided fields (charge /
+ * plannedDays) if already on the roster.
+ */
 export async function addProjectLabour(
   projectId: string,
   labourId: string,
-  charge: number
+  fields: {
+    charge?: number;
+    plannedDays?: number | null;
+    totalAmount?: number | null;
+  }
 ): Promise<ProjectPopulated> {
   const { data } = await api.post<ProjectDetailResponse>(
     `/projects/${projectId}/labours`,
-    { labourId, charge }
+    { labourId, ...fields }
   );
   return data.data;
 }

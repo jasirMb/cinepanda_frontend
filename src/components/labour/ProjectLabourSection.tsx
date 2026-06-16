@@ -34,6 +34,7 @@ import {
   createWorkLog,
   deleteWorkLog,
   type LabourWorkLog,
+  type WorkShift,
 } from "@/lib/api/labour-worklogs";
 import { GroupAvatar } from "@/components/groups/GroupAvatar";
 import { Button } from "@/components/ui/button";
@@ -120,6 +121,33 @@ function inr(n: number) {
   return `₹${(n ?? 0).toLocaleString("en-IN")}`;
 }
 
+const SHIFT_OPTIONS: { value: WorkShift; label: string; short: string }[] = [
+  { value: "MORNING", label: "Morning", short: "M" },
+  { value: "EVENING", label: "Evening", short: "E" },
+  { value: "NIGHT", label: "Night", short: "N" },
+];
+const SHIFTS_PER_DAY = 3; // morning + evening + night = a full day
+const STANDARD_HOURS = 8; // hours that make up a full day
+
+/** Day fraction worked — must mirror the backend: shifts (n/3), else hours (h/8), else 1. */
+function deriveDays(shifts: WorkShift[], hoursStr: string): number {
+  if (shifts.length)
+    return Math.round((shifts.length / SHIFTS_PER_DAY) * 100) / 100;
+  const h = Number(hoursStr);
+  if (h > 0) return Math.round((h / STANDARD_HOURS) * 100) / 100;
+  return 1;
+}
+
+/** A short summary of how a logged session was worked. */
+function sessionWorkSummary(s: LabourWorkLog): string {
+  if (s.shifts && s.shifts.length)
+    return s.shifts
+      .map((sh) => SHIFT_OPTIONS.find((o) => o.value === sh)?.label ?? sh)
+      .join(", ");
+  if (s.hours != null && s.hours > 0) return `${s.hours} hr`;
+  return `${s.days} day${s.days === 1 ? "" : "s"}`;
+}
+
 export function ProjectLabourSection({
   projectId,
   labours: rawLabours,
@@ -160,8 +188,10 @@ export function ProjectLabourSection({
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
   const [newCharge, setNewCharge] = useState("");
+  const [newPlanned, setNewPlanned] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editCharge, setEditCharge] = useState("");
+  const [editPlanned, setEditPlanned] = useState("");
   const [pendingRemove, setPendingRemove] = useState<ProjectLabour | null>(null);
   const [search, setSearch] = useState("");
   const [addingGroup, setAddingGroup] = useState(false);
@@ -214,14 +244,22 @@ export function ProjectLabourSection({
   }
 
   const setMutation = useMutation({
-    mutationFn: ({ labourId, charge }: { labourId: string; charge: number }) =>
-      addProjectLabour(projectId, labourId, charge),
+    mutationFn: ({
+      labourId,
+      charge,
+      plannedDays,
+    }: {
+      labourId: string;
+      charge?: number;
+      plannedDays?: number | null;
+    }) => addProjectLabour(projectId, labourId, { charge, plannedDays }),
     onSuccess: () => {
       invalidate();
       setSelectId("");
       setLabourSearch("");
       setPickerOpen(false);
       setNewCharge("");
+      setNewPlanned("");
       setAdding(false);
       setEditingId(null);
       toast.success("Labour saved on project");
@@ -307,12 +345,22 @@ export function ProjectLabourSection({
       toast.error("Enter a valid charge");
       return;
     }
-    setMutation.mutate({ labourId: selectId, charge: newCharge ? charge : 0 });
+    const planned = Number(newPlanned);
+    if (newPlanned !== "" && (Number.isNaN(planned) || planned < 0)) {
+      toast.error("Enter valid planned days");
+      return;
+    }
+    setMutation.mutate({
+      labourId: selectId,
+      charge: newCharge ? charge : 0,
+      plannedDays: newPlanned ? planned : undefined,
+    });
   }
 
   function startEdit(entry: ProjectLabour) {
     setEditingId(entry.labourId._id);
     setEditCharge(String(entry.charge ?? 0));
+    setEditPlanned(entry.plannedDays != null ? String(entry.plannedDays) : "");
   }
 
   function saveEdit(labourId: string) {
@@ -321,7 +369,16 @@ export function ProjectLabourSection({
       toast.error("Enter a valid charge");
       return;
     }
-    setMutation.mutate({ labourId, charge });
+    const planned = Number(editPlanned);
+    if (editPlanned !== "" && (Number.isNaN(planned) || planned < 0)) {
+      toast.error("Enter valid planned days");
+      return;
+    }
+    setMutation.mutate({
+      labourId,
+      charge,
+      plannedDays: editPlanned === "" ? undefined : planned,
+    });
   }
 
   // ── Work sessions on this project, grouped by labour ──────────────────────
@@ -338,6 +395,17 @@ export function ProjectLabourSection({
       arr.sort(
         (a, b) => new Date(b.workDate).getTime() - new Date(a.workDate).getTime()
       );
+    return map;
+  }, [workLogs]);
+
+  // Total days worked per labour on this project (sum of session day-fractions).
+  const workedDaysByLabour = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const w of workLogs) {
+      const lid = typeof w.labourId === "string" ? w.labourId : w.labourId?._id;
+      if (!lid) continue;
+      map.set(lid, (map.get(lid) ?? 0) + (w.days ?? 0));
+    }
     return map;
   }, [workLogs]);
 
@@ -385,11 +453,19 @@ export function ProjectLabourSection({
   // ── Per-labour expand + log session ───────────────────────────────────────
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [logDate, setLogDate] = useState(todayISO());
-  const [logDays, setLogDays] = useState("1");
+  const [logShifts, setLogShifts] = useState<WorkShift[]>([]);
+  const [logHours, setLogHours] = useState("");
+  const [logExtra, setLogExtra] = useState("");
   const [logRate, setLogRate] = useState("");
   const [logAccountId, setLogAccountId] = useState("");
   const [logMethod, setLogMethod] = useState("");
   const [pendingSession, setPendingSession] = useState<LabourWorkLog | null>(null);
+
+  function toggleLogShift(s: WorkShift) {
+    setLogShifts((prev) =>
+      prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
+    );
+  }
 
   // Accounts the salary can be paid from (cash/bank/etc.), filtered to match
   // the selected payment method — exactly like the ledger's "Paid through".
@@ -422,7 +498,9 @@ export function ProjectLabourSection({
     }
     setExpandedId(lid);
     setLogDate(todayISO());
-    setLogDays("1");
+    setLogShifts([]);
+    setLogHours("");
+    setLogExtra("");
     setLogRate(String(entry.charge || entry.labourId.dailyWage || ""));
   }
 
@@ -435,7 +513,9 @@ export function ProjectLabourSection({
   const logMutation = useMutation({
     mutationFn: (vars: {
       labourId: string;
-      days: number;
+      shifts: WorkShift[];
+      hours?: number;
+      extra?: number;
       rate: number;
       paymentAccountId: string;
       paymentMethod?: string;
@@ -444,14 +524,20 @@ export function ProjectLabourSection({
         labourId: vars.labourId,
         projectId,
         workDate: logDate,
-        days: vars.days,
+        shifts: vars.shifts.length ? vars.shifts : undefined,
+        hours: vars.hours,
+        // No shifts and no hours → a plain full day.
+        days: !vars.shifts.length && vars.hours == null ? 1 : undefined,
         rate: vars.rate,
+        extra: vars.extra,
         paymentAccountId: vars.paymentAccountId,
         paymentMethod: vars.paymentMethod || undefined,
       }),
     onSuccess: () => {
       invalidateSessions();
-      setLogDays("1");
+      setLogShifts([]);
+      setLogHours("");
+      setLogExtra("");
       toast.success("Session logged & expense recorded");
     },
     onError: (e: any) =>
@@ -469,14 +555,24 @@ export function ProjectLabourSection({
   });
 
   function handleLog(labourId: string) {
-    const d = Number(logDays);
     const r = Number(logRate);
-    if (Number.isNaN(d) || d <= 0) {
-      toast.error("Days must be greater than 0");
-      return;
-    }
     if (Number.isNaN(r) || r < 0) {
       toast.error("Enter a valid rate");
+      return;
+    }
+    const hours = logHours.trim() === "" ? undefined : Number(logHours);
+    if (hours !== undefined && (Number.isNaN(hours) || hours <= 0)) {
+      toast.error("Enter valid hours");
+      return;
+    }
+    // Hours and shifts are alternatives — don't mix them.
+    if (logShifts.length && hours !== undefined) {
+      toast.error("Pick shifts OR enter hours, not both");
+      return;
+    }
+    const extra = logExtra.trim() === "" ? undefined : Number(logExtra);
+    if (extra !== undefined && (Number.isNaN(extra) || extra < 0)) {
+      toast.error("Enter a valid extra amount");
       return;
     }
     if (!logAccountId) {
@@ -485,7 +581,9 @@ export function ProjectLabourSection({
     }
     logMutation.mutate({
       labourId,
-      days: d,
+      shifts: logShifts,
+      hours,
+      extra,
       rate: r,
       paymentAccountId: logAccountId,
       paymentMethod: logMethod || undefined,
@@ -499,11 +597,15 @@ export function ProjectLabourSection({
       <LabourEntryCard
         key={entry.labourId._id}
         entry={entry}
+        projectId={projectId}
         earned={earnedByLabour.get(entry.labourId._id) ?? 0}
+        workedDays={workedDaysByLabour.get(entry.labourId._id) ?? 0}
         sessions={sessionsByLabour.get(entry.labourId._id) ?? []}
         isEditing={editingId === entry.labourId._id}
         editCharge={editCharge}
         onEditChargeChange={setEditCharge}
+        editPlanned={editPlanned}
+        onEditPlannedChange={setEditPlanned}
         onStartEdit={() => startEdit(entry)}
         onSaveEdit={() => saveEdit(entry.labourId._id)}
         onCancelEdit={() => setEditingId(null)}
@@ -512,8 +614,12 @@ export function ProjectLabourSection({
         onToggleExpand={() => toggleExpand(entry)}
         logDate={logDate}
         onLogDateChange={setLogDate}
-        logDays={logDays}
-        onLogDaysChange={setLogDays}
+        logShifts={logShifts}
+        onToggleShift={toggleLogShift}
+        logHours={logHours}
+        onLogHoursChange={setLogHours}
+        logExtra={logExtra}
+        onLogExtraChange={setLogExtra}
         logRate={logRate}
         onLogRateChange={setLogRate}
         accounts={payAccounts}
@@ -733,8 +839,16 @@ export function ProjectLabourSection({
                 min={0}
                 value={newCharge}
                 onChange={(e) => setNewCharge(e.target.value)}
-                placeholder="Charge for this project (₹)"
-                className="sm:w-56"
+                placeholder="Rate ₹/day"
+                className="sm:w-40"
+              />
+              <Input
+                type="number"
+                min={0}
+                value={newPlanned}
+                onChange={(e) => setNewPlanned(e.target.value)}
+                placeholder="Planned days"
+                className="sm:w-32"
               />
               <Button
                 onClick={handleAdd}
@@ -855,11 +969,15 @@ export function ProjectLabourSection({
 
 function LabourEntryCard({
   entry,
+  projectId,
   earned,
+  workedDays,
   sessions,
   isEditing,
   editCharge,
   onEditChargeChange,
+  editPlanned,
+  onEditPlannedChange,
   onStartEdit,
   onSaveEdit,
   onCancelEdit,
@@ -868,8 +986,12 @@ function LabourEntryCard({
   onToggleExpand,
   logDate,
   onLogDateChange,
-  logDays,
-  onLogDaysChange,
+  logShifts,
+  onToggleShift,
+  logHours,
+  onLogHoursChange,
+  logExtra,
+  onLogExtraChange,
   logRate,
   onLogRateChange,
   accounts,
@@ -883,11 +1005,15 @@ function LabourEntryCard({
   onDeleteSession,
 }: {
   entry: ProjectLabour;
+  projectId: string;
   earned: number;
+  workedDays: number;
   sessions: LabourWorkLog[];
   isEditing: boolean;
   editCharge: string;
   onEditChargeChange: (v: string) => void;
+  editPlanned: string;
+  onEditPlannedChange: (v: string) => void;
   onStartEdit: () => void;
   onSaveEdit: () => void;
   onCancelEdit: () => void;
@@ -896,8 +1022,12 @@ function LabourEntryCard({
   onToggleExpand: () => void;
   logDate: string;
   onLogDateChange: (v: string) => void;
-  logDays: string;
-  onLogDaysChange: (v: string) => void;
+  logShifts: WorkShift[];
+  onToggleShift: (s: WorkShift) => void;
+  logHours: string;
+  onLogHoursChange: (v: string) => void;
+  logExtra: string;
+  onLogExtraChange: (v: string) => void;
   logRate: string;
   onLogRateChange: (v: string) => void;
   accounts: { _id: string; name: string }[];
@@ -911,7 +1041,10 @@ function LabourEntryCard({
   onDeleteSession: (s: LabourWorkLog) => void;
 }) {
   const labour = entry.labourId;
-  const logTotal = (Number(logDays) || 0) * (Number(logRate) || 0);
+  const logUnitDays = deriveDays(logShifts, logHours);
+  const logTotal =
+    Math.round(logUnitDays * (Number(logRate) || 0)) + (Number(logExtra) || 0);
+  const planned = entry.plannedDays;
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
       <div className="flex items-start gap-3">
@@ -949,6 +1082,14 @@ function LabourEntryCard({
               .join(" · ") || "—"}
           </p>
         </div>
+        <Link
+          href={`/labours/${labour._id}/attendance/${projectId}`}
+          aria-label="Attendance"
+          title="Attendance & dues"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-cine-primary/10 hover:text-cine-primary"
+        >
+          <CalendarDays className="h-3.5 w-3.5" />
+        </Link>
         <button
           type="button"
           onClick={onRemove}
@@ -959,23 +1100,37 @@ function LabourEntryCard({
         </button>
       </div>
 
-      {/* Meta: price + earned + sessions toggle */}
+      {/* Meta: rate/day + planned·worked + earned + sessions toggle */}
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
         {isEditing ? (
-          <span className="flex items-center gap-1">
-            <Input
-              type="number"
-              min={0}
-              value={editCharge}
-              onChange={(e) => onEditChargeChange(e.target.value)}
-              className="h-7 w-24 text-xs"
-              autoFocus
-            />
+          <span className="flex flex-wrap items-center gap-1">
+            <label className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+              ₹/day
+              <Input
+                type="number"
+                min={0}
+                value={editCharge}
+                onChange={(e) => onEditChargeChange(e.target.value)}
+                className="h-7 w-20 text-xs"
+                autoFocus
+              />
+            </label>
+            <label className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+              Planned
+              <Input
+                type="number"
+                min={0}
+                value={editPlanned}
+                onChange={(e) => onEditPlannedChange(e.target.value)}
+                placeholder="days"
+                className="h-7 w-16 text-xs"
+              />
+            </label>
             <button
               type="button"
               onClick={onSaveEdit}
               disabled={savingCharge}
-              aria-label="Save charge"
+              aria-label="Save"
               className="flex h-7 w-7 items-center justify-center rounded-md text-emerald-600 hover:bg-emerald-50 disabled:opacity-50 dark:hover:bg-emerald-950/40"
             >
               <Check className="h-4 w-4" />
@@ -994,11 +1149,21 @@ function LabourEntryCard({
             type="button"
             onClick={onStartEdit}
             className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:underline dark:text-emerald-300"
-            title="Edit price"
+            title="Edit rate / planned days"
           >
-            Price: {inr(entry.charge)}
+            {inr(entry.charge)}/day
             <Pencil className="h-3 w-3 text-slate-400" />
           </button>
+        )}
+        {!isEditing && (
+          <span className="text-slate-500 dark:text-slate-400">
+            Worked:{" "}
+            <span className="font-semibold text-slate-700 dark:text-slate-200">
+              {+workedDays.toFixed(2)}
+              {planned != null ? ` / ${planned}` : ""} day
+              {workedDays === 1 && planned == null ? "" : "s"}
+            </span>
+          </span>
         )}
         <span className="text-slate-500 dark:text-slate-400">
           Earned:{" "}
@@ -1033,8 +1198,8 @@ function LabourEntryCard({
                   <span className="flex min-w-0 items-center gap-1.5 text-slate-600 dark:text-slate-300">
                     <CalendarDays className="h-3 w-3 shrink-0 text-slate-400" />
                     <span className="truncate">
-                      {fmtDate(s.workDate)} · {s.days} day
-                      {s.days === 1 ? "" : "s"}
+                      {fmtDate(s.workDate)} · {sessionWorkSummary(s)}
+                      {s.extra ? ` · +${inr(s.extra)} extra` : ""}
                       {s.sessionLabel ? ` · ${s.sessionLabel}` : ""}
                     </span>
                   </span>
@@ -1068,25 +1233,62 @@ function LabourEntryCard({
                   className="h-7 w-36 text-xs"
                 />
               </label>
+              <div className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                Shifts
+                <div className="flex gap-1">
+                  {SHIFT_OPTIONS.map((s) => {
+                    const on = logShifts.includes(s.value);
+                    return (
+                      <button
+                        key={s.value}
+                        type="button"
+                        onClick={() => onToggleShift(s.value)}
+                        title={s.label}
+                        disabled={logHours.trim() !== ""}
+                        className={`flex h-7 w-7 items-center justify-center rounded-md border text-xs font-semibold transition disabled:opacity-40 ${
+                          on
+                            ? "border-cine-primary bg-cine-primary text-white"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                        }`}
+                      >
+                        {s.short}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-                Days
+                or Hours
                 <Input
                   type="number"
                   min={0}
                   step="0.5"
-                  value={logDays}
-                  onChange={(e) => onLogDaysChange(e.target.value)}
-                  className="h-7 w-16 text-xs"
+                  value={logHours}
+                  onChange={(e) => onLogHoursChange(e.target.value)}
+                  disabled={logShifts.length > 0}
+                  placeholder="hrs"
+                  className="h-7 w-16 text-xs disabled:opacity-40"
                 />
               </label>
               <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-                Rate (₹)
+                Rate (₹/day)
                 <Input
                   type="number"
                   min={0}
                   value={logRate}
                   onChange={(e) => onLogRateChange(e.target.value)}
                   className="h-7 w-24 text-xs"
+                />
+              </label>
+              <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                Extra (₹)
+                <Input
+                  type="number"
+                  min={0}
+                  value={logExtra}
+                  onChange={(e) => onLogExtraChange(e.target.value)}
+                  placeholder="0"
+                  className="h-7 w-20 text-xs"
                 />
               </label>
               <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
@@ -1129,7 +1331,13 @@ function LabourEntryCard({
               </Button>
             </div>
             <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-              Records {inr(logTotal)} as a labour expense for this project.
+              {+logUnitDays.toFixed(2)} day{logUnitDays === 1 ? "" : "s"} ×{" "}
+              {inr(Number(logRate) || 0)}
+              {Number(logExtra) ? ` + ${inr(Number(logExtra))} extra` : ""} ={" "}
+              <span className="font-semibold text-slate-700 dark:text-slate-200">
+                {inr(logTotal)}
+              </span>{" "}
+              recorded as a labour expense.
             </p>
           </div>
         </div>

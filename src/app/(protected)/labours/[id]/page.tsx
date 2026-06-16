@@ -413,6 +413,54 @@ export default function LabourDetailPage({
         </div>
       )}
 
+      {/* Project attendance — pick a project to open its calendar + dues */}
+      {projects.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+            <CalendarDays className="h-4 w-4 text-slate-400" />
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+              Project attendance
+            </h3>
+          </div>
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+            {projects.map((p) => {
+              const entry = (p.labours ?? []).find(
+                (l) => l.labourId?._id === id
+              );
+              const planned = entry?.plannedDays;
+              const total = entry?.totalAmount;
+              const rate =
+                total && planned ? Math.round(total / planned) : entry?.charge;
+              return (
+                <li key={p._id}>
+                  <Link
+                    href={`/labours/${id}/attendance/${p._id}`}
+                    className="flex items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cine-primary/10 text-cine-primary">
+                        <FolderKanban className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
+                          {p.clientName} — {p.serviceType}
+                        </p>
+                        <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                          {planned != null ? `${planned} planned days` : "No plan set"}
+                          {rate ? ` · ${inr(rate)}/day` : ""}
+                          {total ? ` · ${inr(total)} total` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       {/* Member of: vendors & groups */}
       {((memberships?.vendors.length ?? 0) > 0 ||
         (memberships?.groups.length ?? 0) > 0) && (
