@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   IdCard,
+  Pencil,
   Plus,
   Trash2,
   Wallet,
@@ -175,12 +176,23 @@ export default function StaffDetailPage({
   const [menuDay, setMenuDay] = useState<number | null>(null);
   const [menuOt, setMenuOt] = useState(false);
   const [menuHours, setMenuHours] = useState("");
+  // Past days open in a read-only view first; today edits straight away.
+  const [menuEdit, setMenuEdit] = useState(false);
 
   // Map day-of-month → status.
   const statusByDay = useMemo(() => {
     const m = new Map<number, AttendanceStatus>();
     for (const r of monthQuery.data?.attendance ?? []) {
       m.set(new Date(r.date).getUTCDate(), r.status);
+    }
+    return m;
+  }, [monthQuery.data]);
+
+  // Map day-of-month → full attendance record (for the menu's view mode).
+  const recByDay = useMemo(() => {
+    const m = new Map<number, AttendanceRecord>();
+    for (const r of monthQuery.data?.attendance ?? []) {
+      m.set(new Date(r.date).getUTCDate(), r);
     }
     return m;
   }, [monthQuery.data]);
@@ -264,11 +276,15 @@ export default function StaffDetailPage({
   }
 
   // Open/close a day's popup menu, resetting its inline overtime sub-state.
+  // Today opens straight in edit mode; past days open in a read-only view first.
   function openMenu(day: number) {
-    const rec = monthQuery.data?.attendance.find(
-      (r) => new Date(r.date).getUTCDate() === day
-    );
+    const rec = recByDay.get(day);
+    const dateStr = `${year}-${pad(month)}-${pad(day)}`;
+    const today = `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(
+      now.getUTCDate()
+    )}`;
     setMenuDay(day);
+    setMenuEdit(dateStr === today);
     setMenuOt(false);
     setMenuHours(rec?.overtimeHours != null ? String(rec.overtimeHours) : "");
   }
@@ -769,6 +785,7 @@ export default function StaffDetailPage({
             const day = i + 1;
             const holiday = isHoliday(year, month - 1, day, settings);
             const status = statusByDay.get(day);
+            const rec = recByDay.get(day);
             const holidayWorked = holiday && status === "PRESENT";
             const meta = !holiday && status ? STATUS_META[status] : null;
             const dateStr = `${year}-${pad(month)}-${pad(day)}`;
@@ -840,6 +857,47 @@ export default function StaffDetailPage({
                     )}
                   </p>
 
+                  {!menuEdit ? (
+                  /* Past day → show the current state, tap Edit to change it. */
+                  <div className="space-y-2">
+                    <div className="rounded-md bg-slate-50 px-2 py-2 text-sm dark:bg-slate-800/50">
+                      {status ? (
+                        <span className="flex items-center gap-2 text-slate-800 dark:text-slate-100">
+                          <span
+                            className={`h-2.5 w-2.5 rounded-full ${STATUS_META[status].cls}`}
+                          />
+                          {holiday && status === "PRESENT"
+                            ? "Worked (holiday)"
+                            : STATUS_META[status].label}
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 dark:text-slate-400">
+                          {holiday ? "Holiday / weekly off" : "Not marked"}
+                        </span>
+                      )}
+                      {rec &&
+                        (rec.overtimeHours != null ||
+                          rec.overtimePay != null ||
+                          (holiday && status === "PRESENT")) && (
+                          <p className="mt-1 text-xs font-medium text-violet-600 dark:text-violet-400">
+                            + overtime {inr(overtimePayFor(rec, holiday))}
+                            {rec.overtimeHours != null
+                              ? ` · ${rec.overtimeHours} hr`
+                              : ""}
+                          </p>
+                        )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full gap-1.5"
+                      onClick={() => setMenuEdit(true)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> Edit
+                    </Button>
+                  </div>
+                  ) : (
+                  <>
                   {/* Status options (a holiday only supports "worked") */}
                   <div className="space-y-0.5">
                     {(holiday ? (["PRESENT"] as AttendanceStatus[]) : STATUS_ORDER).map(
@@ -933,6 +991,8 @@ export default function StaffDetailPage({
                       </span>
                       Clear
                     </button>
+                  )}
+                  </>
                   )}
                 </PopoverContent>
               </Popover>
