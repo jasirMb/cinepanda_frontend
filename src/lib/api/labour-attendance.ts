@@ -26,6 +26,8 @@ export interface LabourAttendanceSummary {
   projectName?: string;
   plannedDays?: number;
   totalAmount?: number;
+  startDate?: string;
+  endDate?: string;
   workedDays: number;
   owed: number;
   paid: number;
@@ -105,4 +107,28 @@ export async function payLabourAttendance(
 
 export async function deleteLabourAttendancePayment(id: string): Promise<void> {
   await api.delete(`/labour-attendance/payments/${id}`);
+}
+
+/** One of a labour's attendance settlement payments (project populated). */
+export interface LabourPaymentItem {
+  _id: string;
+  amount: number;
+  projectId?:
+    | { _id: string; clientName?: string; serviceType?: string }
+    | string
+    | null;
+  paymentAccountId?: { _id: string; name: string; type?: string } | string | null;
+  paymentMethod?: string;
+  paidDate: string;
+}
+
+/** All of a labour's attendance payments across every project. */
+export async function fetchLabourPayments(
+  labourId: string
+): Promise<LabourPaymentItem[]> {
+  const { data } = await api.get<{ success: boolean; data: LabourPaymentItem[] }>(
+    "/labour-attendance/payments",
+    { params: { labourId } }
+  );
+  return data.data;
 }

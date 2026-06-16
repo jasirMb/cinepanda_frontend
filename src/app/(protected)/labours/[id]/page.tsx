@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Banknote,
@@ -30,6 +30,8 @@ import {
   type LabourWorkLog,
   type WorkLogProjectRef,
 } from "@/lib/api/labour-worklogs";
+import { fetchLabourPayments } from "@/lib/api/labour-attendance";
+import { labourAttendanceKeys } from "@/hooks/useLabourAttendance";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -53,6 +55,24 @@ function projectLabel(p: WorkLogProjectRef | string | null): string {
 function projId(p: WorkLogProjectRef | string | null): string {
   if (!p) return "__deleted__";
   return typeof p === "string" ? p : p._id;
+}
+
+/** A row in the unified "work sessions" list — a logged session OR an
+ * attendance settlement payment (the user treats both as work entries). */
+interface LabourListEntry {
+  key: string;
+  kind: "session" | "attendance";
+  pid: string;
+  projectName: string;
+  date: string;
+  amount: number;
+  /** session only */
+  days?: number;
+  rate?: number;
+  sessionLabel?: string;
+  log?: LabourWorkLog;
+  /** attendance only */
+  account?: string;
 }
 
 const PAYMENT_METHODS: { value: string; label: string }[] = [
@@ -151,31 +171,88 @@ export default function LabourDetailPage({
     return Math.round(d * r * 100) / 100;
   }, [form.days, form.rate]);
 
-  const totalPaid = useMemo(
+  // Attendance settlement payments for this labour (across projects).
+  const attPaymentsQuery = useQuery({
+    queryKey: [...labourAttendanceKeys.all, "labour-payments", id],
+    queryFn: () => fetchLabourPayments(id),
+    enabled: !!id,
+  });
+  const attPayments = attPaymentsQuery.data ?? [];
+  const attendancePaid = useMemo(
+    () => attPayments.reduce((s, p) => s + (p.amount ?? 0), 0),
+    [attPayments]
+  );
+
+  // Work-session earnings (the per-day "Log session" flow).
+  const workLogPaid = useMemo(
     () => logs.reduce((s, l) => s + (l.amount ?? 0), 0),
     [logs]
   );
+  // Total earned = work-session expenses + attendance settlements.
+  const totalEarned = workLogPaid + attendancePaid;
 
-  // Earnings grouped by project, highest first — so we can show the top project.
+  // Unified list = work-log sessions + attendance settlement payments. Both are
+  // shown as "work" entries (the attendance pay is its own ledger expense, so
+  // no double-count — this just displays them together).
+  const entries = useMemo<LabourListEntry[]>(() => {
+    const out: LabourListEntry[] = [];
+    for (const l of logs) {
+      out.push({
+        key: `s-${l._id}`,
+        kind: "session",
+        pid: projId(l.projectId),
+        projectName: projectLabel(l.projectId),
+        date: l.workDate,
+        amount: l.amount ?? 0,
+        days: l.days,
+        rate: l.rate,
+        sessionLabel: l.sessionLabel,
+        log: l,
+      });
+    }
+    for (const p of attPayments) {
+      const proj =
+        typeof p.projectId === "object" && p.projectId ? p.projectId : null;
+      out.push({
+        key: `a-${p._id}`,
+        kind: "attendance",
+        pid: proj?._id ?? (typeof p.projectId === "string" ? p.projectId : "__deleted__"),
+        projectName: proj
+          ? [proj.clientName, proj.serviceType].filter(Boolean).join(" — ") ||
+            "Project"
+          : "Project",
+        date: p.paidDate,
+        amount: p.amount ?? 0,
+        account:
+          typeof p.paymentAccountId === "object" && p.paymentAccountId
+            ? p.paymentAccountId.name
+            : undefined,
+      });
+    }
+    return out.sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  }, [logs, attPayments]);
+
+  // Earnings grouped by project (sessions + attendance), highest first.
   const byProject = useMemo(() => {
     const map = new Map<
       string,
       { id: string; name: string; total: number; sessions: number }
     >();
-    for (const l of logs) {
-      const pid = projId(l.projectId);
-      const entry = map.get(pid) ?? {
-        id: pid,
-        name: projectLabel(l.projectId),
+    for (const e of entries) {
+      const entry = map.get(e.pid) ?? {
+        id: e.pid,
+        name: e.projectName,
         total: 0,
         sessions: 0,
       };
-      entry.total += l.amount ?? 0;
+      entry.total += e.amount;
       entry.sessions += 1;
-      map.set(pid, entry);
+      map.set(e.pid, entry);
     }
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
-  }, [logs]);
+  }, [entries]);
 
   const topProject = byProject[0];
 
@@ -186,27 +263,33 @@ export default function LabourDetailPage({
   const [logProject, setLogProject] = useState(""); // "" = all projects
   const [logPage, setLogPage] = useState(1);
 
-  const filteredLogs = useMemo(() => {
+  const filteredEntries = useMemo(() => {
     const q = logSearch.trim().toLowerCase();
-    return logs.filter((l) => {
-      if (logProject && projId(l.projectId) !== logProject) return false;
+    return entries.filter((e) => {
+      if (logProject && e.pid !== logProject) return false;
       if (!q) return true;
-      const date = new Date(l.workDate).toLocaleDateString().toLowerCase();
+      const date = new Date(e.date).toLocaleDateString().toLowerCase();
       return (
-        projectLabel(l.projectId).toLowerCase().includes(q) ||
-        (l.sessionLabel ?? "").toLowerCase().includes(q) ||
+        e.projectName.toLowerCase().includes(q) ||
+        (e.sessionLabel ?? "").toLowerCase().includes(q) ||
         date.includes(q)
       );
     });
-  }, [logs, logSearch, logProject]);
+  }, [entries, logSearch, logProject]);
 
   const selectedProject = byProject.find((p) => p.id === logProject);
 
-  const logPageCount = Math.max(1, Math.ceil(filteredLogs.length / LOGS_PER_PAGE));
-  const pagedLogs = useMemo(
+  const logPageCount = Math.max(
+    1,
+    Math.ceil(filteredEntries.length / LOGS_PER_PAGE)
+  );
+  const pagedEntries = useMemo(
     () =>
-      filteredLogs.slice((logPage - 1) * LOGS_PER_PAGE, logPage * LOGS_PER_PAGE),
-    [filteredLogs, logPage]
+      filteredEntries.slice(
+        (logPage - 1) * LOGS_PER_PAGE,
+        logPage * LOGS_PER_PAGE
+      ),
+    [filteredEntries, logPage]
   );
 
   useEffect(() => {
@@ -354,7 +437,7 @@ export default function LabourDetailPage({
         <StatCard
           icon={<Banknote className="h-4 w-4" />}
           label="Total earned"
-          value={inr(totalPaid)}
+          value={inr(totalEarned)}
           accent
         />
         <StatCard
@@ -519,7 +602,7 @@ export default function LabourDetailPage({
               Work sessions
             </h3>
             <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-              {inr(totalPaid)}
+              {inr(totalEarned)}
             </span>
           </div>
           <Button size="sm" onClick={() => setShowSessionForm((v) => !v)}>
@@ -684,7 +767,7 @@ export default function LabourDetailPage({
           </form>
         )}
 
-        {logs.length > 0 && (
+        {entries.length > 0 && (
           <div className="space-y-2 border-b border-slate-100 p-3 dark:border-slate-800">
             <div className="flex flex-col gap-2 sm:flex-row">
               <div className="relative flex-1">
@@ -709,7 +792,7 @@ export default function LabourDetailPage({
                 <span className="font-semibold text-emerald-700 dark:text-emerald-300">
                   {inr(selectedProject.total)}
                 </span>{" "}
-                · {selectedProject.sessions} session(s)
+                · {selectedProject.sessions} entr{selectedProject.sessions === 1 ? "y" : "ies"}
               </p>
             )}
           </div>
@@ -720,64 +803,98 @@ export default function LabourDetailPage({
             <Skeleton className="h-12 w-full rounded-lg" />
             <Skeleton className="h-12 w-full rounded-lg" />
           </div>
-        ) : logs.length === 0 ? (
+        ) : entries.length === 0 ? (
           <p className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">
-            No work sessions logged yet.
+            No work sessions yet.
           </p>
-        ) : filteredLogs.length === 0 ? (
+        ) : filteredEntries.length === 0 ? (
           <p className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">
-            No sessions match your search.
+            No entries match your search.
           </p>
         ) : (
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {pagedLogs.map((log) => (
-              <li
-                key={log._id}
-                className="group flex items-center gap-3 px-4 py-3 transition hover:bg-slate-50 dark:hover:bg-slate-800/40"
-              >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cine-primary/10 text-cine-primary">
-                  <FolderKanban className="h-4 w-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
-                      {projectLabel(log.projectId)}
-                    </p>
-                    {log.sessionLabel && (
-                      <span className="rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
-                        {log.sessionLabel}
-                      </span>
+            {pagedEntries.map((e) => {
+              const isAtt = e.kind === "attendance";
+              return (
+                <li
+                  key={e.key}
+                  className="group flex items-center gap-3 px-4 py-3 transition hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                >
+                  <div
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                      isAtt
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                        : "bg-cine-primary/10 text-cine-primary"
+                    }`}
+                  >
+                    {isAtt ? (
+                      <Banknote className="h-4 w-4" />
+                    ) : (
+                      <FolderKanban className="h-4 w-4" />
                     )}
                   </div>
-                  <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                    <CalendarDays className="h-3 w-3" />
-                    {new Date(log.workDate).toLocaleDateString()}
-                    <span className="text-slate-300 dark:text-slate-600">•</span>
-                    {log.days} day(s) × {inr(log.rate)}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
-                    {inr(log.amount)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setPendingDelete(log)}
-                    aria-label="Remove session"
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:hover:bg-red-950/40"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </li>
-            ))}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
+                        {e.projectName}
+                      </p>
+                      {isAtt ? (
+                        <span className="rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                          Project session
+                        </span>
+                      ) : (
+                        e.sessionLabel && (
+                          <span className="rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
+                            {e.sessionLabel}
+                          </span>
+                        )
+                      )}
+                    </div>
+                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                      <CalendarDays className="h-3 w-3" />
+                      {new Date(e.date).toLocaleDateString()}
+                      <span className="text-slate-300 dark:text-slate-600">•</span>
+                      {isAtt
+                        ? `Settled${e.account ? ` · ${e.account}` : ""}`
+                        : `${e.days} day(s) × ${inr(e.rate ?? 0)}`}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                      {inr(e.amount)}
+                    </span>
+                    {isAtt ? (
+                      <Link
+                        href={`/labours/${id}/attendance/${e.pid}`}
+                        aria-label="Open session"
+                        title="Open to edit / undo"
+                        className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 opacity-0 transition hover:bg-cine-primary/10 hover:text-cine-primary group-hover:opacity-100"
+                      >
+                        <CalendarDays className="h-3.5 w-3.5" />
+                      </Link>
+                    ) : (
+                      e.log && (
+                        <button
+                          type="button"
+                          onClick={() => setPendingDelete(e.log!)}
+                          aria-label="Remove session"
+                          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:hover:bg-red-950/40"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
 
-        {filteredLogs.length > LOGS_PER_PAGE && (
+        {filteredEntries.length > LOGS_PER_PAGE && (
           <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-2.5 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
             <span>
-              Page {logPage} of {logPageCount} · {filteredLogs.length} sessions
+              Page {logPage} of {logPageCount} · {filteredEntries.length} entries
             </span>
             <div className="flex items-center gap-1">
               <button

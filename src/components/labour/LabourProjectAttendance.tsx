@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, ChevronLeft, ChevronRight, Wallet } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Wallet,
+} from "lucide-react";
 
 import {
   useLabourAttendance,
@@ -105,6 +111,22 @@ export function LabourProjectAttendance({
     return { status, extra };
   }, [records]);
 
+  // This month's per-status counts (like the staff overview cards).
+  const counts = useMemo(() => {
+    const c = { FULL_DAY: 0, HALF_DAY: 0, OVERTIME: 0, LEAVE: 0, ABSENT: 0 };
+    for (const r of records) c[r.status] += 1;
+    return c;
+  }, [records]);
+
+  // Assignment work timeline (YYYY-MM-DD bounds). A day outside it isn't markable.
+  const startStr = summary?.startDate ? summary.startDate.slice(0, 10) : "";
+  const endStr = summary?.endDate ? summary.endDate.slice(0, 10) : "";
+  function inRange(dateStr: string): boolean {
+    if (startStr && dateStr < startStr) return false;
+    if (endStr && dateStr > endStr) return false;
+    return true;
+  }
+
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: labourAttendanceKeys.all });
     queryClient.invalidateQueries({ queryKey: ["projects"] });
@@ -114,16 +136,22 @@ export function LabourProjectAttendance({
   // ── Assignment editor (total + planned days → rate) ───────────────────────
   const [editTotal, setEditTotal] = useState("");
   const [editPlanned, setEditPlanned] = useState("");
+  const [editStart, setEditStart] = useState("");
+  const [editEnd, setEditEnd] = useState("");
   useEffect(() => {
     setEditTotal(summary?.totalAmount != null ? String(summary.totalAmount) : "");
     setEditPlanned(summary?.plannedDays != null ? String(summary.plannedDays) : "");
-  }, [summary?.totalAmount, summary?.plannedDays]);
+    setEditStart(summary?.startDate ? summary.startDate.slice(0, 10) : "");
+    setEditEnd(summary?.endDate ? summary.endDate.slice(0, 10) : "");
+  }, [summary?.totalAmount, summary?.plannedDays, summary?.startDate, summary?.endDate]);
 
   const assignMutation = useMutation({
     mutationFn: () =>
       addProjectLabour(projectId, labourId, {
         totalAmount: editTotal.trim() === "" ? null : Number(editTotal),
         plannedDays: editPlanned.trim() === "" ? null : Number(editPlanned),
+        startDate: editStart.trim() === "" ? null : editStart,
+        endDate: editEnd.trim() === "" ? null : editEnd,
       }),
     onSuccess: () => {
       invalidate();
@@ -264,17 +292,27 @@ export function LabourProjectAttendance({
           Rate / day
           <span className="flex h-8 items-center font-semibold text-slate-800 dark:text-slate-100">{inr(previewRate)}</span>
         </div>
+        <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+          From
+          <Input type="date" value={editStart} onChange={(e) => setEditStart(e.target.value)} className="h-8 w-36 text-xs" />
+        </label>
+        <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+          To
+          <Input type="date" value={editEnd} min={editStart || undefined} onChange={(e) => setEditEnd(e.target.value)} className="h-8 w-36 text-xs" />
+        </label>
         <Button size="sm" variant="outline" className="h-8" onClick={() => assignMutation.mutate()} disabled={assignMutation.isPending}>
           {assignMutation.isPending ? "Saving…" : "Save"}
         </Button>
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Worked" value={`${+(summary?.workedDays ?? 0).toFixed(2)}${summary?.plannedDays != null ? ` / ${summary.plannedDays}` : ""} days`} />
-        <Stat label="Owed" value={inr(summary?.owed ?? 0)} />
-        <Stat label="Paid" value={inr(summary?.paid ?? 0)} tone="emerald" />
-        <Stat label="Outstanding" value={inr(summary?.outstanding ?? 0)} tone="amber" />
+      {/* Overview stats (this month) + owed — mirrors the staff overview cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <Stat label="Full days" value={String(counts.FULL_DAY)} tone="emerald" />
+        <Stat label="Half days" value={String(counts.HALF_DAY)} tone="amber" />
+        <Stat label="Overtime" value={String(counts.OVERTIME)} tone="violet" />
+        <Stat label="Leave" value={String(counts.LEAVE)} tone="sky" />
+        <Stat label="Absent" value={String(counts.ABSENT)} tone="rose" />
+        <Stat label="Owed (total)" value={inr(summary?.owed ?? 0)} tone="emerald" />
       </div>
 
       {/* Calendar */}
@@ -298,6 +336,12 @@ export function LabourProjectAttendance({
             ))}
           </div>
         </div>
+        {(startStr || endStr) && (
+          <p className="mb-2 text-[11px] text-slate-500 dark:text-slate-400">
+            Work dates: {startStr ? fmtDateISO(startStr) : "—"} →{" "}
+            {endStr ? fmtDateISO(endStr) : "—"} (other days are locked)
+          </p>
+        )}
 
         <div className="grid grid-cols-7 gap-1.5">
           {WEEKDAYS.map((w) => (
@@ -311,10 +355,12 @@ export function LabourProjectAttendance({
             const dateStr = `${year}-${pad(month)}-${pad(day)}`;
             const isToday = dateStr === todayStr;
             const isFuture = dateStr > todayStr;
+            const outOfRange = !inRange(dateStr);
+            const disabled = isFuture || outOfRange;
             const cellClass = `flex aspect-square w-full flex-col items-center justify-center rounded-lg border text-xs transition ${
               isToday ? "ring-2 ring-cine-primary/50" : ""
             } ${
-              isFuture
+              disabled
                 ? "cursor-not-allowed border-slate-100 bg-slate-50/60 text-slate-300 dark:border-slate-800/60 dark:bg-slate-900/30 dark:text-slate-700"
                 : meta
                   ? `border-transparent ${meta.cls} hover:opacity-90`
@@ -326,9 +372,17 @@ export function LabourProjectAttendance({
                 {meta && <span className="text-[10px] font-bold">{meta.short}</span>}
               </>
             );
-            if (isFuture) {
+            if (disabled) {
               return (
-                <button key={day} type="button" disabled className={cellClass} title="Future date">{inner}</button>
+                <button
+                  key={day}
+                  type="button"
+                  disabled
+                  className={cellClass}
+                  title={isFuture ? "Future date" : "Outside the work dates"}
+                >
+                  {inner}
+                </button>
               );
             }
             return (
@@ -383,15 +437,43 @@ export function LabourProjectAttendance({
         </div>
       </div>
 
-      {/* Pay / dues */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/20">
-        <p className="text-sm text-slate-700 dark:text-slate-200">
-          Outstanding: <span className="font-bold text-amber-700 dark:text-amber-300">{inr(summary?.outstanding ?? 0)}</span>
-        </p>
-        {!showPay && (summary?.outstanding ?? 0) > 0 && (
-          <Button size="sm" onClick={openPay}><Wallet className="h-4 w-4" /> Pay</Button>
-        )}
-      </div>
+      {/* Pay / dues — styled like the staff salary banner */}
+      {(summary?.outstanding ?? 0) > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/20">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-6 w-6 shrink-0 text-amber-500" />
+            <div>
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                Need to pay — {inr(summary?.outstanding ?? 0)} outstanding
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Worked {+(summary?.workedDays ?? 0).toFixed(2)}
+                {summary?.plannedDays != null ? ` / ${summary.plannedDays}` : ""} days ·{" "}
+                {inr(summary?.owed ?? 0)} owed · {inr(summary?.paid ?? 0)} paid
+              </p>
+            </div>
+          </div>
+          {!showPay && (
+            <Button size="sm" onClick={openPay}><Wallet className="h-4 w-4" /> Pay</Button>
+          )}
+        </div>
+      ) : (summary?.paid ?? 0) > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/20">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <div>
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                Settled · {inr(summary?.paid ?? 0)} paid
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Worked {+(summary?.workedDays ?? 0).toFixed(2)}
+                {summary?.plannedDays != null ? ` / ${summary.plannedDays}` : ""} days ·{" "}
+                {inr(summary?.owed ?? 0)} owed
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {showPay && (
         <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-4 dark:border-slate-800 dark:bg-slate-900/60">
@@ -458,12 +540,15 @@ function Stat({
 }: {
   label: string;
   value: string;
-  tone?: "slate" | "emerald" | "amber";
+  tone?: "slate" | "emerald" | "amber" | "violet" | "sky" | "rose";
 }) {
   const cls: Record<string, string> = {
     slate: "text-slate-900 dark:text-slate-50",
     emerald: "text-emerald-600 dark:text-emerald-400",
     amber: "text-amber-600 dark:text-amber-400",
+    violet: "text-violet-600 dark:text-violet-400",
+    sky: "text-sky-600 dark:text-sky-400",
+    rose: "text-rose-600 dark:text-rose-400",
   };
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
