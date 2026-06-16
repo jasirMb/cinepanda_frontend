@@ -347,20 +347,32 @@ export default function StaffDetailPage({
     mark.mutate({ date, status, overtimePay: num });
   }
 
-  // Worked days (not holidays) that don't have overtime logged yet — selectable
-  // in the "add overtime" control so any working day can earn overtime.
+  // Every day of the month from the 1st up to today (no future days) that doesn't
+  // already have overtime — selectable in the "add overtime" control. A day off
+  // (absent / paid leave) is skipped; an unmarked day is marked present when added.
   const addableDays = useMemo(() => {
     const already = new Set(overtimeDays.map((o) => o.day));
+    const recByDay = new Map<number, AttendanceRecord>();
+    for (const r of monthQuery.data?.attendance ?? [])
+      recByDay.set(new Date(r.date).getUTCDate(), r);
+    const dim = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const tStr = `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(
+      now.getUTCDate()
+    )}`;
     const out: { day: number; status: AttendanceStatus }[] = [];
-    for (const r of monthQuery.data?.attendance ?? []) {
-      const day = new Date(r.date).getUTCDate();
-      const holiday = isHoliday(year, month - 1, day, settings);
-      const worked = r.status === "PRESENT" || r.status === "HALF_DAY";
-      if (!holiday && worked && !already.has(day))
-        out.push({ day, status: r.status });
+    for (let day = 1; day <= dim; day++) {
+      if (already.has(day)) continue;
+      const dateStr = `${year}-${pad(month)}-${pad(day)}`;
+      if (dateStr > tStr) continue; // today + previous days only
+      const rec = recByDay.get(day);
+      if (rec && (rec.status === "ABSENT" || rec.status === "PAID_LEAVE"))
+        continue;
+      const status: AttendanceStatus =
+        rec?.status === "HALF_DAY" ? "HALF_DAY" : "PRESENT";
+      out.push({ day, status });
     }
-    return out.sort((a, b) => a.day - b.day);
-  }, [monthQuery.data, overtimeDays, settings, year, month]);
+    return out;
+  }, [monthQuery.data, overtimeDays, year, month, now]);
 
   function addOvertime() {
     if (!otDay) {
@@ -833,13 +845,16 @@ export default function StaffDetailPage({
                   className="h-8 w-36 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
                 >
                   <option value="">Pick a day…</option>
-                  {addableDays.map(({ day }) => (
-                    <option key={day} value={day}>
-                      {MONTHS[month - 1].slice(0, 3)} {day} (
-                      {WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()]}
-                      )
-                    </option>
-                  ))}
+                  {addableDays.map(({ day }) => {
+                    const dow = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+                    const hol = isHoliday(year, month - 1, day, settings);
+                    return (
+                      <option key={day} value={day}>
+                        {MONTHS[month - 1].slice(0, 3)} {day} ({WEEKDAYS[dow]})
+                        {hol ? " · holiday" : ""}
+                      </option>
+                    );
+                  })}
                 </select>
               </label>
               <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
