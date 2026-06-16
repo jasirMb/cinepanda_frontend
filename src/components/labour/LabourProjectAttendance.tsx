@@ -27,6 +27,7 @@ import {
 } from "@/lib/api/labour-attendance";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Popover,
   PopoverContent,
@@ -147,12 +148,14 @@ export function LabourProjectAttendance({
     return out.sort((a, b) => a.day - b.day);
   }, [records]);
 
-  // Effective work periods (YYYY-MM-DD ranges). A day outside ALL of them is locked.
+  // Effective work periods (YYYY-MM-DD ranges, each with its own rate). A day
+  // outside ALL of them is locked.
   const periods = useMemo(
     () =>
       (summary?.workPeriods ?? []).map((p) => ({
         start: p.startDate.slice(0, 10),
         end: p.endDate.slice(0, 10),
+        rate: p.rate,
       })),
     [summary?.workPeriods]
   );
@@ -162,6 +165,13 @@ export function LabourProjectAttendance({
       (p) =>
         (!p.start || dateStr >= p.start) && (!p.end || dateStr <= p.end)
     );
+  }
+  // The per-day rate = the rate of the period covering the date, else the fallback.
+  function rateForDateStr(dateStr: string): number {
+    const per = periods.find(
+      (p) => (!p.start || dateStr >= p.start) && (!p.end || dateStr <= p.end)
+    );
+    return per?.rate != null ? per.rate : rate;
   }
 
   function invalidate() {
@@ -173,7 +183,9 @@ export function LabourProjectAttendance({
   // ── Assignment editor (total + planned days → rate) ───────────────────────
   const [editTotal, setEditTotal] = useState("");
   const [editPlanned, setEditPlanned] = useState("");
-  const [editPeriods, setEditPeriods] = useState<{ start: string; end: string }[]>([]);
+  const [editPeriods, setEditPeriods] = useState<
+    { start: string; end: string; rate: string }[]
+  >([]);
   useEffect(() => {
     setEditTotal(summary?.totalAmount != null ? String(summary.totalAmount) : "");
     setEditPlanned(summary?.plannedDays != null ? String(summary.plannedDays) : "");
@@ -181,15 +193,20 @@ export function LabourProjectAttendance({
       (summary?.workPeriods ?? []).map((p) => ({
         start: p.startDate.slice(0, 10),
         end: p.endDate.slice(0, 10),
+        rate: p.rate != null ? String(p.rate) : "",
       }))
     );
   }, [summary?.totalAmount, summary?.plannedDays, summary?.workPeriods]);
 
-  function setPeriodField(i: number, key: "start" | "end", val: string) {
+  function setPeriodField(
+    i: number,
+    key: "start" | "end" | "rate",
+    val: string
+  ) {
     setEditPeriods((ps) => ps.map((p, idx) => (idx === i ? { ...p, [key]: val } : p)));
   }
   function addPeriod() {
-    setEditPeriods((ps) => [...ps, { start: "", end: "" }]);
+    setEditPeriods((ps) => [...ps, { start: "", end: "", rate: "" }]);
   }
   function removePeriod(i: number) {
     setEditPeriods((ps) => ps.filter((_, idx) => idx !== i));
@@ -202,7 +219,11 @@ export function LabourProjectAttendance({
         plannedDays: editPlanned.trim() === "" ? null : Number(editPlanned),
         workPeriods: editPeriods
           .filter((p) => p.start && p.end)
-          .map((p) => ({ startDate: p.start, endDate: p.end })),
+          .map((p) => ({
+            startDate: p.start,
+            endDate: p.end,
+            rate: p.rate.trim() === "" ? undefined : Number(p.rate),
+          })),
       }),
     onSuccess: () => {
       invalidate();
@@ -366,11 +387,15 @@ export function LabourProjectAttendance({
               <div key={i} className="flex flex-wrap items-end gap-2">
                 <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                   From
-                  <Input type="date" value={p.start} onChange={(e) => setPeriodField(i, "start", e.target.value)} className="h-8 w-36 text-xs" />
+                  <DatePicker value={p.start} onChange={(v) => setPeriodField(i, "start", v)} placeholder="dd/mm/yyyy" className="h-8 w-36 text-xs" />
                 </label>
                 <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                   To
-                  <Input type="date" value={p.end} min={p.start || undefined} onChange={(e) => setPeriodField(i, "end", e.target.value)} className="h-8 w-36 text-xs" />
+                  <DatePicker value={p.end} onChange={(v) => setPeriodField(i, "end", v)} placeholder="dd/mm/yyyy" className="h-8 w-36 text-xs" />
+                </label>
+                <label className="flex flex-col gap-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                  Rate / day (₹)
+                  <Input type="number" min={0} value={p.rate} onChange={(e) => setPeriodField(i, "rate", e.target.value)} placeholder="e.g. 1000" className="h-8 w-24 text-xs" />
                 </label>
                 <button type="button" onClick={() => removePeriod(i)} aria-label="Remove period" className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40">
                   <Trash2 className="h-4 w-4" />
@@ -382,11 +407,17 @@ export function LabourProjectAttendance({
             </Button>
           </div>
           <p className="mt-1.5 text-[10px] text-slate-400">
-            e.g. 01/05 → 10/06, then 01/09 → 20/09. Days outside every period are
-            locked. Leave empty to allow any past day.{" "}
+            Each period has its own rate (e.g. 01/05→10/06 at ₹1,000, 15/06→20/06
+            at ₹1,200). Days outside every period are locked.{" "}
             {periods.length > 0 && (
               <span className="text-slate-500 dark:text-slate-400">
-                Now: {periods.map((p) => `${fmtDMY(p.start)}–${fmtDMY(p.end)}`).join(", ")}
+                Now:{" "}
+                {periods
+                  .map(
+                    (p) =>
+                      `${fmtDMY(p.start)}–${fmtDMY(p.end)}${p.rate != null ? ` @ ${inr(p.rate)}` : ""}`
+                  )
+                  .join(", ")}
               </span>
             )}
           </p>
@@ -444,6 +475,7 @@ export function LabourProjectAttendance({
             const status = statusByDay.status.get(day);
             const meta = status ? STATUS_META[status] : null;
             const dateStr = `${year}-${pad(month)}-${pad(day)}`;
+            const dayRate = rateForDateStr(dateStr);
             const isToday = dateStr === todayStr;
             const isFuture = dateStr > todayStr;
             const outOfRange = !inRange(dateStr);
@@ -501,12 +533,12 @@ export function LabourProjectAttendance({
                   </div>
                   {menuOt && (
                     <div className="mt-1 rounded-md bg-violet-50 p-2 dark:bg-violet-950/30">
-                      <p className="mb-1 text-[10px] text-slate-500 dark:text-slate-400">Overtime = {inr(rate)} day + extra</p>
+                      <p className="mb-1 text-[10px] text-slate-500 dark:text-slate-400">Overtime = {inr(dayRate)} day + extra</p>
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs text-slate-400">₹</span>
                         <input type="number" min={0} autoFocus value={menuExtra} onChange={(e) => setMenuExtra(e.target.value)} placeholder="extra"
                           className="h-8 w-20 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50" />
-                        <span className="ml-auto text-sm font-semibold text-violet-700 dark:text-violet-300">{inr(rate + (Number(menuExtra) || 0))}</span>
+                        <span className="ml-auto text-sm font-semibold text-violet-700 dark:text-violet-300">{inr(dayRate + (Number(menuExtra) || 0))}</span>
                       </div>
                       <div className="mt-1.5 flex justify-end gap-1.5">
                         <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setMenuOt(false)}>Back</Button>

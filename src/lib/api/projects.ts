@@ -85,8 +85,8 @@ export interface ProjectLabour {
   /** Legacy single work timeline. */
   startDate?: string;
   endDate?: string;
-  /** Multiple work periods (sections). */
-  workPeriods?: { startDate: string; endDate: string }[];
+  /** Multiple work periods (sections), each with its own per-day rate. */
+  workPeriods?: { startDate: string; endDate: string; rate?: number }[];
 }
 
 export interface ProjectsListResponse {
@@ -196,7 +196,7 @@ export async function addProjectLabour(
     totalAmount?: number | null;
     startDate?: string | null;
     endDate?: string | null;
-    workPeriods?: { startDate: string; endDate: string }[];
+    workPeriods?: { startDate: string; endDate: string; rate?: number }[];
   }
 ): Promise<ProjectPopulated> {
   const { data } = await api.post<ProjectDetailResponse>(
