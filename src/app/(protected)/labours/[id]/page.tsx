@@ -8,11 +8,10 @@ import {
   ArrowLeft,
   Banknote,
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   FolderKanban,
-  MapPin,
-  Phone,
   Plus,
   Search,
   Trash2,
@@ -147,7 +146,6 @@ export default function LabourDetailPage({
   const logs = logsQuery.data?.data ?? [];
 
   const [form, setForm] = useState(EMPTY);
-  const [showSessionForm, setShowSessionForm] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<LabourWorkLog | null>(null);
 
   const payAccounts = usePaymentAccounts().data?.data ?? [];
@@ -234,35 +232,95 @@ export default function LabourDetailPage({
     );
   }, [logs, attPayments]);
 
-  // Earnings grouped by project (sessions + attendance), highest first.
-  const byProject = useMemo(() => {
-    const map = new Map<
+  // One card per project the labour relates to (its assignment and/or its
+  // sessions/attendance) — groups everything that used to be 3 separate lists.
+  const projectCards = useMemo(() => {
+    const byPid = new Map<
       string,
-      { id: string; name: string; total: number; sessions: number }
+      { entries: LabourListEntry[]; earned: number; name: string }
     >();
     for (const e of entries) {
-      const entry = map.get(e.pid) ?? {
-        id: e.pid,
-        name: e.projectName,
-        total: 0,
-        sessions: 0,
-      };
-      entry.total += e.amount;
-      entry.sessions += 1;
-      map.set(e.pid, entry);
+      const g = byPid.get(e.pid) ?? { entries: [], earned: 0, name: e.projectName };
+      g.entries.push(e);
+      g.earned += e.amount;
+      byPid.set(e.pid, g);
     }
-    return Array.from(map.values()).sort((a, b) => b.total - a.total);
-  }, [entries]);
+    const assign = new Map<
+      string,
+      { name: string; plannedDays?: number; totalAmount?: number; rate?: number }
+    >();
+    for (const p of projects) {
+      const entry = (p.labours ?? []).find((l) => l.labourId?._id === id);
+      const plannedDays = entry?.plannedDays;
+      const totalAmount = entry?.totalAmount;
+      const rate =
+        totalAmount && plannedDays
+          ? Math.round(totalAmount / plannedDays)
+          : entry?.charge;
+      assign.set(p._id, {
+        name: [p.clientName, p.serviceType].filter(Boolean).join(" — ") || "Project",
+        plannedDays,
+        totalAmount,
+        rate,
+      });
+    }
+    const ids = new Set<string>([...assign.keys(), ...byPid.keys()]);
+    return Array.from(ids)
+      .map((pid) => {
+        const g = byPid.get(pid);
+        const a = assign.get(pid);
+        return {
+          id: pid,
+          name: a?.name || g?.name || "Project",
+          assigned: !!a,
+          earned: g?.earned ?? 0,
+          sessionCount: g?.entries.length ?? 0,
+          plannedDays: a?.plannedDays,
+          rate: a?.rate,
+          entries: g?.entries ?? [],
+        };
+      })
+      .sort((x, y) => y.earned - x.earned);
+  }, [entries, projects, id]);
 
-  const topProject = byProject[0];
+  const topProject = projectCards.find((c) => c.earned > 0);
+  const projectsWorked = projectCards.filter((c) => c.sessionCount > 0).length;
 
-  // Search + pagination for the work-sessions list (client-side — all of this
-  // labour's logs are already loaded).
-  const LOGS_PER_PAGE = 8;
+  // Which project's inline "Log session" form is open.
+  const [logForProject, setLogForProject] = useState<string | null>(null);
+  function openLog(card: { id: string; rate?: number }) {
+    if (logForProject === card.id) {
+      setLogForProject(null);
+      return;
+    }
+    setLogForProject(card.id);
+    setForm({
+      ...EMPTY,
+      projectId: card.id,
+      rate: String(card.rate ?? labour?.dailyWage ?? ""),
+    });
+  }
+
+  // ── Projects list pagination ──────────────────────────────────────────────
+  const PROJ_PER_PAGE = 6;
+  const [projPage, setProjPage] = useState(1);
+  const projPageCount = Math.max(1, Math.ceil(projectCards.length / PROJ_PER_PAGE));
+  const pagedCards = useMemo(
+    () =>
+      projectCards.slice((projPage - 1) * PROJ_PER_PAGE, projPage * PROJ_PER_PAGE),
+    [projectCards, projPage]
+  );
+  useEffect(() => {
+    if (projPage > projPageCount) setProjPage(projPageCount);
+  }, [projPage, projPageCount]);
+
+  // ── Work-sessions list: a flat list of all entries (work-session + project
+  // session), with search, project filter and pagination — separate from the
+  // projects list above. ─────────────────────────────────────────────────────
+  const SESS_PER_PAGE = 8;
   const [logSearch, setLogSearch] = useState("");
   const [logProject, setLogProject] = useState(""); // "" = all projects
   const [logPage, setLogPage] = useState(1);
-
   const filteredEntries = useMemo(() => {
     const q = logSearch.trim().toLowerCase();
     return entries.filter((e) => {
@@ -276,28 +334,21 @@ export default function LabourDetailPage({
       );
     });
   }, [entries, logSearch, logProject]);
-
-  const selectedProject = byProject.find((p) => p.id === logProject);
-
-  const logPageCount = Math.max(
-    1,
-    Math.ceil(filteredEntries.length / LOGS_PER_PAGE)
-  );
+  const sessPageCount = Math.max(1, Math.ceil(filteredEntries.length / SESS_PER_PAGE));
   const pagedEntries = useMemo(
-    () =>
-      filteredEntries.slice(
-        (logPage - 1) * LOGS_PER_PAGE,
-        logPage * LOGS_PER_PAGE
-      ),
+    () => filteredEntries.slice((logPage - 1) * SESS_PER_PAGE, logPage * SESS_PER_PAGE),
     [filteredEntries, logPage]
   );
-
+  const selectedProjEarned =
+    logProject != null
+      ? projectCards.find((c) => c.id === logProject)?.earned
+      : undefined;
   useEffect(() => {
     setLogPage(1);
   }, [logSearch, logProject]);
   useEffect(() => {
-    if (logPage > logPageCount) setLogPage(logPageCount);
-  }, [logPage, logPageCount]);
+    if (logPage > sessPageCount) setLogPage(sessPageCount);
+  }, [logPage, sessPageCount]);
 
   const createMutation = useMutation({
     mutationFn: createWorkLog,
@@ -305,7 +356,7 @@ export default function LabourDetailPage({
       queryClient.invalidateQueries({ queryKey: workLogKeys.all });
       queryClient.invalidateQueries({ queryKey: ["ledger"] });
       setForm({ ...EMPTY, rate: labour?.dailyWage != null ? String(labour.dailyWage) : "" });
-      setShowSessionForm(false);
+      setLogForProject(null);
       toast.success("Work session added & expense recorded");
     },
     onError: (err: any) =>
@@ -360,7 +411,7 @@ export default function LabourDetailPage({
 
   if (labourQuery.isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="max-w-5xl space-y-4">
         <Skeleton className="h-6 w-40" />
         <Skeleton className="h-28 w-full rounded-xl" />
         <Skeleton className="h-64 w-full rounded-xl" />
@@ -378,12 +429,12 @@ export default function LabourDetailPage({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="max-w-5xl space-y-4">
       <BackLink />
 
       {/* Labour header */}
       <div className="flex items-start gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-cine-primary/10 text-lg font-semibold text-cine-primary">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-cine-primary to-indigo-600 text-lg font-semibold text-white shadow-sm">
           {labour.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -401,34 +452,35 @@ export default function LabourDetailPage({
               {labour.role}
             </p>
           )}
-          <h2 className="truncate text-xl font-semibold text-slate-900 dark:text-slate-50">
+          <h2 className="truncate text-xl font-bold text-slate-900 dark:text-slate-50">
             {labour.name}
           </h2>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {labour.dailyWage != null && (
-              <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-                <Banknote className="h-3 w-3" /> {inr(labour.dailyWage)}/day
-              </Badge>
-            )}
-            {(labour.region || labour.state) && (
-              <Badge className="bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
-                <MapPin className="h-3 w-3" />
-                {Array.from(
-                  new Set([labour.region, labour.state].filter(Boolean))
-                ).join(" · ")}
-              </Badge>
-            )}
-            {labour.phone && (
-              <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                <Phone className="h-3 w-3" /> {labour.phone}
-              </Badge>
-            )}
-          </div>
+          <p className="truncate text-sm text-slate-500 dark:text-slate-400">
+            {[
+              Array.from(
+                new Set([labour.region, labour.state].filter(Boolean))
+              ).join(" · ") || null,
+              labour.phone || null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || "—"}
+          </p>
           {labour.details && (
-            <p className="mt-3 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-2 line-clamp-2 text-xs text-slate-400 dark:text-slate-500">
               {labour.details}
             </p>
           )}
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+            {labour.dailyWage != null ? "Daily wage" : "Total earned"}
+          </p>
+          <p className="text-lg font-bold text-slate-900 dark:text-slate-50">
+            {labour.dailyWage != null ? inr(labour.dailyWage) : inr(totalEarned)}
+          </p>
+          <p className="text-[11px] text-slate-400">
+            {labour.dailyWage != null ? "per day" : "all projects"}
+          </p>
         </div>
       </div>
 
@@ -443,106 +495,311 @@ export default function LabourDetailPage({
         <StatCard
           icon={<FolderKanban className="h-4 w-4" />}
           label="Projects worked"
-          value={String(byProject.length)}
+          value={String(projectsWorked)}
         />
         <StatCard
           icon={<Trophy className="h-4 w-4" />}
           label="Top project"
-          value={topProject ? inr(topProject.total) : "—"}
+          value={topProject ? inr(topProject.earned) : "—"}
           sub={topProject?.name}
           highlight
         />
       </div>
 
-      {/* Earnings by project */}
-      {byProject.length > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-          <div className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-900 dark:border-slate-800 dark:text-slate-50">
-            Earnings by project
-          </div>
+      {/* Projects — tap a project to open its attendance; log a session from the left */}
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+          <FolderKanban className="h-4 w-4 text-slate-400" />
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+            Projects
+          </h3>
+          <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+            {projectCards.length}
+          </span>
+        </div>
+
+        {projectCards.length === 0 ? (
+          <p className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">
+            Not on any project yet. Add this labour to a project first.
+          </p>
+        ) : (
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {byProject.map((p, i) => (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setLogProject((cur) => (cur === p.id ? "" : p.id))
-                  }
-                  title="Filter sessions by this project"
-                  className={`flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800/50 ${
-                    logProject === p.id ? "bg-cine-primary/5" : ""
-                  }`}
-                >
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="truncate text-sm text-slate-700 dark:text-slate-200">
-                      {p.name}
+            {pagedCards.map((c, idx) => {
+              const i = (projPage - 1) * PROJ_PER_PAGE + idx;
+              const logging = logForProject === c.id;
+              const meta = (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
+                      {c.name}
                     </span>
-                    {i === 0 && (
+                    {i === 0 && c.earned > 0 && (
                       <span className="shrink-0 rounded bg-cine-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-cine-primary">
                         Highest
                       </span>
                     )}
-                    <span className="shrink-0 text-xs text-slate-400">
-                      {p.sessions} session(s)
-                    </span>
                   </div>
-                  <span className="shrink-0 text-sm font-semibold text-slate-900 dark:text-slate-50">
-                    {inr(p.total)}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Project attendance — pick a project to open its calendar + dues */}
-      {projects.length > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-          <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-            <CalendarDays className="h-4 w-4 text-slate-400" />
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-              Project attendance
-            </h3>
-          </div>
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {projects.map((p) => {
-              const entry = (p.labours ?? []).find(
-                (l) => l.labourId?._id === id
+                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                    {c.plannedDays != null
+                      ? `${c.plannedDays} planned days`
+                      : c.assigned
+                        ? "No plan set"
+                        : "Removed from project"}
+                    {c.rate ? ` · ${inr(c.rate)}/day` : ""}
+                    {` · ${c.sessionCount} session${c.sessionCount === 1 ? "" : "s"}`}
+                  </p>
+                </>
               );
-              const planned = entry?.plannedDays;
-              const total = entry?.totalAmount;
-              const rate =
-                total && planned ? Math.round(total / planned) : entry?.charge;
               return (
-                <li key={p._id}>
-                  <Link
-                    href={`/labours/${id}/attendance/${p._id}`}
-                    className="flex items-center justify-between gap-3 px-4 py-3 transition hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cine-primary/10 text-cine-primary">
-                        <FolderKanban className="h-4 w-4" />
+                <li key={c.id}>
+                  <div className="flex items-center gap-2 px-3 py-2.5 transition hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    {c.assigned ? (
+                      <button
+                        type="button"
+                        onClick={() => openLog(c)}
+                        title="Log session"
+                        aria-label="Log session"
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md border transition ${
+                          logging
+                            ? "border-cine-primary bg-cine-primary text-white"
+                            : "border-slate-200 bg-white text-slate-500 hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                        }`}
+                      >
+                        {logging ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                      </button>
+                    ) : (
+                      <span className="h-8 w-8 shrink-0" />
+                    )}
+
+                    {c.assigned ? (
+                      <Link
+                        href={`/labours/${id}/attendance/${c.id}`}
+                        className="flex min-w-0 flex-1 items-center gap-3"
+                      >
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cine-primary/10 text-cine-primary">
+                          <FolderKanban className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">{meta}</div>
+                        <span className="shrink-0 text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                          {inr(c.earned)}
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+                      </Link>
+                    ) : (
+                      <div className="flex min-w-0 flex-1 items-center gap-3 opacity-70">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400 dark:bg-slate-800">
+                          <FolderKanban className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">{meta}</div>
+                        <span className="shrink-0 text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                          {inr(c.earned)}
+                        </span>
                       </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
-                          {p.clientName} — {p.serviceType}
-                        </p>
-                        <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                          {planned != null ? `${planned} planned days` : "No plan set"}
-                          {rate ? ` · ${inr(rate)}/day` : ""}
-                          {total ? ` · ${inr(total)} total` : ""}
-                        </p>
+                    )}
+                  </div>
+
+                  {logging && (
+                    <form
+                      onSubmit={handleSubmit}
+                      className="space-y-3 border-t border-slate-100 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-950/30"
+                    >
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <Field label="Date *">
+                          <Input type="date" value={form.workDate} onChange={(e) => setForm((f) => ({ ...f, workDate: e.target.value }))} />
+                        </Field>
+                        <Field label="Days *">
+                          <Input type="number" min={0} step="0.5" value={form.days} onChange={(e) => setForm((f) => ({ ...f, days: e.target.value }))} />
+                        </Field>
+                        <Field label="Rate / day *">
+                          <Input type="number" min={0} value={form.rate} onChange={(e) => setForm((f) => ({ ...f, rate: e.target.value }))} />
+                        </Field>
+                        <Field label="Type">
+                          <select
+                            value={form.paymentMethod}
+                            onChange={(e) => {
+                              const method = e.target.value;
+                              const t = accountTypeForMethod(method);
+                              setForm((f) => {
+                                const acc = payAccounts.find((a) => a._id === f.paymentAccountId);
+                                const keep = !t || !f.paymentAccountId || acc?.type === t;
+                                return { ...f, paymentMethod: method, paymentAccountId: keep ? f.paymentAccountId : "" };
+                              });
+                            }}
+                            className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                          >
+                            <option value="">Method…</option>
+                            {PAYMENT_METHODS.map((m) => (
+                              <option key={m.value} value={m.value}>{m.label}</option>
+                            ))}
+                          </select>
+                        </Field>
+                        <Field label="Paid from *">
+                          <select
+                            value={form.paymentAccountId}
+                            onChange={(e) => {
+                              const accId = e.target.value;
+                              const acc = payAccounts.find((a) => a._id === accId);
+                              setForm((f) => ({ ...f, paymentAccountId: accId, paymentMethod: acc ? methodForType(acc.type) : f.paymentMethod }));
+                            }}
+                            className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                          >
+                            <option value="">Select account…</option>
+                            {visibleAccounts.map((acc) => (
+                              <option key={acc._id} value={acc._id}>{acc.name}</option>
+                            ))}
+                          </select>
+                        </Field>
+                        <Field label="Session label">
+                          <Input placeholder="e.g. Day 1" value={form.sessionLabel} onChange={(e) => setForm((f) => ({ ...f, sessionLabel: e.target.value }))} />
+                        </Field>
+                        <Field label="Notes">
+                          <Input placeholder="Optional" value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
+                        </Field>
                       </div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
-                  </Link>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs text-slate-600 dark:text-slate-300">
+                          Expense:{" "}
+                          <span className="font-semibold text-emerald-700 dark:text-emerald-300">{inr(amountPreview)}</span>
+                        </p>
+                        <Button type="submit" size="sm" disabled={createMutation.isPending}>
+                          {createMutation.isPending ? "Saving..." : "Add session"}
+                        </Button>
+                      </div>
+                    </form>
+                  )}
                 </li>
               );
             })}
           </ul>
+        )}
+
+        {projectCards.length > PROJ_PER_PAGE && (
+          <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-2.5 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+            <span>Page {projPage} of {projPageCount} · {projectCards.length} projects</span>
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={() => setProjPage((p) => Math.max(1, p - 1))} disabled={projPage <= 1} aria-label="Previous page" className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:border-slate-400 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300">
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button type="button" onClick={() => setProjPage((p) => Math.min(projPageCount, p + 1))} disabled={projPage >= projPageCount} aria-label="Next page" className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:border-slate-400 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300">
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Work sessions — flat list of all entries (work session + project session) */}
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+          <CalendarDays className="h-4 w-4 text-slate-400" />
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+            Work sessions
+          </h3>
+          <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+            {inr(totalEarned)}
+          </span>
         </div>
-      )}
+
+        {entries.length > 0 && (
+          <div className="space-y-2 border-b border-slate-100 p-3 dark:border-slate-800">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input value={logSearch} onChange={(e) => setLogSearch(e.target.value)} placeholder="Search by project, session or date" className="pl-9" />
+              </div>
+              <ProjectFilter
+                value={logProject}
+                onChange={setLogProject}
+                options={projectCards.map((c) => ({ _id: c.id, name: c.name }))}
+                includeNone={false}
+              />
+            </div>
+            {logProject && selectedProjEarned != null && (
+              <p className="text-xs text-slate-600 dark:text-slate-300">
+                <span className="font-medium">
+                  {projectCards.find((c) => c.id === logProject)?.name}
+                </span>
+                :{" "}
+                <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                  {inr(selectedProjEarned)}
+                </span>
+              </p>
+            )}
+          </div>
+        )}
+
+        {logsQuery.isLoading ? (
+          <div className="space-y-2 p-4">
+            <Skeleton className="h-12 w-full rounded-lg" />
+            <Skeleton className="h-12 w-full rounded-lg" />
+          </div>
+        ) : entries.length === 0 ? (
+          <p className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">
+            No work sessions yet.
+          </p>
+        ) : filteredEntries.length === 0 ? (
+          <p className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">
+            No entries match your search.
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+            {pagedEntries.map((e) => {
+              const isAtt = e.kind === "attendance";
+              return (
+                <li key={e.key} className="group flex items-center gap-3 px-4 py-3 transition hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isAtt ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-cine-primary/10 text-cine-primary"}`}>
+                    {isAtt ? <Banknote className="h-4 w-4" /> : <FolderKanban className="h-4 w-4" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">{e.projectName}</p>
+                      {isAtt ? (
+                        <span className="rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">Project session</span>
+                      ) : (
+                        e.sessionLabel && (
+                          <span className="rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">{e.sessionLabel}</span>
+                        )
+                      )}
+                    </div>
+                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                      <CalendarDays className="h-3 w-3" />
+                      {new Date(e.date).toLocaleDateString()}
+                      <span className="text-slate-300 dark:text-slate-600">•</span>
+                      {isAtt ? `Settled${e.account ? ` · ${e.account}` : ""}` : `${e.days} day(s) × ${inr(e.rate ?? 0)}`}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{inr(e.amount)}</span>
+                    {e.kind === "session" && e.log ? (
+                      <button type="button" onClick={() => setPendingDelete(e.log!)} aria-label="Remove session" className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:hover:bg-red-950/40">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    ) : (
+                      <Link href={`/labours/${id}/attendance/${e.pid}`} aria-label="Open to edit / undo" className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 opacity-0 transition hover:bg-cine-primary/10 hover:text-cine-primary group-hover:opacity-100">
+                        <CalendarDays className="h-3.5 w-3.5" />
+                      </Link>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {filteredEntries.length > SESS_PER_PAGE && (
+          <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-2.5 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+            <span>Page {logPage} of {sessPageCount} · {filteredEntries.length} entries</span>
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={() => setLogPage((p) => Math.max(1, p - 1))} disabled={logPage <= 1} aria-label="Previous page" className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:border-slate-400 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300">
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button type="button" onClick={() => setLogPage((p) => Math.min(sessPageCount, p + 1))} disabled={logPage >= sessPageCount} aria-label="Next page" className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:border-slate-400 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300">
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Member of: vendors & groups */}
       {((memberships?.vendors.length ?? 0) > 0 ||
@@ -594,331 +851,6 @@ export default function LabourDetailPage({
         </div>
       )}
 
-      {/* Work sessions */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-        <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-              Work sessions
-            </h3>
-            <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-              {inr(totalEarned)}
-            </span>
-          </div>
-          <Button size="sm" onClick={() => setShowSessionForm((v) => !v)}>
-            {showSessionForm ? (
-              <>
-                <X className="h-4 w-4" /> Cancel
-              </>
-            ) : (
-              <>
-                <Plus className="h-4 w-4" /> Log session
-              </>
-            )}
-          </Button>
-        </div>
-
-        {showSessionForm && (
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-4 border-b border-slate-100 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-950/30"
-          >
-            {projects.length === 0 && (
-              <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
-                This labour isn&apos;t added to any project yet. Add them to a
-                project&apos;s &ldquo;Involved Labours&rdquo; list first, then you
-                can log sessions here.
-              </p>
-            )}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Project *">
-                <select
-                  value={form.projectId}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, projectId: e.target.value }))
-                  }
-                  className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary/40 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                  required
-                >
-                  <option value="">Select a project…</option>
-                  {projects.map((p) => (
-                    <option key={p._id} value={p._id}>
-                      {p.clientName} — {p.serviceType}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Date (session) *">
-                <Input
-                  type="date"
-                  value={form.workDate}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, workDate: e.target.value }))
-                  }
-                  required
-                />
-              </Field>
-              <Field label="Session label">
-                <Input
-                  placeholder="e.g. Day 1, Morning shoot"
-                  value={form.sessionLabel}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, sessionLabel: e.target.value }))
-                  }
-                />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Days *">
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.5"
-                    value={form.days}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, days: e.target.value }))
-                    }
-                    required
-                  />
-                </Field>
-                <Field label="Rate / day (₹) *">
-                  <Input
-                    type="number"
-                    min={0}
-                    value={form.rate}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, rate: e.target.value }))
-                    }
-                    required
-                  />
-                </Field>
-              </div>
-            </div>
-            <Field label="Payment type">
-              <select
-                value={form.paymentMethod}
-                onChange={(e) => {
-                  const method = e.target.value;
-                  const t = accountTypeForMethod(method);
-                  setForm((f) => {
-                    const acc = payAccounts.find(
-                      (a) => a._id === f.paymentAccountId
-                    );
-                    const keep = !t || !f.paymentAccountId || acc?.type === t;
-                    return {
-                      ...f,
-                      paymentMethod: method,
-                      paymentAccountId: keep ? f.paymentAccountId : "",
-                    };
-                  });
-                }}
-                className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-              >
-                <option value="">Method…</option>
-                {PAYMENT_METHODS.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Paid from (account) *">
-              <select
-                value={form.paymentAccountId}
-                onChange={(e) => {
-                  const accId = e.target.value;
-                  const acc = payAccounts.find((a) => a._id === accId);
-                  setForm((f) => ({
-                    ...f,
-                    paymentAccountId: accId,
-                    paymentMethod: acc ? methodForType(acc.type) : f.paymentMethod,
-                  }));
-                }}
-                className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-                required
-              >
-                <option value="">Select account…</option>
-                {visibleAccounts.map((acc) => (
-                  <option key={acc._id} value={acc._id}>
-                    {acc.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Notes">
-              <Input
-                placeholder="Optional"
-                value={form.notes}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, notes: e.target.value }))
-                }
-              />
-            </Field>
-            <div className="flex items-center justify-between gap-3 pt-1">
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                Expense:{" "}
-                <span className="font-semibold text-emerald-700 dark:text-emerald-300">
-                  {inr(amountPreview)}
-                </span>
-              </p>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Saving..." : "Add session"}
-              </Button>
-            </div>
-          </form>
-        )}
-
-        {entries.length > 0 && (
-          <div className="space-y-2 border-b border-slate-100 p-3 dark:border-slate-800">
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input
-                  value={logSearch}
-                  onChange={(e) => setLogSearch(e.target.value)}
-                  placeholder="Search by project, session or date"
-                  className="pl-9"
-                />
-              </div>
-              <ProjectFilter
-                value={logProject}
-                onChange={setLogProject}
-                options={byProject.map((p) => ({ _id: p.id, name: p.name }))}
-                includeNone={false}
-              />
-            </div>
-            {selectedProject && (
-              <p className="text-xs text-slate-600 dark:text-slate-300">
-                Earned from <span className="font-medium">{selectedProject.name}</span>:{" "}
-                <span className="font-semibold text-emerald-700 dark:text-emerald-300">
-                  {inr(selectedProject.total)}
-                </span>{" "}
-                · {selectedProject.sessions} entr{selectedProject.sessions === 1 ? "y" : "ies"}
-              </p>
-            )}
-          </div>
-        )}
-
-        {logsQuery.isLoading ? (
-          <div className="space-y-2 p-4">
-            <Skeleton className="h-12 w-full rounded-lg" />
-            <Skeleton className="h-12 w-full rounded-lg" />
-          </div>
-        ) : entries.length === 0 ? (
-          <p className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">
-            No work sessions yet.
-          </p>
-        ) : filteredEntries.length === 0 ? (
-          <p className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">
-            No entries match your search.
-          </p>
-        ) : (
-          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {pagedEntries.map((e) => {
-              const isAtt = e.kind === "attendance";
-              return (
-                <li
-                  key={e.key}
-                  className="group flex items-center gap-3 px-4 py-3 transition hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                >
-                  <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                      isAtt
-                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                        : "bg-cine-primary/10 text-cine-primary"
-                    }`}
-                  >
-                    {isAtt ? (
-                      <Banknote className="h-4 w-4" />
-                    ) : (
-                      <FolderKanban className="h-4 w-4" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
-                        {e.projectName}
-                      </p>
-                      {isAtt ? (
-                        <span className="rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
-                          Project session
-                        </span>
-                      ) : (
-                        e.sessionLabel && (
-                          <span className="rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:bg-sky-950/50 dark:text-sky-300">
-                            {e.sessionLabel}
-                          </span>
-                        )
-                      )}
-                    </div>
-                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                      <CalendarDays className="h-3 w-3" />
-                      {new Date(e.date).toLocaleDateString()}
-                      <span className="text-slate-300 dark:text-slate-600">•</span>
-                      {isAtt
-                        ? `Settled${e.account ? ` · ${e.account}` : ""}`
-                        : `${e.days} day(s) × ${inr(e.rate ?? 0)}`}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
-                      {inr(e.amount)}
-                    </span>
-                    {isAtt ? (
-                      <Link
-                        href={`/labours/${id}/attendance/${e.pid}`}
-                        aria-label="Open session"
-                        title="Open to edit / undo"
-                        className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 opacity-0 transition hover:bg-cine-primary/10 hover:text-cine-primary group-hover:opacity-100"
-                      >
-                        <CalendarDays className="h-3.5 w-3.5" />
-                      </Link>
-                    ) : (
-                      e.log && (
-                        <button
-                          type="button"
-                          onClick={() => setPendingDelete(e.log!)}
-                          aria-label="Remove session"
-                          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:hover:bg-red-950/40"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-
-        {filteredEntries.length > LOGS_PER_PAGE && (
-          <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-2.5 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
-            <span>
-              Page {logPage} of {logPageCount} · {filteredEntries.length} entries
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setLogPage((p) => Math.max(1, p - 1))}
-                disabled={logPage <= 1}
-                aria-label="Previous page"
-                className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:border-slate-400 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setLogPage((p) => Math.min(logPageCount, p + 1))}
-                disabled={logPage >= logPageCount}
-                aria-label="Next page"
-                className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:border-slate-400 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
 
       <ConfirmDialog
         open={!!pendingDelete}
@@ -931,22 +863,6 @@ export default function LabourDetailPage({
         }
       />
     </div>
-  );
-}
-
-function Badge({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold ${className ?? ""}`}
-    >
-      {children}
-    </span>
   );
 }
 
