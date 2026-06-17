@@ -135,7 +135,9 @@ export interface CreateLeadPayload {
   customerName: string;
   place: string;
   contactNumber: string;
+  contactCountryCode: string; // e.g., "+1", "+91", "+44"
   alternativeNumber?: string | null;
+  alternativeCountryCode?: string | null; // e.g., "+1", "+91", "+44"
   leadSource: string;
   leadDate: string;
   lastUpdate: string;
@@ -144,6 +146,12 @@ export interface CreateLeadPayload {
   statusDescription: string;
   status?: string;
   nextCallTime?: string | null;
+}
+
+export interface Lead extends CreateLeadPayload {
+  _id: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CreateLeadResponse {

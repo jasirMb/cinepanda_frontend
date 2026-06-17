@@ -31,6 +31,100 @@ import {
 
 type Option = { label: string; value: string };
 
+// Comprehensive list of countries with country codes and emoji flags
+const COUNTRY_CODE_OPTIONS: Option[] = [
+  // Asia
+  { label: "🇮🇳 India (+91)", value: "+91" },
+  { label: "🇨🇳 China (+86)", value: "+86" },
+  { label: "🇯🇵 Japan (+81)", value: "+81" },
+  { label: "🇰🇷 South Korea (+82)", value: "+82" },
+  { label: "🇲🇾 Malaysia (+60)", value: "+60" },
+  { label: "🇸🇬 Singapore (+65)", value: "+65" },
+  { label: "🇹🇭 Thailand (+66)", value: "+66" },
+  { label: "🇮🇩 Indonesia (+62)", value: "+62" },
+  { label: "🇵🇭 Philippines (+63)", value: "+63" },
+  { label: "🇻🇳 Vietnam (+84)", value: "+84" },
+  { label: "🇧🇩 Bangladesh (+880)", value: "+880" },
+  { label: "🇵🇰 Pakistan (+92)", value: "+92" },
+  { label: "🇱🇰 Sri Lanka (+94)", value: "+94" },
+  { label: "🇦🇪 UAE (+971)", value: "+971" },
+  { label: "🇶🇦 Qatar (+974)", value: "+974" },
+  { label: "🇸🇦 Saudi Arabia (+966)", value: "+966" },
+  { label: "🇰🇼 Kuwait (+965)", value: "+965" },
+  { label: "🇧🇭 Bahrain (+973)", value: "+973" },
+  { label: "🇴🇲 Oman (+968)", value: "+968" },
+  { label: "🇮🇱 Israel (+972)", value: "+972" },
+  { label: "🇹🇷 Turkey (+90)", value: "+90" },
+  // Africa
+  { label: "🇲🇦 Morocco (+212)", value: "+212" },
+  { label: "🇪🇬 Egypt (+20)", value: "+20" },
+  { label: "🇳🇬 Nigeria (+234)", value: "+234" },
+  { label: "🇿🇦 South Africa (+27)", value: "+27" },
+  { label: "🇰🇪 Kenya (+254)", value: "+254" },
+  { label: "🇺🇬 Uganda (+256)", value: "+256" },
+  { label: "🇹🇿 Tanzania (+255)", value: "+255" },
+  { label: "🇬🇭 Ghana (+233)", value: "+233" },
+  { label: "🇨🇲 Cameroon (+237)", value: "+237" },
+  { label: "🇪🇹 Ethiopia (+251)", value: "+251" },
+  { label: "🇹🇳 Tunisia (+216)", value: "+216" },
+  { label: "🇩🇿 Algeria (+213)", value: "+213" },
+  { label: "🇨🇬 Congo (+242)", value: "+242" },
+  { label: "🇦🇴 Angola (+244)", value: "+244" },
+  { label: "🇲🇿 Mozambique (+258)", value: "+258" },
+  { label: "🇿🇲 Zambia (+260)", value: "+260" },
+  { label: "🇿🇼 Zimbabwe (+263)", value: "+263" },
+  { label: "🇸🇩 Sudan (+249)", value: "+249" },
+  // Europe
+  { label: "🇬🇧 UK (+44)", value: "+44" },
+  { label: "🇫🇷 France (+33)", value: "+33" },
+  { label: "🇮🇹 Italy (+39)", value: "+39" },
+  { label: "🇩🇪 Germany (+49)", value: "+49" },
+  { label: "🇪🇸 Spain (+34)", value: "+34" },
+  { label: "🇳🇱 Netherlands (+31)", value: "+31" },
+  { label: "🇧🇪 Belgium (+32)", value: "+32" },
+  { label: "🇨🇭 Switzerland (+41)", value: "+41" },
+  { label: "🇦🇹 Austria (+43)", value: "+43" },
+  { label: "🇩🇰 Denmark (+45)", value: "+45" },
+  { label: "🇸🇪 Sweden (+46)", value: "+46" },
+  { label: "🇳🇴 Norway (+47)", value: "+47" },
+  { label: "🇵🇱 Poland (+48)", value: "+48" },
+  { label: "🇫🇮 Finland (+358)", value: "+358" },
+  { label: "🇮🇪 Ireland (+353)", value: "+353" },
+  { label: "🇬🇷 Greece (+30)", value: "+30" },
+  { label: "🇭🇺 Hungary (+36)", value: "+36" },
+  { label: "🇷🇴 Romania (+40)", value: "+40" },
+  { label: "🇨🇿 Czech Republic (+420)", value: "+420" },
+  { label: "🇷🇺 Russia (+7)", value: "+7" },
+  { label: "🇺🇦 Ukraine (+380)", value: "+380" },
+  { label: "🇧🇬 Bulgaria (+359)", value: "+359" },
+  { label: "🇭🇷 Croatia (+385)", value: "+385" },
+  { label: "🇲🇰 North Macedonia (+389)", value: "+389" },
+  // Americas
+  { label: "🇺🇸 USA (+1)", value: "+1" },
+  { label: "🇨🇦 Canada (+1)", value: "+1" },
+  { label: "🇲🇽 Mexico (+52)", value: "+52" },
+  { label: "🇧🇷 Brazil (+55)", value: "+55" },
+  { label: "🇨🇱 Chile (+56)", value: "+56" },
+  { label: "🇨🇴 Colombia (+57)", value: "+57" },
+  { label: "🇦🇷 Argentina (+54)", value: "+54" },
+  { label: "🇵🇪 Peru (+51)", value: "+51" },
+  { label: "🇻🇪 Venezuela (+58)", value: "+58" },
+  { label: "🇧🇴 Bolivia (+591)", value: "+591" },
+  { label: "🇬🇾 Guyana (+592)", value: "+592" },
+  { label: "🇪🇨 Ecuador (+593)", value: "+593" },
+  { label: "🇵🇾 Paraguay (+595)", value: "+595" },
+  { label: "🇺🇾 Uruguay (+598)", value: "+598" },
+  { label: "🇧🇸 Bahamas (+1-242)", value: "+1-242" },
+  { label: "🇧🇧 Barbados (+1-246)", value: "+1-246" },
+  { label: "🇹🇹 Trinidad and Tobago (+1-868)", value: "+1-868" },
+  // Oceania
+  { label: "🇦🇺 Australia (+61)", value: "+61" },
+  { label: "🇳🇿 New Zealand (+64)", value: "+64" },
+  { label: "🇵🇬 Papua New Guinea (+675)", value: "+675" },
+  { label: "🇫🇯 Fiji (+679)", value: "+679" },
+  { label: "🇹🇻 Tuvalu (+688)", value: "+688" },
+];
+
 // Fallbacks used only until the live enum lists load (values match the backend
 // seed). The actual options come from the backend enum endpoints — see below.
 const DEFAULT_LEAD_SOURCES: Option[] = [
@@ -59,7 +153,9 @@ const initialFormValues: CreateLeadPayload = {
   customerName: "",
   place: "",
   contactNumber: "",
+  contactCountryCode: "+91",
   alternativeNumber: "",
+  alternativeCountryCode: "+91",
   leadSource: "",
   leadDate: "",
   lastUpdate: "",
@@ -139,7 +235,9 @@ export default function NewLeadPage() {
         customerName: lead.customerName ?? "",
         place: lead.place ?? "",
         contactNumber: lead.contactNumber ?? "",
+        contactCountryCode: lead.contactCountryCode ?? "+91",
         alternativeNumber: lead.alternativeNumber ?? "",
+        alternativeCountryCode: lead.alternativeCountryCode ?? "+91",
         leadSource: lead.leadSource ?? "",
         leadDate: lead.leadDate ? lead.leadDate.slice(0, 10) : "",
         lastUpdate: lead.lastUpdate ? lead.lastUpdate.slice(0, 10) : "",
@@ -160,18 +258,30 @@ export default function NewLeadPage() {
     if (!values.customerName.trim())
       errors.customerName = "Customer name is required.";
     if (!values.place.trim()) errors.place = "Place is required.";
+    
+    // Validate contact number and country code
     if (!values.contactNumber.trim()) {
       errors.contactNumber = "Contact number is required.";
-    } else if (!/^[0-9+\-\s()]{6,}$/.test(values.contactNumber.trim())) {
-      errors.contactNumber = "Enter a valid phone number.";
+    } else if (!/^[0-9\-\s()]{6,}$/.test(values.contactNumber.trim())) {
+      errors.contactNumber = "Enter a valid phone number (digits only).";
     }
+    if (!values.contactCountryCode?.trim()) {
+      errors.contactCountryCode = "Country code is required.";
+    }
+    
+    // Validate alternative number if provided
     if (
       values.alternativeNumber &&
-      values.alternativeNumber.trim() !== "" &&
-      !/^[0-9+\-\s()]{6,}$/.test(values.alternativeNumber.trim())
+      values.alternativeNumber.trim() !== ""
     ) {
-      errors.alternativeNumber = "Enter a valid phone number.";
+      if (!/^[0-9\-\s()]{6,}$/.test(values.alternativeNumber.trim())) {
+        errors.alternativeNumber = "Enter a valid phone number (digits only).";
+      }
+      if (!values.alternativeCountryCode?.trim()) {
+        errors.alternativeCountryCode = "Country code is required if alternative number is provided.";
+      }
     }
+    
     if (!values.leadSource.trim())
       errors.leadSource = "Lead source is required.";
     if (!values.leadDate) errors.leadDate = "Lead date is required.";
@@ -202,6 +312,7 @@ export default function NewLeadPage() {
     const normalized: CreateLeadPayload = {
       ...formValues,
       status: (formValues.status || "OPEN").trim(),
+      contactCountryCode: formValues.contactCountryCode || "+91",
       nextCallTime:
         typeof formValues.nextCallTime === "string" &&
         formValues.nextCallTime.trim() === ""
@@ -212,6 +323,11 @@ export default function NewLeadPage() {
         formValues.alternativeNumber.trim() === ""
           ? null
           : formValues.alternativeNumber?.trim(),
+      alternativeCountryCode:
+        typeof formValues.alternativeNumber === "string" &&
+        formValues.alternativeNumber.trim() === ""
+          ? null
+          : formValues.alternativeCountryCode,
     };
 
     const nextErrors = validate(normalized);
@@ -269,26 +385,73 @@ export default function NewLeadPage() {
             </Field>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Contact Number *" error={formErrors.contactNumber}>
-              <Input
-                value={formValues.contactNumber}
-                onChange={(e) => handleChange("contactNumber", e.target.value)}
-                placeholder="+91 9XXXX XXXXX"
-              />
-            </Field>
-            <Field
-              label="Alternative Number"
-              error={formErrors.alternativeNumber}
-            >
-              <Input
-                value={formValues.alternativeNumber ?? ""}
-                onChange={(e) =>
-                  handleChange("alternativeNumber", e.target.value)
-                }
-                placeholder="Optional backup number"
-              />
-            </Field>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+              <div className="sm:col-span-1">
+                <Field label="Country Code *" error={formErrors.contactCountryCode}>
+                  <Select
+                    value={formValues.contactCountryCode || undefined}
+                    onValueChange={(v) => v && handleChange("contactCountryCode", v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COUNTRY_CODE_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+              <div className="sm:col-span-3">
+                <Field label="Contact Number *" error={formErrors.contactNumber}>
+                  <Input
+                    value={formValues.contactNumber}
+                    onChange={(e) => handleChange("contactNumber", e.target.value)}
+                    placeholder="9XXXX XXXXX"
+                  />
+                </Field>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+              <div className="sm:col-span-1">
+                <Field label="Alt Country Code" error={formErrors.alternativeCountryCode}>
+                  <Select
+                    value={formValues.alternativeCountryCode || undefined}
+                    onValueChange={(v) => v && handleChange("alternativeCountryCode", v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COUNTRY_CODE_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+              <div className="sm:col-span-3">
+                <Field
+                  label="Alternative Number"
+                  error={formErrors.alternativeNumber}
+                >
+                  <Input
+                    value={formValues.alternativeNumber ?? ""}
+                    onChange={(e) =>
+                      handleChange("alternativeNumber", e.target.value)
+                    }
+                    placeholder="Optional backup number"
+                  />
+                </Field>
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -445,3 +608,6 @@ function Field({
     </div>
   );
 }
+
+// Export country codes so they can be used in other components if needed
+export { COUNTRY_CODE_OPTIONS };
