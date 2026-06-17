@@ -298,7 +298,13 @@ export default function NewLeadPage() {
   }
 
   function handleChange(field: keyof CreateLeadPayload, value: string): void {
-    setFormValues((prev) => ({ ...prev, [field]: value }));
+    // Strip spaces from phone number fields (handles iPhone format: +91 12345 67890)
+    let cleanedValue = value;
+    if ((field === 'contactNumber' || field === 'alternativeNumber') && value) {
+      cleanedValue = value.replace(/\s+/g, ''); // Remove all whitespace
+    }
+    
+    setFormValues((prev) => ({ ...prev, [field]: cleanedValue }));
     setFormErrors((prev) => {
       const next = { ...prev };
       delete next[field as string];
@@ -313,6 +319,8 @@ export default function NewLeadPage() {
       ...formValues,
       status: (formValues.status || "OPEN").trim(),
       contactCountryCode: formValues.contactCountryCode || "+91",
+      // Strip spaces from phone numbers (handles iPhone paste format)
+      contactNumber: formValues.contactNumber?.replace(/\s+/g, '') || '',
       nextCallTime:
         typeof formValues.nextCallTime === "string" &&
         formValues.nextCallTime.trim() === ""
@@ -322,7 +330,7 @@ export default function NewLeadPage() {
         typeof formValues.alternativeNumber === "string" &&
         formValues.alternativeNumber.trim() === ""
           ? null
-          : formValues.alternativeNumber?.trim(),
+          : formValues.alternativeNumber?.trim().replace(/\s+/g, ''),
       alternativeCountryCode:
         typeof formValues.alternativeNumber === "string" &&
         formValues.alternativeNumber.trim() === ""
