@@ -616,6 +616,3 @@ function Field({
     </div>
   );
 }
-
-// Export country codes so they can be used in other components if needed
-export { COUNTRY_CODE_OPTIONS };
