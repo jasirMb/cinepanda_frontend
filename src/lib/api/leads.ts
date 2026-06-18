@@ -148,10 +148,10 @@ export interface CreateLeadPayload {
   nextCallTime?: string | null;
 }
 
+// Adds the editable lead fields (incl. contact/alternative country codes) onto
+// the display shape declared above — the two declarations merge into one `Lead`.
 export interface Lead extends CreateLeadPayload {
   _id: string;
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 export interface CreateLeadResponse {
