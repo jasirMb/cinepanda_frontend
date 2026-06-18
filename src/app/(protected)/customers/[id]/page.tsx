@@ -16,6 +16,7 @@ import {
 
 import { fetchCustomerOverview } from "@/lib/api/customers";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatPhone, telHref } from "@/lib/country-codes";
 
 function inr(n: number) {
   return `₹${(n ?? 0).toLocaleString("en-IN")}`;
@@ -100,7 +101,13 @@ export default function CustomerDetailPage({
           </h2>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
             <span className="flex items-center gap-1">
-              <Phone className="h-3 w-3" /> {customer.phone}
+              <Phone className="h-3 w-3" />{" "}
+              <a
+                href={telHref(customer.countryCode, customer.phone)}
+                className="hover:text-cine-primary"
+              >
+                {formatPhone(customer.countryCode, customer.phone)}
+              </a>
             </span>
             {customer.place && (
               <span className="flex items-center gap-1">

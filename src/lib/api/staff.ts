@@ -20,6 +20,7 @@ export interface Staff {
   /** Override for overtime pay per hour (else the global default). */
   overtimeRate?: number;
   phone?: string;
+  countryCode?: string;
   joiningDate?: string;
   avatarUrl?: string;
   avatarKey?: string;
@@ -38,6 +39,7 @@ export interface StaffPayload {
   /** null clears the override → falls back to the global default. */
   overtimeRate?: number | null;
   phone?: string;
+  countryCode?: string;
   joiningDate?: string;
   avatarUrl?: string;
   avatarKey?: string;

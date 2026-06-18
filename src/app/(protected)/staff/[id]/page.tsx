@@ -36,6 +36,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
+import { formatPhone } from "@/lib/country-codes";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Popover,
@@ -574,7 +575,7 @@ export default function StaffDetailPage({
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {staff.designation || "—"}
-            {staff.phone ? ` · ${staff.phone}` : ""}
+            {staff.phone ? ` · ${formatPhone(staff.countryCode, staff.phone)}` : ""}
           </p>
           <p className="mt-0.5 text-xs text-slate-400">
             {stdHours}h/day · overtime ₹{otRate.toLocaleString("en-IN")}/hr

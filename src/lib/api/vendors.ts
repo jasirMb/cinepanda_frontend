@@ -6,6 +6,7 @@ export interface Vendor {
   name: string;
   contactPerson?: string;
   phone?: string;
+  countryCode?: string;
   email?: string;
   gstNumber?: string;
   address?: string;
@@ -31,6 +32,7 @@ export interface VendorPayload {
   name: string;
   contactPerson?: string;
   phone?: string;
+  countryCode?: string;
   email?: string;
   gstNumber?: string;
   address?: string;

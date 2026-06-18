@@ -38,8 +38,10 @@ import { uploadFile, deleteFile } from "@/lib/api/files";
 import { compressImageToLimit } from "@/lib/compress-image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneField } from "@/components/ui/phone-field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DEFAULT_COUNTRY_CODE } from "@/lib/country-codes";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -111,6 +113,7 @@ const EMPTY = {
   workHours: "",
   overtimeRate: "",
   phone: "",
+  countryCode: DEFAULT_COUNTRY_CODE,
   joiningDate: "",
   avatarUrl: "",
   avatarKey: "",
@@ -239,6 +242,7 @@ export default function StaffPage() {
       workHours: s.workHours != null ? String(s.workHours) : "",
       overtimeRate: s.overtimeRate != null ? String(s.overtimeRate) : "",
       phone: s.phone ?? "",
+      countryCode: s.countryCode ?? DEFAULT_COUNTRY_CODE,
       joiningDate: s.joiningDate ? s.joiningDate.slice(0, 10) : "",
       avatarUrl: s.avatarUrl ?? "",
       avatarKey: s.avatarKey ?? "",
@@ -283,6 +287,7 @@ export default function StaffPage() {
       workHours,
       overtimeRate,
       phone: form.phone.trim() || undefined,
+      countryCode: form.countryCode,
       joiningDate: form.joiningDate || undefined,
       avatarUrl: form.avatarUrl || undefined,
       avatarKey: form.avatarKey || undefined,
@@ -498,9 +503,13 @@ export default function StaffPage() {
               />
             </Field>
             <Field label="Phone">
-              <Input
-                value={form.phone}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+              <PhoneField
+                countryCode={form.countryCode}
+                number={form.phone}
+                onCountryCodeChange={(c) =>
+                  setForm((f) => ({ ...f, countryCode: c }))
+                }
+                onNumberChange={(n) => setForm((f) => ({ ...f, phone: n }))}
                 placeholder="10-digit"
               />
             </Field>

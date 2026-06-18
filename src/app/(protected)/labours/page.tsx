@@ -35,8 +35,10 @@ import {
 } from "@/lib/api/labours";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneField } from "@/components/ui/phone-field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DEFAULT_COUNTRY_CODE, telHref } from "@/lib/country-codes";
 
 const AVATAR_PALETTE = [
   "from-violet-500 to-fuchsia-500",
@@ -70,6 +72,7 @@ const EMPTY_FORM = {
   name: "",
   role: "",
   phone: "",
+  countryCode: DEFAULT_COUNTRY_CODE,
   dailyWage: "",
   region: "",
   state: "",
@@ -201,6 +204,7 @@ export default function LaboursPage() {
       name: labour.name ?? "",
       role: labour.role ?? "",
       phone: labour.phone ?? "",
+      countryCode: labour.countryCode ?? DEFAULT_COUNTRY_CODE,
       dailyWage: labour.dailyWage != null ? String(labour.dailyWage) : "",
       region: labour.region ?? "",
       state: labour.state ?? "",
@@ -230,8 +234,8 @@ export default function LaboursPage() {
       return;
     }
     const phone = form.phone.trim();
-    if (phone && !/^\d{10}$/.test(phone)) {
-      toast.error("Phone must be exactly 10 digits");
+    if (phone && !/^\d{5,15}$/.test(phone)) {
+      toast.error("Enter a valid phone number");
       return;
     }
     const wage = form.dailyWage.trim() ? Number(form.dailyWage) : undefined;
@@ -243,6 +247,7 @@ export default function LaboursPage() {
       name: form.name.trim(),
       role: form.role.trim() || undefined,
       phone: phone || undefined,
+      countryCode: form.countryCode,
       dailyWage: wage,
       region: (form.region as LabourRegion) || undefined,
       state: form.state.trim() || undefined,
@@ -441,10 +446,12 @@ export default function LaboursPage() {
               />
             </Field>
             <Field label="Phone">
-              <Input
+              <PhoneField
+                countryCode={form.countryCode}
+                number={form.phone}
+                onCountryCodeChange={(c) => setForm((f) => ({ ...f, countryCode: c }))}
+                onNumberChange={(n) => setForm((f) => ({ ...f, phone: n }))}
                 placeholder="10-digit number"
-                value={form.phone}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
               />
             </Field>
             <Field label="Daily wage (₹)">
@@ -685,7 +692,7 @@ function LabourCard({
       <div className="flex items-center gap-1.5 border-t border-slate-100 bg-slate-50/70 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-800/30">
         {labour.phone && (
           <a
-            href={`tel:${labour.phone}`}
+            href={telHref(labour.countryCode, labour.phone)}
             aria-label="Call"
             className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-emerald-300 hover:text-emerald-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
           >

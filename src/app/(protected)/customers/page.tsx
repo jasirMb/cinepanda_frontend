@@ -27,7 +27,13 @@ import {
 import { uploadFile } from "@/lib/api/files";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneField } from "@/components/ui/phone-field";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DEFAULT_COUNTRY_CODE,
+  formatPhone,
+  telHref,
+} from "@/lib/country-codes";
 
 const AVATAR_PALETTE = [
   "from-violet-500 to-fuchsia-500",
@@ -62,6 +68,7 @@ function apiErrorMessage(err: unknown, fallback: string): string {
 type FormState = {
   name: string;
   phone: string;
+  countryCode: string;
   place: string;
   email: string;
   notes: string;
@@ -72,6 +79,7 @@ type FormState = {
 const EMPTY_FORM: FormState = {
   name: "",
   phone: "",
+  countryCode: DEFAULT_COUNTRY_CODE,
   place: "",
   email: "",
   notes: "",
@@ -107,6 +115,7 @@ export default function CustomersPage() {
     setForm({
       name: c.name,
       phone: c.phone,
+      countryCode: c.countryCode ?? DEFAULT_COUNTRY_CODE,
       place: c.place,
       email: c.email ?? "",
       notes: c.notes ?? "",
@@ -157,6 +166,7 @@ export default function CustomersPage() {
     saveMutation.mutate({
       name: form.name.trim(),
       phone: form.phone.trim(),
+      countryCode: form.countryCode,
       place: form.place.trim(),
       email: form.email.trim() || undefined,
       notes: form.notes.trim() || undefined,
@@ -301,12 +311,15 @@ export default function CustomersPage() {
                 required
               />
             </Field>
-            <Field label="Phone * (10 digits)">
-              <Input
+            <Field label="Phone *">
+              <PhoneField
+                countryCode={form.countryCode}
+                number={form.phone}
+                onCountryCodeChange={(c) =>
+                  setForm((f) => ({ ...f, countryCode: c }))
+                }
+                onNumberChange={(n) => setForm((f) => ({ ...f, phone: n }))}
                 placeholder="9XXXXXXXXX"
-                value={form.phone}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                required
               />
             </Field>
             <Field label="Place *">
@@ -422,8 +435,11 @@ function CustomerCard({
           <div className="mt-1.5 space-y-1 text-sm text-slate-600 dark:text-slate-300">
             <p className="flex items-center gap-2">
               <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-              <a href={`tel:${customer.phone}`} className="hover:text-cine-primary">
-                {customer.phone}
+              <a
+                href={telHref(customer.countryCode, customer.phone)}
+                className="hover:text-cine-primary"
+              >
+                {formatPhone(customer.countryCode, customer.phone)}
               </a>
             </p>
             <p className="flex items-center gap-2">

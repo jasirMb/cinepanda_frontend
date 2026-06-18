@@ -10,9 +10,11 @@ import { useCustomers, customersKeys } from "@/hooks/useCustomers";
 import { createProject, type CreateProjectPayload } from "@/lib/api/projects";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneField } from "@/components/ui/phone-field";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Combobox } from "@/components/ui/combobox";
 import { createCustomer, type Customer } from "@/lib/api/customers";
+import { DEFAULT_COUNTRY_CODE } from "@/lib/country-codes";
 
 const EMPTY_FORM: CreateProjectPayload = {
   clientName: "",
@@ -38,6 +40,7 @@ export default function NewProjectPage() {
   const [newCustomer, setNewCustomer] = useState({
     name: "",
     phone: "",
+    countryCode: DEFAULT_COUNTRY_CODE,
     place: "",
     email: "",
   });
@@ -65,7 +68,13 @@ export default function NewProjectPage() {
       // Select the new customer + prefill the client name.
       setForm((f) => ({ ...f, customerId: created._id, clientName: created.name }));
       setShowNewCustomer(false);
-      setNewCustomer({ name: "", phone: "", place: "", email: "" });
+      setNewCustomer({
+        name: "",
+        phone: "",
+        countryCode: DEFAULT_COUNTRY_CODE,
+        place: "",
+        email: "",
+      });
       toast.success("Customer created");
     },
     onError: () => toast.error("Failed to create customer"),
@@ -84,14 +93,15 @@ export default function NewProjectPage() {
     if (
       !newCustomer.name.trim() ||
       !newCustomer.place.trim() ||
-      !/^\d{10}$/.test(newCustomer.phone.trim())
+      !/^\d{5,15}$/.test(newCustomer.phone.trim())
     ) {
-      toast.error("Name, place and a 10-digit phone are required");
+      toast.error("Name, place and a valid phone are required");
       return;
     }
     createCustomerMutation.mutate({
       name: newCustomer.name.trim(),
       phone: newCustomer.phone.trim(),
+      countryCode: newCustomer.countryCode,
       place: newCustomer.place.trim(),
       ...(newCustomer.email.trim() ? { email: newCustomer.email.trim() } : {}),
     });
@@ -170,12 +180,16 @@ export default function NewProjectPage() {
                   }
                   placeholder="Name *"
                 />
-                <Input
-                  value={newCustomer.phone}
-                  onChange={(e) =>
-                    setNewCustomer((c) => ({ ...c, phone: e.target.value }))
+                <PhoneField
+                  countryCode={newCustomer.countryCode}
+                  number={newCustomer.phone}
+                  onCountryCodeChange={(code) =>
+                    setNewCustomer((c) => ({ ...c, countryCode: code }))
                   }
-                  placeholder="Phone (10 digits) *"
+                  onNumberChange={(n) =>
+                    setNewCustomer((c) => ({ ...c, phone: n }))
+                  }
+                  placeholder="Phone *"
                 />
                 <Input
                   value={newCustomer.place}

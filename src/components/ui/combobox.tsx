@@ -27,6 +27,8 @@ interface ComboboxProps {
   emptyText?: string;
   disabled?: boolean;
   className?: string;
+  /** Extra classes for the dropdown panel (e.g. to widen a narrow trigger). */
+  contentClassName?: string;
   /** Show a leading "clear" row; selecting it calls onChange(""). */
   clearable?: boolean;
   clearLabel?: string;
@@ -46,6 +48,7 @@ export function Combobox({
   emptyText = "No results found",
   disabled,
   className,
+  contentClassName,
   clearable,
   clearLabel = "None",
 }: ComboboxProps) {
@@ -100,7 +103,7 @@ export function Combobox({
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="w-[--radix-popover-trigger-width] p-0"
+        className={cn("w-[--radix-popover-trigger-width] p-0", contentClassName)}
       >
         <div className="flex items-center border-b border-slate-200 px-3 dark:border-slate-700">
           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
@@ -128,9 +131,9 @@ export function Combobox({
               {emptyText}
             </div>
           ) : (
-            filtered.map((o) => (
+            filtered.map((o, i) => (
               <OptionRow
-                key={o.value}
+                key={`${o.value}-${i}`}
                 label={o.label}
                 hint={o.hint}
                 selected={o.value === value}

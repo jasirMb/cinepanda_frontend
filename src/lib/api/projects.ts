@@ -38,6 +38,7 @@ export interface ProjectPopulated {
     _id: string;
     name: string;
     phone: string;
+    countryCode?: string;
     place: string;
     email?: string;
   } | null;

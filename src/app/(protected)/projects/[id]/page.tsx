@@ -39,6 +39,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { formatPhone, telHref } from "@/lib/country-codes";
 import { ProjectLabourSection } from "@/components/labour/ProjectLabourSection";
 import {
   isFeeEntry,
@@ -584,8 +585,14 @@ export default function ProjectDetailPage({
             <DetailRow
               icon={Phone}
               label="Phone"
-              value={project.customerId.phone}
-              link={`tel:${project.customerId.phone}`}
+              value={formatPhone(
+                project.customerId.countryCode,
+                project.customerId.phone
+              )}
+              link={telHref(
+                project.customerId.countryCode,
+                project.customerId.phone
+              )}
             />
             <DetailRow
               icon={MapPin}

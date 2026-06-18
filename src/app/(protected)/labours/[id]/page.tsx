@@ -38,6 +38,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProjectFilter } from "@/components/ui/project-filter";
 import { DatePicker } from "@/components/ui/date-picker";
 import { formatDate } from "@/lib/format-date";
+import { formatPhone } from "@/lib/country-codes";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -462,7 +463,7 @@ export default function LabourDetailPage({
               Array.from(
                 new Set([labour.region, labour.state].filter(Boolean))
               ).join(" · ") || null,
-              labour.phone || null,
+              formatPhone(labour.countryCode, labour.phone) || null,
             ]
               .filter(Boolean)
               .join(" · ") || "—"}

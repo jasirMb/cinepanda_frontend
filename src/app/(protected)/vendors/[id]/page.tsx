@@ -27,6 +27,7 @@ import {
   downloadVendorStatementPdf,
   type VendorStatementRow,
 } from "@/lib/statement-pdf";
+import { formatPhone, telHref } from "@/lib/country-codes";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog } from "@/components/ui/dialog";
@@ -321,7 +322,13 @@ export default function VendorDetailPage({
             {vendor.contactPerson && <span>{vendor.contactPerson}</span>}
             {vendor.phone && (
               <span className="flex items-center gap-1">
-                <Phone className="h-3 w-3" /> {vendor.phone}
+                <Phone className="h-3 w-3" />{" "}
+                <a
+                  href={telHref(vendor.countryCode, vendor.phone)}
+                  className="hover:text-cine-primary"
+                >
+                  {formatPhone(vendor.countryCode, vendor.phone)}
+                </a>
               </span>
             )}
             {vendor.gstNumber && <span>GST: {vendor.gstNumber}</span>}

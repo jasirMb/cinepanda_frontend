@@ -16,13 +16,16 @@ import {
 } from "@/lib/api/vendors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneField } from "@/components/ui/phone-field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DEFAULT_COUNTRY_CODE, formatPhone, telHref } from "@/lib/country-codes";
 
 const EMPTY = {
   name: "",
   contactPerson: "",
   phone: "",
+  countryCode: DEFAULT_COUNTRY_CODE,
   email: "",
   gstNumber: "",
   address: "",
@@ -88,6 +91,7 @@ export default function VendorsPage() {
       name: v.name ?? "",
       contactPerson: v.contactPerson ?? "",
       phone: v.phone ?? "",
+      countryCode: v.countryCode ?? DEFAULT_COUNTRY_CODE,
       email: v.email ?? "",
       gstNumber: v.gstNumber ?? "",
       address: v.address ?? "",
@@ -107,14 +111,15 @@ export default function VendorsPage() {
       toast.error("Vendor name is required");
       return;
     }
-    if (form.phone.trim() && !/^\d{10}$/.test(form.phone.trim())) {
-      toast.error("Phone must be 10 digits");
+    if (form.phone.trim() && !/^\d{5,15}$/.test(form.phone.trim())) {
+      toast.error("Enter a valid phone number");
       return;
     }
     const payload: VendorPayload = {
       name: form.name.trim(),
       contactPerson: form.contactPerson.trim() || undefined,
       phone: form.phone.trim() || undefined,
+      countryCode: form.countryCode,
       email: form.email.trim() || undefined,
       gstNumber: form.gstNumber.trim() || undefined,
       address: form.address.trim() || undefined,
@@ -199,10 +204,12 @@ export default function VendorsPage() {
               />
             </Field>
             <Field label="Phone">
-              <Input
+              <PhoneField
+                countryCode={form.countryCode}
+                number={form.phone}
+                onCountryCodeChange={(c) => setForm((f) => ({ ...f, countryCode: c }))}
+                onNumberChange={(n) => setForm((f) => ({ ...f, phone: n }))}
                 placeholder="10-digit"
-                value={form.phone}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
               />
             </Field>
             <Field label="Email">
@@ -320,7 +327,12 @@ export default function VendorsPage() {
                     {v.phone && (
                       <p className="flex items-center gap-2">
                         <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                        {v.phone}
+                        <a
+                          href={telHref(v.countryCode, v.phone)}
+                          className="hover:text-cine-primary"
+                        >
+                          {formatPhone(v.countryCode, v.phone)}
+                        </a>
                       </p>
                     )}
                     {v.gstNumber && (

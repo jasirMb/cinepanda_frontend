@@ -8,6 +8,7 @@ export interface Customer {
   _id: string;
   name: string;
   phone: string;
+  countryCode?: string;
   place: string;
   email?: string;
   notes?: string;
@@ -35,6 +36,7 @@ export async function fetchCustomers(): Promise<CustomersListResponse> {
 export interface CreateCustomerPayload {
   name: string;
   phone: string;
+  countryCode?: string;
   place: string;
   email?: string;
   notes?: string;

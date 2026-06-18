@@ -34,6 +34,7 @@ import {
   type CreateQuotationPayload,
   type Quotation,
 } from "@/lib/api/quotations";
+import { formatPhone } from "@/lib/country-codes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -136,7 +137,7 @@ export default function QuotationsPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [whatsappTarget, setWhatsappTarget] = useState<
-    { phone: string; name: string } | null
+    { phone: string; name: string; countryCode?: string } | null
   > (null);
 
   // ── list filters / pagination ─────────────
@@ -642,7 +643,9 @@ export default function QuotationsPage() {
                     <div className="mt-1.5 space-y-1 text-sm text-slate-600 dark:text-slate-300">
                       <p className="flex items-center gap-2">
                         <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                        <span className="truncate">{cust.phone}</span>
+                        <span className="truncate">
+                          {formatPhone(cust.countryCode, cust.phone)}
+                        </span>
                       </p>
                       <p className="flex items-center gap-2">
                         <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
@@ -798,7 +801,8 @@ export default function QuotationsPage() {
               {selectedCustomer?.name}
             </p>
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              {selectedCustomer?.place} · {selectedCustomer?.phone}
+              {selectedCustomer?.place} ·{" "}
+              {formatPhone(selectedCustomer?.countryCode, selectedCustomer?.phone)}
             </p>
             {notes && (
               <p className="mt-1 text-sm italic text-slate-500 dark:text-slate-400">
@@ -1083,8 +1087,8 @@ export default function QuotationsPage() {
               onStatusChange={(id, status) =>
                 statusMutation.mutate({ id, status })
               }
-              onWhatsapp={(phone, name) =>
-                setWhatsappTarget({ phone, name })
+              onWhatsapp={(phone, name, countryCode) =>
+                setWhatsappTarget({ phone, name, countryCode })
               }
             />
           ))}
@@ -1145,7 +1149,8 @@ export default function QuotationsPage() {
           if (whatsappTarget) {
             const url = buildWhatsappUrl(
               whatsappTarget.phone,
-              defaultWhatsappMessage(whatsappTarget.name)
+              defaultWhatsappMessage(whatsappTarget.name),
+              whatsappTarget.countryCode
             );
             window.open(url, "_blank", "noopener,noreferrer");
           }
@@ -1160,12 +1165,22 @@ export default function QuotationsPage() {
    WhatsApp helpers
    ──────────────────────────────────────────── */
 
-function buildWhatsappUrl(phone: string, message: string): string {
+function buildWhatsappUrl(
+  phone: string,
+  message: string,
+  countryCode?: string
+): string {
   // wa.me works across WhatsApp Web (macOS/Windows browser), desktop apps,
   // Android and iOS — it picks the right target based on the platform.
   const digits = phone.replace(/\D/g, "");
-  // Fall back to India country code for 10-digit local numbers (project default).
-  const normalized = digits.length === 10 ? `91${digits}` : digits;
+  const ccDigits = (countryCode ?? "").replace(/\D/g, "");
+  // Prefer the customer's saved country code; otherwise fall back to India for
+  // 10-digit local numbers (project default).
+  const normalized = ccDigits
+    ? `${ccDigits}${digits}`
+    : digits.length === 10
+      ? `91${digits}`
+      : digits;
   return `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
 }
 
@@ -1201,7 +1216,7 @@ function QuotationCard({
   quotation: Quotation;
   onDelete: (id: string) => void;
   onStatusChange: (id: string, status: Quotation["status"]) => void;
-  onWhatsapp: (phone: string, name: string) => void;
+  onWhatsapp: (phone: string, name: string, countryCode?: string) => void;
 }) {
   const statusColor = STATUS_COLORS[quotation.status] ?? STATUS_COLORS.DRAFT;
   const statusMap: Record<Quotation["status"], Quotation["status"][]> = {
@@ -1248,7 +1263,11 @@ function QuotationCard({
           </Link>
           <div className="mt-0.5 flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400">
             <span className="truncate">
-              {quotation.customerId.place} · {quotation.customerId.phone}
+              {quotation.customerId.place} ·{" "}
+              {formatPhone(
+                quotation.customerId.countryCode,
+                quotation.customerId.phone
+              )}
             </span>
             {quotation.customerId.phone && (
               <button
@@ -1256,7 +1275,8 @@ function QuotationCard({
                 onClick={() =>
                   onWhatsapp(
                     quotation.customerId.phone,
-                    quotation.customerId.name
+                    quotation.customerId.name,
+                    quotation.customerId.countryCode
                   )
                 }
                 aria-label={`Send WhatsApp message to ${quotation.customerId.name}`}

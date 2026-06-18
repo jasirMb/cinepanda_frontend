@@ -11,6 +11,7 @@ export interface Labour {
   _id: string;
   name: string;
   phone?: string;
+  countryCode?: string;
   role?: string;
   dailyWage?: number;
   region?: LabourRegion;
@@ -31,6 +32,7 @@ export interface LaboursListResponse {
 export interface LabourPayload {
   name: string;
   phone?: string;
+  countryCode?: string;
   role?: string;
   dailyWage?: number;
   region?: LabourRegion;
@@ -96,6 +98,7 @@ export interface LabourLite {
   name: string;
   role?: string;
   phone?: string;
+  countryCode?: string;
   dailyWage?: number;
   region?: LabourRegion;
   state?: string;

@@ -62,6 +62,7 @@ export interface QuotationCustomer {
   _id: string;
   name: string;
   phone: string;
+  countryCode?: string;
   place: string;
   email?: string;
 }
