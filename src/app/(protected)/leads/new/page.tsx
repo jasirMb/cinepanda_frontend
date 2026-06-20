@@ -18,6 +18,10 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { PhoneField } from "@/components/ui/phone-field";
 import {
+  isValidPhoneForCountry,
+  expectedPhoneLength,
+} from "@/lib/country-codes";
+import {
   leadsKeys,
   useLeadSources,
   usePriorityTypes,
@@ -170,20 +174,37 @@ export default function NewLeadPage() {
     // Validate contact number and country code
     if (!values.contactNumber.trim()) {
       errors.contactNumber = "Contact number is required.";
-    } else if (!/^[0-9\-\s()]{6,}$/.test(values.contactNumber.trim())) {
+    } else if (!/^[0-9\-\s()]+$/.test(values.contactNumber.trim())) {
       errors.contactNumber = "Enter a valid phone number (digits only).";
+    } else if (
+      !isValidPhoneForCountry(values.contactNumber, values.contactCountryCode)
+    ) {
+      errors.contactNumber = `${
+        values.contactCountryCode || "+91"
+      } numbers must be ${expectedPhoneLength(values.contactCountryCode)}.`;
     }
     if (!values.contactCountryCode?.trim()) {
       errors.contactCountryCode = "Country code is required.";
     }
-    
+
     // Validate alternative number if provided
     if (
       values.alternativeNumber &&
       values.alternativeNumber.trim() !== ""
     ) {
-      if (!/^[0-9\-\s()]{6,}$/.test(values.alternativeNumber.trim())) {
+      if (!/^[0-9\-\s()]+$/.test(values.alternativeNumber.trim())) {
         errors.alternativeNumber = "Enter a valid phone number (digits only).";
+      } else if (
+        !isValidPhoneForCountry(
+          values.alternativeNumber,
+          values.alternativeCountryCode
+        )
+      ) {
+        errors.alternativeNumber = `${
+          values.alternativeCountryCode || "+91"
+        } numbers must be ${expectedPhoneLength(
+          values.alternativeCountryCode
+        )}.`;
       }
       if (!values.alternativeCountryCode?.trim()) {
         errors.alternativeCountryCode = "Country code is required if alternative number is provided.";
