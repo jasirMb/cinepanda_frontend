@@ -361,14 +361,14 @@ export default function LeadDetailPage() {
                 {lead.customerName}
               </h2>
               <span
-                className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${statusBadgeClass(
+                className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ring-1 ring-inset ring-black/5 dark:ring-white/10 ${statusBadgeClass(
                   lead.status
                 )}`}
               >
                 {labelOf(statusOptions, lead.status)}
               </span>
               {lead.leadTemperature && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-slate-700 ring-1 ring-inset ring-black/5 dark:bg-slate-800/70 dark:text-slate-200 dark:ring-white/10">
                   <span
                     className="h-2 w-2 rounded-full"
                     style={{
@@ -381,13 +381,8 @@ export default function LeadDetailPage() {
                 </span>
               )}
               {lead.leadPriority && (
-                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-slate-700 ring-1 ring-inset ring-black/5 dark:bg-slate-800/70 dark:text-slate-200 dark:ring-white/10">
                   {labelOf(priorities, lead.leadPriority)}
-                </span>
-              )}
-              {lead.leadScore != null && (
-                <span className="rounded-full bg-cine-primary/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-cine-primary">
-                  Score {lead.leadScore}/100
                 </span>
               )}
             </div>
@@ -398,6 +393,7 @@ export default function LeadDetailPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {lead.leadScore != null && <ScoreGauge value={lead.leadScore} />}
           <Button variant="outline" size="sm" asChild>
             <Link href="/leads">
               <ArrowLeft className="h-4 w-4" /> Back
@@ -1028,11 +1024,50 @@ export default function LeadDetailPage() {
 /* ── building blocks ── */
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-      <h3 className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-50">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
         {title}
-      </h3>
+      </p>
       {children}
+    </div>
+  );
+}
+
+/** Compact circular lead-score gauge with the number centred inside. */
+function ScoreGauge({ value }: { value: number }) {
+  const r = 15;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (Math.max(0, Math.min(100, value)) / 100) * circ;
+  const color = value >= 70 ? "#10b981" : value >= 40 ? "#f59e0b" : "#ef4444";
+  return (
+    <div
+      className="relative flex h-11 w-11 shrink-0 items-center justify-center"
+      title={`Lead score ${value}/100`}
+    >
+      <svg width="44" height="44" viewBox="0 0 44 44" className="-rotate-90">
+        <circle
+          cx="22"
+          cy="22"
+          r={r}
+          fill="none"
+          strokeWidth="4"
+          className="stroke-slate-200 dark:stroke-slate-700"
+        />
+        <circle
+          cx="22"
+          cy="22"
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth="4"
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+        />
+      </svg>
+      <span className="absolute text-[11px] font-bold text-slate-700 dark:text-slate-200">
+        {value}
+      </span>
     </div>
   );
 }
@@ -1041,6 +1076,10 @@ function Grid({ children }: { children: React.ReactNode }) {
     <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">{children}</div>
   );
 }
+function isEmptyValue(children: React.ReactNode) {
+  return children == null || children === "" || children === "—";
+}
+
 function DetailItem({
   icon,
   label,
@@ -1050,6 +1089,8 @@ function DetailItem({
   label: string;
   children: React.ReactNode;
 }) {
+  // Hide fields that have no value (avoids rows of "—").
+  if (isEmptyValue(children)) return null;
   return (
     <div className="flex items-start gap-2.5">
       <span className="mt-0.5 text-slate-400">{icon}</span>
@@ -1078,10 +1119,11 @@ function FileLink({ fileName, fileUrl }: { fileName: string; fileUrl: string }) 
 
 /** Compact label : value row for the sidebar cards. */
 function SideRow({ label, children }: { label: string; children: React.ReactNode }) {
+  if (isEmptyValue(children)) return null;
   return (
     <div className="flex items-center justify-between gap-2 text-sm">
       <span className="text-slate-400">{label}</span>
-      <span className="text-slate-800 dark:text-slate-100">{children}</span>
+      <span className="font-medium text-slate-800 dark:text-slate-100">{children}</span>
     </div>
   );
 }
