@@ -24,7 +24,7 @@ function sourceLabel(s: string) {
 
 function statusTone(status: string) {
   switch (status) {
-    case "OPEN":
+    case "NEW_LEAD":
       return "text-blue-700 bg-blue-100 dark:text-blue-200 dark:bg-blue-950/50";
     case "CLOSED_WON":
       return "text-emerald-700 bg-emerald-100 dark:text-emerald-200 dark:bg-emerald-950/50";

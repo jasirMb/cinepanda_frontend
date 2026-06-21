@@ -61,11 +61,11 @@ const DEFAULT_LEAD_SOURCES: Option[] = [
 ];
 
 const DEFAULT_STATUSES: Option[] = [
-  { label: "Open", value: "OPEN" },
-  { label: "Closed Won", value: "CLOSED_WON" },
-  { label: "Closed Lost", value: "CLOSED_LOST" },
+  { label: "New Lead", value: "NEW_LEAD" },
+  { label: "Contacted", value: "CONTACTED" },
+  { label: "Won", value: "CLOSED_WON" },
+  { label: "Lost", value: "CLOSED_LOST" },
   { label: "On Hold", value: "ON_HOLD" },
-  { label: "Follow Up", value: "FOLLOW_UP" },
 ];
 
 const initialFormValues: CreateLeadPayload = {
@@ -79,7 +79,7 @@ const initialFormValues: CreateLeadPayload = {
   priorityType: "",
   requirement: "",
   statusDescription: "",
-  status: "OPEN",
+  status: "NEW_LEAD",
   nextCallTime: null,
   // extended
   leadOwner: "",
@@ -255,7 +255,7 @@ export default function NewLeadPage() {
         priorityType: lead.priorityType ?? "",
         requirement: lead.requirement ?? "",
         statusDescription: lead.statusDescription ?? "",
-        status: lead.status ?? "OPEN",
+        status: lead.status ?? "NEW_LEAD",
         nextCallTime: lead.nextCallTime ? lead.nextCallTime.slice(0, 16) : null,
         leadOwner: lead.leadOwner ?? "",
         email: lead.email ?? "",
@@ -471,7 +471,7 @@ export default function NewLeadPage() {
 
     const normalized: CreateLeadPayload = {
       ...formValues,
-      status: (formValues.status || "OPEN").trim(),
+      status: (formValues.status || "NEW_LEAD").trim(),
       contactCountryCode: formValues.contactCountryCode || "+91",
       contactNumber: (formValues.contactNumber || "").replace(/\s+/g, ""),
       alternativeNumber: blankToNull(formValues.alternativeNumber),
@@ -1296,12 +1296,21 @@ function SendButton({ href, label }: { href?: string; label: string }) {
   );
 }
 
-/** Circular lead-score gauge (0–100), colour-coded. */
+/** Lead-score classification band (matches the business's scoring tiers). */
+function scoreTier(n: number): { label: string; color: string } {
+  if (n >= 90) return { label: "Excellent", color: "#10b981" };
+  if (n >= 75) return { label: "High Potential", color: "#22c55e" };
+  if (n >= 60) return { label: "Good", color: "#f59e0b" };
+  if (n >= 40) return { label: "Average", color: "#f97316" };
+  return { label: "Low Potential", color: "#ef4444" };
+}
+
+/** Circular lead-score gauge (0–100) + classification label. */
 function ScoreGauge({ value }: { value: number }) {
   const r = 16;
   const circ = 2 * Math.PI * r;
   const offset = circ - (Math.max(0, Math.min(100, value)) / 100) * circ;
-  const color = value >= 70 ? "#10b981" : value >= 40 ? "#f59e0b" : "#ef4444";
+  const tier = scoreTier(value);
   return (
     <div className="flex h-10 items-center gap-2">
       <svg width="40" height="40" viewBox="0 0 40 40" className="-rotate-90">
@@ -1318,17 +1327,22 @@ function ScoreGauge({ value }: { value: number }) {
           cy="20"
           r={r}
           fill="none"
-          stroke={color}
+          stroke={tier.color}
           strokeWidth="4"
           strokeDasharray={circ}
           strokeDashoffset={offset}
           strokeLinecap="round"
         />
       </svg>
-      <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-        {value}
-        <span className="text-xs text-slate-400"> / 100</span>
-      </span>
+      <div className="leading-tight">
+        <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+          {value}
+          <span className="text-xs text-slate-400"> / 100</span>
+        </span>
+        <p className="text-[11px] font-medium" style={{ color: tier.color }}>
+          {tier.label}
+        </p>
+      </div>
     </div>
   );
 }

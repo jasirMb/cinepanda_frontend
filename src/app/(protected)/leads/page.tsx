@@ -24,7 +24,7 @@ import {
   XCircle,
 } from "lucide-react";
 
-import { leadsKeys, useLeads } from "@/hooks/useLeads";
+import { leadsKeys, useLeads, useLeadStatuses } from "@/hooks/useLeads";
 import { LeadsTable } from "@/components/tables/LeadsTable";
 import { Button } from "@/components/ui/button";
 import {
@@ -128,7 +128,7 @@ function categoryBadgeClass(category: LeadCategory) {
 
 function statusBadgeClass(status?: string) {
   switch (status) {
-    case "OPEN":
+    case "NEW_LEAD":
       return "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300";
     case "CLOSED_WON":
       return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300";
@@ -227,14 +227,13 @@ export default function LeadsPage() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  const statusOptions = [
-    { label: "All statuses", value: "" },
-    { label: "Open", value: "OPEN" },
-    { label: "Closed Won", value: "CLOSED_WON" },
-    { label: "Closed Lost", value: "CLOSED_LOST" },
-    { label: "On Hold", value: "ON_HOLD" },
-    { label: "Follow up", value: "FOLLOW_UP" }
+  const statusEnum = useLeadStatuses().data ?? [
+    { value: "NEW_LEAD", label: "New Lead" },
+    { value: "CLOSED_WON", label: "Won" },
+    { value: "CLOSED_LOST", label: "Lost" },
+    { value: "ON_HOLD", label: "On Hold" },
   ];
+  const statusOptions = [{ label: "All statuses", value: "" }, ...statusEnum];
 
   const priorityTypeOptions = [
     { label: "All priorities", value: "" },
@@ -312,10 +311,10 @@ export default function LeadsPage() {
     let overdue = 0;
     let dueToday = 0;
     for (const lead of allLeadsRaw) {
-      if (lead.status === "OPEN") open++;
-      else if (lead.status === "CLOSED_WON") won++;
+      if (lead.status === "CLOSED_WON") won++;
       else if (lead.status === "CLOSED_LOST") lost++;
       else if (lead.status === "ON_HOLD") onHold++;
+      else open++; // any active pipeline status (New Lead, Contacted, …)
       if (lead.priorityType === "URGENT_BUILD") urgent++;
       const cat = getCategory(lead);
       if (cat === "overdue") overdue++;

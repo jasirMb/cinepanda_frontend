@@ -105,7 +105,7 @@ function gradientFor(seed: string) {
 }
 function statusBadgeClass(status?: string) {
   switch (status) {
-    case "OPEN":
+    case "NEW_LEAD":
       return "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300";
     case "CLOSED_WON":
       return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300";
@@ -176,11 +176,11 @@ export default function LeadDetailPage() {
 
   const statusOptions =
     useLeadStatuses().data ?? [
-      { value: "OPEN", label: "Open" },
-      { value: "FOLLOW_UP", label: "Follow up" },
-      { value: "ON_HOLD", label: "On hold" },
-      { value: "CLOSED_WON", label: "Closed won" },
-      { value: "CLOSED_LOST", label: "Closed lost" },
+      { value: "NEW_LEAD", label: "New Lead" },
+      { value: "CONTACTED", label: "Contacted" },
+      { value: "ON_HOLD", label: "On Hold" },
+      { value: "CLOSED_WON", label: "Won" },
+      { value: "CLOSED_LOST", label: "Lost" },
     ];
 
   const [statusValue, setStatusValue] = useState("");
@@ -393,7 +393,17 @@ export default function LeadDetailPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {lead.leadScore != null && <ScoreGauge value={lead.leadScore} />}
+          {lead.leadScore != null && (
+            <div className="flex items-center gap-2">
+              <ScoreGauge value={lead.leadScore} />
+              <span
+                className="hidden text-xs font-medium sm:inline"
+                style={{ color: scoreTier(lead.leadScore).color }}
+              >
+                {scoreTier(lead.leadScore).label}
+              </span>
+            </div>
+          )}
           <Button variant="outline" size="sm" asChild>
             <Link href="/leads">
               <ArrowLeft className="h-4 w-4" /> Back
@@ -425,7 +435,7 @@ export default function LeadDetailPage() {
           Update status
         </span>
         <Select
-          value={statusValue || "OPEN"}
+          value={statusValue || "NEW_LEAD"}
           onValueChange={(v) => v && setStatusValue(v)}
           disabled={statusMutation.isPending}
         >
@@ -1033,12 +1043,21 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
+/** Lead-score classification band. */
+function scoreTier(n: number): { label: string; color: string } {
+  if (n >= 90) return { label: "Excellent", color: "#10b981" };
+  if (n >= 75) return { label: "High Potential", color: "#22c55e" };
+  if (n >= 60) return { label: "Good", color: "#f59e0b" };
+  if (n >= 40) return { label: "Average", color: "#f97316" };
+  return { label: "Low Potential", color: "#ef4444" };
+}
+
 /** Compact circular lead-score gauge with the number centred inside. */
 function ScoreGauge({ value }: { value: number }) {
   const r = 15;
   const circ = 2 * Math.PI * r;
   const offset = circ - (Math.max(0, Math.min(100, value)) / 100) * circ;
-  const color = value >= 70 ? "#10b981" : value >= 40 ? "#f59e0b" : "#ef4444";
+  const color = scoreTier(value).color;
   return (
     <div
       className="relative flex h-11 w-11 shrink-0 items-center justify-center"
