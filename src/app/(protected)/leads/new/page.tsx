@@ -1018,7 +1018,7 @@ export default function NewLeadPage() {
                       )}
                     </p>
                     <p className="text-[11px] text-slate-400">
-                      PDF, JPG, PNG (Max 10MB each)
+                      Images, PDF, docs, 3D/CAD, zip, video · max 10MB each
                     </p>
                   </div>
                   {(formValues.attachments ?? []).map((a) => (
@@ -1242,7 +1242,7 @@ function FileList({
           onChange={(e) => onUpload(e.target.files)}
         />
       </label>
-      <p className="mt-1 text-[11px] text-slate-400">Max 10MB each</p>
+      <p className="mt-1 text-[11px] text-slate-400">3D/CAD, images, zip, video · max 10MB each</p>
       {files.map((a) => (
         <div
           key={a.fileUrl}
