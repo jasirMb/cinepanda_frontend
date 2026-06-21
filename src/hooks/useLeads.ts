@@ -7,6 +7,17 @@ import {
   fetchLeadSources,
   fetchPriorityTypes,
   fetchLeadStatuses,
+  fetchProjectStages,
+  fetchLeadTemperatures,
+  fetchBudgetRanges,
+  fetchPropertyTypes,
+  fetchPropertyStatuses,
+  fetchSystemTypes,
+  fetchLeadPriorities,
+  fetchExpectedTimelines,
+  fetchDesignApprovals,
+  fetchAcousticPackages,
+  fetchLostReasons,
   type FollowupQuery,
   type FollowupResponse,
   type LeadsListQuery,
@@ -63,4 +74,26 @@ export function useLeadStatuses() {
     staleTime: ENUM_STALE
   });
 }
+
+/** Factory for the extended lead dropdown hooks (project stage, budget, etc.). */
+function makeEnumHook(key: string, queryFn: () => Promise<LeadEnumOption[]>) {
+  return () =>
+    useQuery<LeadEnumOption[]>({
+      queryKey: ["lead-enums", key],
+      queryFn,
+      staleTime: ENUM_STALE
+    });
+}
+
+export const useProjectStages = makeEnumHook("project-stages", fetchProjectStages);
+export const useLeadTemperatures = makeEnumHook("temperatures", fetchLeadTemperatures);
+export const useBudgetRanges = makeEnumHook("budget-ranges", fetchBudgetRanges);
+export const usePropertyTypes = makeEnumHook("property-types", fetchPropertyTypes);
+export const usePropertyStatuses = makeEnumHook("property-statuses", fetchPropertyStatuses);
+export const useSystemTypes = makeEnumHook("system-types", fetchSystemTypes);
+export const useLeadPriorities = makeEnumHook("lead-priorities", fetchLeadPriorities);
+export const useExpectedTimelines = makeEnumHook("expected-timelines", fetchExpectedTimelines);
+export const useDesignApprovals = makeEnumHook("design-approvals", fetchDesignApprovals);
+export const useAcousticPackages = makeEnumHook("acoustic-packages", fetchAcousticPackages);
+export const useLostReasons = makeEnumHook("lost-reasons", fetchLostReasons);
 

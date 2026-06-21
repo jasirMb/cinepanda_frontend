@@ -1,34 +1,57 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
-import {
+  Activity,
   ArrowLeft,
+  Building2,
   CalendarClock,
   CalendarDays,
+  CheckCircle2,
+  FolderKanban,
   Mail,
   MapPin,
+  Paperclip,
   Pencil,
   Phone,
+  Plus,
+  Ruler,
   Sparkles,
+  Tag,
+  Thermometer,
+  User,
   UserCheck,
   UserPlus,
+  XCircle,
 } from "lucide-react";
 
 import { leadsKeys } from "@/hooks/useLeads";
-import { useLeadStatuses } from "@/hooks/useLeads";
+import {
+  useLeadStatuses,
+  useLeadTemperatures,
+  useLeadPriorities,
+  useBudgetRanges,
+  useProjectStages,
+  usePropertyTypes,
+  usePropertyStatuses,
+  useSystemTypes,
+  useExpectedTimelines,
+  useDesignApprovals,
+  useAcousticPackages,
+  useLostReasons,
+} from "@/hooks/useLeads";
 import {
   fetchLead,
   updateLeadStatus,
   convertLeadToCustomer,
+  convertLeadToProject,
+  addLeadActivity,
   type Lead,
+  type LeadEnumOption,
 } from "@/lib/api/leads";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,7 +66,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 
 /* ── helpers ── */
-function humanize(value?: string) {
+function humanize(value?: string | null) {
   if (!value) return "Not set";
   return value
     .replace(/_/g, " ")
@@ -88,34 +111,31 @@ function statusBadgeClass(status?: string) {
       return "bg-slate-100 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200";
   }
 }
-function priorityBadgeClass(priority?: string) {
-  switch (priority) {
-    case "URGENT_BUILD":
-      return "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300";
-    case "TAKES_TIME":
-      return "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300";
-    case "ENQUIRED":
-      return "bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300";
-    default:
-      return "bg-slate-100 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200";
-  }
-}
-function fmtDate(iso?: string) {
+function fmtDate(iso?: string | null) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-IN", { dateStyle: "long" });
 }
-function fmtDateTime(iso?: string) {
+function fmtDateTime(iso?: string | null) {
   if (!iso) return "Not scheduled";
   return new Date(iso).toLocaleString("en-IN", {
     dateStyle: "medium",
     timeStyle: "short",
   });
 }
+function fmtMoney(n?: number | null) {
+  if (n == null) return "—";
+  return "₹" + n.toLocaleString("en-IN");
+}
 function customerRef(lead: Lead): string | undefined {
   if (!lead.customerId) return undefined;
   return typeof lead.customerId === "object"
     ? lead.customerId._id
     : lead.customerId;
+}
+/** value → enum label (falls back to a humanized code). */
+function labelOf(options: LeadEnumOption[] | undefined, value?: string | null) {
+  if (!value) return "—";
+  return options?.find((o) => o.value === value)?.label ?? humanize(value);
 }
 
 export default function LeadDetailPage() {
@@ -130,6 +150,19 @@ export default function LeadDetailPage() {
     enabled: !!leadId,
   });
   const lead = leadQuery.data;
+
+  // Enum label maps (cached; used to show friendly labels for stored codes).
+  const temperatures = useLeadTemperatures().data;
+  const priorities = useLeadPriorities().data;
+  const budgets = useBudgetRanges().data;
+  const stages = useProjectStages().data;
+  const propTypes = usePropertyTypes().data;
+  const propStatuses = usePropertyStatuses().data;
+  const systemTypes = useSystemTypes().data;
+  const timelines = useExpectedTimelines().data;
+  const designApprovals = useDesignApprovals().data;
+  const acousticPackages = useAcousticPackages().data;
+  const lostReasons = useLostReasons().data;
 
   const statusOptions =
     useLeadStatuses().data ?? [
@@ -167,7 +200,10 @@ export default function LeadDetailPage() {
   const [cEmail, setCEmail] = useState("");
   const [cNotes, setCNotes] = useState("");
   useEffect(() => {
-    if (lead) setCPlace(lead.place ?? "");
+    if (lead) {
+      setCPlace(lead.place ?? "");
+      setCEmail(lead.email ?? "");
+    }
   }, [lead]);
 
   const convertMutation = useMutation({
@@ -189,6 +225,46 @@ export default function LeadDetailPage() {
     onError: (e: any) =>
       toast.error(e?.response?.data?.error ?? "Failed to convert"),
   });
+
+  // Convert to project
+  const [projectOpen, setProjectOpen] = useState(false);
+  const [projectValue, setProjectValue] = useState("");
+  useEffect(() => {
+    if (lead?.projectValue != null) setProjectValue(String(lead.projectValue));
+  }, [lead]);
+
+  const projectMutation = useMutation({
+    mutationFn: () =>
+      convertLeadToProject(leadId, { projectValue: Number(projectValue) }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: leadsKeys.all });
+      setProjectOpen(false);
+      toast.success(`Project created for "${res.project.clientName}"`);
+      router.push(`/projects/${res.project._id}`);
+    },
+    onError: (e: any) =>
+      toast.error(e?.response?.data?.error ?? "Failed to convert to project"),
+  });
+
+  // Add activity
+  const [activityLabel, setActivityLabel] = useState("");
+  const activityMutation = useMutation({
+    mutationFn: (label: string) => addLeadActivity(leadId, { label }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: leadsKeys.detail(leadId) });
+      setActivityLabel("");
+      toast.success("Activity added");
+    },
+    onError: () => toast.error("Failed to add activity"),
+  });
+
+  const sortedActivities = useMemo(
+    () =>
+      [...(lead?.activities ?? [])].sort(
+        (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()
+      ),
+    [lead?.activities]
+  );
 
   if (leadQuery.isLoading) {
     return (
@@ -214,9 +290,12 @@ export default function LeadDetailPage() {
 
   const custId = customerRef(lead);
   const isWon = lead.status === "CLOSED_WON";
+  const isLost = lead.status === "CLOSED_LOST";
+  const dims = [lead.roomLength, lead.roomWidth, lead.roomHeight];
+  const hasDims = dims.some((d) => d != null);
 
   return (
-    <div className="max-w-4xl space-y-4">
+    <div className="max-w-5xl space-y-4">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
@@ -237,15 +316,26 @@ export default function LeadDetailPage() {
                   lead.status
                 )}`}
               >
-                {humanize(lead.status)}
+                {labelOf(statusOptions, lead.status)}
               </span>
-              <span
-                className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${priorityBadgeClass(
-                  lead.priorityType
-                )}`}
-              >
-                {humanize(lead.priorityType)}
-              </span>
+              {lead.leadTemperature && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{
+                      backgroundColor:
+                        temperatures?.find((t) => t.value === lead.leadTemperature)
+                          ?.color || "#94a3b8",
+                    }}
+                  />
+                  {labelOf(temperatures, lead.leadTemperature)}
+                </span>
+              )}
+              {lead.leadPriority && (
+                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                  {labelOf(priorities, lead.leadPriority)}
+                </span>
+              )}
             </div>
             <p className="mt-0.5 flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400">
               <MapPin className="h-3.5 w-3.5" />
@@ -259,6 +349,19 @@ export default function LeadDetailPage() {
               <ArrowLeft className="h-4 w-4" /> Back
             </Link>
           </Button>
+          {lead.convertedProjectId ? (
+            <Button size="sm" variant="outline" asChild>
+              <Link href={`/projects/${lead.convertedProjectId}`}>
+                <FolderKanban className="h-4 w-4" /> View project
+              </Link>
+            </Button>
+          ) : (
+            isWon && (
+              <Button size="sm" variant="outline" onClick={() => setProjectOpen(true)}>
+                <FolderKanban className="h-4 w-4" /> Convert to project
+              </Button>
+            )
+          )}
           {isWon &&
             (custId ? (
               <Button size="sm" variant="outline" asChild>
@@ -309,69 +412,298 @@ export default function LeadDetailPage() {
         </Button>
       </div>
 
-      {/* Details */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-50">
-          Lead details
-        </h3>
-        <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-          <DetailItem icon={<Phone className="h-4 w-4" />} label="Contact">
-            <a href={`tel:${lead.contactNumber}`} className="hover:text-cine-primary">
-              {lead.contactNumber || "—"}
-            </a>
-          </DetailItem>
-          <DetailItem icon={<Phone className="h-4 w-4" />} label="Alternative number">
-            {lead.alternativeNumber || "—"}
-          </DetailItem>
-          <DetailItem icon={<MapPin className="h-4 w-4" />} label="Place">
-            {lead.place || "—"}
-          </DetailItem>
-          <DetailItem icon={<Sparkles className="h-4 w-4" />} label="Source">
-            {humanize(lead.leadSource)}
-          </DetailItem>
-          <DetailItem icon={<CalendarDays className="h-4 w-4" />} label="Lead date">
-            {fmtDate(lead.leadDate)}
-          </DetailItem>
-          <DetailItem icon={<CalendarDays className="h-4 w-4" />} label="Last update">
-            {fmtDate(lead.lastUpdate)}
-          </DetailItem>
-          <DetailItem
-            icon={<CalendarClock className="h-4 w-4" />}
-            label="Next call"
-          >
-            {fmtDateTime(lead.nextCallTime)}
-          </DetailItem>
-          <DetailItem icon={<Sparkles className="h-4 w-4" />} label="Priority">
-            {humanize(lead.priorityType)}
-          </DetailItem>
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Left column */}
+        <div className="space-y-4 lg:col-span-2">
+          {/* Contact & source */}
+          <Card title="Lead details">
+            <Grid>
+              <DetailItem icon={<Phone className="h-4 w-4" />} label="Contact">
+                <a href={`tel:${lead.contactNumber}`} className="hover:text-cine-primary">
+                  {lead.contactNumber || "—"}
+                </a>
+              </DetailItem>
+              <DetailItem icon={<Phone className="h-4 w-4" />} label="Alternative number">
+                {lead.alternativeNumber || "—"}
+              </DetailItem>
+              <DetailItem icon={<Mail className="h-4 w-4" />} label="Email">
+                {lead.email || "—"}
+              </DetailItem>
+              <DetailItem icon={<User className="h-4 w-4" />} label="Lead owner">
+                {lead.leadOwner || "—"}
+              </DetailItem>
+              <DetailItem icon={<MapPin className="h-4 w-4" />} label="Place">
+                {lead.place || "—"}
+              </DetailItem>
+              <DetailItem icon={<Sparkles className="h-4 w-4" />} label="Source">
+                {humanize(lead.leadSource)}
+              </DetailItem>
+              <DetailItem icon={<CalendarDays className="h-4 w-4" />} label="Lead date">
+                {fmtDate(lead.leadDate)}
+              </DetailItem>
+              <DetailItem icon={<CalendarClock className="h-4 w-4" />} label="Next call">
+                {fmtDateTime(lead.nextCallTime)}
+              </DetailItem>
+              <DetailItem icon={<CalendarClock className="h-4 w-4" />} label="Follow-up reminder">
+                {fmtDateTime(lead.followupReminder)}
+              </DetailItem>
+              <DetailItem icon={<Thermometer className="h-4 w-4" />} label="Stage">
+                {labelOf(stages, lead.projectStage)}
+              </DetailItem>
+            </Grid>
+          </Card>
+
+          {/* Project & site */}
+          {(lead.systemType ||
+            lead.budgetRange ||
+            lead.expectedTimeline ||
+            lead.propertyType ||
+            lead.propertyStatus ||
+            lead.expectedPurchaseDate ||
+            lead.siteAddress ||
+            hasDims ||
+            lead.dedicatedRoom != null ||
+            lead.acousticPackage ||
+            lead.designApproval ||
+            lead.designDeliveryDate ||
+            lead.viewedOn) && (
+            <Card title="Project & site">
+              <Grid>
+                <DetailItem icon={<Sparkles className="h-4 w-4" />} label="System type">
+                  {labelOf(systemTypes, lead.systemType)}
+                </DetailItem>
+                <DetailItem icon={<Sparkles className="h-4 w-4" />} label="Budget range">
+                  {labelOf(budgets, lead.budgetRange)}
+                </DetailItem>
+                <DetailItem icon={<CalendarClock className="h-4 w-4" />} label="Expected timeline">
+                  {labelOf(timelines, lead.expectedTimeline)}
+                </DetailItem>
+                <DetailItem icon={<CalendarDays className="h-4 w-4" />} label="Expected purchase">
+                  {fmtDate(lead.expectedPurchaseDate)}
+                </DetailItem>
+                <DetailItem icon={<Building2 className="h-4 w-4" />} label="Property type">
+                  {labelOf(propTypes, lead.propertyType)}
+                </DetailItem>
+                <DetailItem icon={<Building2 className="h-4 w-4" />} label="Property status">
+                  {labelOf(propStatuses, lead.propertyStatus)}
+                </DetailItem>
+                {hasDims && (
+                  <DetailItem icon={<Ruler className="h-4 w-4" />} label="Room (L×W×H ft)">
+                    {dims.map((d) => d ?? "—").join(" × ")}
+                  </DetailItem>
+                )}
+                {lead.dedicatedRoom != null && (
+                  <DetailItem icon={<Building2 className="h-4 w-4" />} label="Dedicated room">
+                    {lead.dedicatedRoom ? "Yes" : "No"}
+                  </DetailItem>
+                )}
+                <DetailItem icon={<Sparkles className="h-4 w-4" />} label="Acoustic package">
+                  {labelOf(acousticPackages, lead.acousticPackage)}
+                </DetailItem>
+                <DetailItem icon={<CheckCircle2 className="h-4 w-4" />} label="Design approval">
+                  {labelOf(designApprovals, lead.designApproval)}
+                </DetailItem>
+                <DetailItem icon={<CalendarDays className="h-4 w-4" />} label="Design delivery">
+                  {fmtDate(lead.designDeliveryDate)}
+                </DetailItem>
+                <DetailItem icon={<CalendarDays className="h-4 w-4" />} label="Viewed on">
+                  {fmtDate(lead.viewedOn)}
+                </DetailItem>
+              </Grid>
+              {lead.siteAddress && (
+                <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                    Site address
+                  </p>
+                  <p className="mt-0.5 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">
+                    {lead.siteAddress}
+                  </p>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* People */}
+          {(lead.architectName ||
+            lead.architectContact ||
+            lead.designerName ||
+            lead.designerContact) && (
+            <Card title="Architect & designer">
+              <Grid>
+                <DetailItem icon={<User className="h-4 w-4" />} label="Architect">
+                  {lead.architectName || "—"}
+                </DetailItem>
+                <DetailItem icon={<Phone className="h-4 w-4" />} label="Architect contact">
+                  {lead.architectContact || "—"}
+                </DetailItem>
+                <DetailItem icon={<User className="h-4 w-4" />} label="Interior designer">
+                  {lead.designerName || "—"}
+                </DetailItem>
+                <DetailItem icon={<Phone className="h-4 w-4" />} label="Designer contact">
+                  {lead.designerContact || "—"}
+                </DetailItem>
+              </Grid>
+            </Card>
+          )}
+
+          {/* Quotation tracking */}
+          {(lead.quoteSent ||
+            lead.quoteValue != null ||
+            lead.quoteDate ||
+            lead.followUpDate) && (
+            <Card title="Quotation tracking">
+              <Grid>
+                <DetailItem icon={<CheckCircle2 className="h-4 w-4" />} label="Quote sent">
+                  {lead.quoteSent ? "Yes" : "No"}
+                </DetailItem>
+                <DetailItem icon={<Sparkles className="h-4 w-4" />} label="Quote value">
+                  {fmtMoney(lead.quoteValue)}
+                </DetailItem>
+                <DetailItem icon={<CalendarDays className="h-4 w-4" />} label="Quote date">
+                  {fmtDate(lead.quoteDate)}
+                </DetailItem>
+                <DetailItem icon={<CalendarDays className="h-4 w-4" />} label="Follow-up date">
+                  {fmtDate(lead.followUpDate)}
+                </DetailItem>
+              </Grid>
+            </Card>
+          )}
+
+          {/* Outcome */}
+          {isLost && (
+            <div className="rounded-xl border border-red-200 bg-red-50/50 p-5 shadow-sm dark:border-red-900/40 dark:bg-red-950/20">
+              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-red-700 dark:text-red-300">
+                <XCircle className="h-4 w-4" /> Lost
+              </h3>
+              <p className="text-sm text-slate-700 dark:text-slate-200">
+                Reason: {labelOf(lostReasons, lead.lostReason)}
+              </p>
+            </div>
+          )}
+          {isWon && lead.projectValue != null && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm dark:border-emerald-900/40 dark:bg-emerald-950/20">
+              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                <CheckCircle2 className="h-4 w-4" /> Won
+              </h3>
+              <p className="text-sm text-slate-700 dark:text-slate-200">
+                Project value: {fmtMoney(lead.projectValue)}
+              </p>
+            </div>
+          )}
+
+          {/* Requirement & notes */}
+          {(lead.requirement || lead.statusDescription || lead.internalNotes) && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {lead.requirement && (
+                <Card title="Requirement">
+                  <p className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">
+                    {lead.requirement}
+                  </p>
+                </Card>
+              )}
+              {lead.statusDescription && (
+                <Card title="Status notes">
+                  <p className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">
+                    {lead.statusDescription}
+                  </p>
+                </Card>
+              )}
+              {lead.internalNotes && (
+                <Card title="Internal notes">
+                  <p className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">
+                    {lead.internalNotes}
+                  </p>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {/* Tags */}
+          {(lead.tags?.length ?? 0) > 0 && (
+            <Card title="Tags">
+              <div className="flex flex-wrap gap-1.5">
+                {lead.tags!.map((t) => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    <Tag className="h-3 w-3" /> {t}
+                  </span>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
+
+        {/* Right column — activity + attachments */}
+        <div className="space-y-4">
+          <Card title="Activity timeline">
+            <div className="mb-3 flex gap-2">
+              <Input
+                value={activityLabel}
+                onChange={(e) => setActivityLabel(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && activityLabel.trim()) {
+                    activityMutation.mutate(activityLabel.trim());
+                  }
+                }}
+                placeholder="Add an activity…"
+                className="h-9"
+              />
+              <Button
+                size="sm"
+                disabled={!activityLabel.trim() || activityMutation.isPending}
+                onClick={() => activityMutation.mutate(activityLabel.trim())}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            {sortedActivities.length === 0 ? (
+              <p className="text-sm text-slate-400">No activity yet.</p>
+            ) : (
+              <ol className="space-y-3">
+                {sortedActivities.map((a, i) => (
+                  <li key={i} className="flex gap-2.5">
+                    <span className="mt-1 flex h-2 w-2 shrink-0 rounded-full bg-cine-primary" />
+                    <div className="min-w-0">
+                      <p className="text-sm text-slate-800 dark:text-slate-100">
+                        {a.label}
+                      </p>
+                      {a.note && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {a.note}
+                        </p>
+                      )}
+                      <p className="text-[11px] text-slate-400">
+                        {fmtDateTime(a.at)}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </Card>
+
+          {(lead.attachments?.length ?? 0) > 0 && (
+            <Card title="Attachments">
+              <div className="space-y-1.5">
+                {lead.attachments!.map((a) => (
+                  <a
+                    key={a.fileUrl}
+                    href={a.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 rounded-md border border-slate-200 px-2 py-1.5 text-xs text-cine-primary hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+                  >
+                    <Paperclip className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{a.fileName}</span>
+                  </a>
+                ))}
+              </div>
+            </Card>
+          )}
         </div>
       </div>
-
-      {/* Requirement & notes */}
-      {(lead.requirement || lead.statusDescription) && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {lead.requirement && (
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-              <h3 className="mb-2 text-sm font-semibold text-slate-900 dark:text-slate-50">
-                Requirement
-              </h3>
-              <p className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">
-                {lead.requirement}
-              </p>
-            </div>
-          )}
-          {lead.statusDescription && (
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-              <h3 className="mb-2 text-sm font-semibold text-slate-900 dark:text-slate-50">
-                Status notes
-              </h3>
-              <p className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">
-                {lead.statusDescription}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Meta */}
       <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-400 dark:text-slate-500">
@@ -385,11 +717,11 @@ export default function LeadDetailPage() {
         </span>
       </div>
 
-      {/* Convert dialog */}
+      {/* Convert-to-customer dialog */}
       <Dialog open={convertOpen} onClose={() => setConvertOpen(false)} className="max-w-md">
         <div className="space-y-4 p-5">
           <div className="flex items-center gap-2">
-            <Mail className="h-4 w-4 text-cine-primary" />
+            <UserPlus className="h-4 w-4 text-cine-primary" />
             <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">
               Convert to customer
             </h3>
@@ -401,11 +733,7 @@ export default function LeadDetailPage() {
           <div className="space-y-3">
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">
               Place
-              <Input
-                value={cPlace}
-                onChange={(e) => setCPlace(e.target.value)}
-                className="mt-1"
-              />
+              <Input value={cPlace} onChange={(e) => setCPlace(e.target.value)} className="mt-1" />
             </label>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">
               Email (optional)
@@ -418,23 +746,58 @@ export default function LeadDetailPage() {
             </label>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">
               Notes (optional)
-              <Input
-                value={cNotes}
-                onChange={(e) => setCNotes(e.target.value)}
-                className="mt-1"
-              />
+              <Input value={cNotes} onChange={(e) => setCNotes(e.target.value)} className="mt-1" />
             </label>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setConvertOpen(false)}>
               Cancel
             </Button>
+            <Button size="sm" disabled={convertMutation.isPending} onClick={() => convertMutation.mutate()}>
+              {convertMutation.isPending ? "Converting…" : "Convert"}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Convert-to-project dialog */}
+      <Dialog open={projectOpen} onClose={() => setProjectOpen(false)} className="max-w-md">
+        <div className="space-y-4 p-5">
+          <div className="flex items-center gap-2">
+            <FolderKanban className="h-4 w-4 text-cine-primary" />
+            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">
+              Convert to project
+            </h3>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Creates a project linked to this lead (and its customer). The lead is
+            marked Closed Won.
+          </p>
+          <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">
+            Project value
+            <div className="relative mt-1">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+                ₹
+              </span>
+              <Input
+                type="number"
+                className="pl-7"
+                value={projectValue}
+                onChange={(e) => setProjectValue(e.target.value)}
+                placeholder="Enter project value"
+              />
+            </div>
+          </label>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setProjectOpen(false)}>
+              Cancel
+            </Button>
             <Button
               size="sm"
-              disabled={convertMutation.isPending}
-              onClick={() => convertMutation.mutate()}
+              disabled={projectMutation.isPending || !projectValue || Number(projectValue) < 0}
+              onClick={() => projectMutation.mutate()}
             >
-              {convertMutation.isPending ? "Converting…" : "Convert"}
+              {projectMutation.isPending ? "Converting…" : "Create project"}
             </Button>
           </div>
         </div>
@@ -443,6 +806,22 @@ export default function LeadDetailPage() {
   );
 }
 
+/* ── building blocks ── */
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+      <h3 className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-50">
+        {title}
+      </h3>
+      {children}
+    </div>
+  );
+}
+function Grid({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">{children}</div>
+  );
+}
 function DetailItem({
   icon,
   label,

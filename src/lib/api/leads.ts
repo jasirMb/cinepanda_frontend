@@ -118,18 +118,76 @@ export async function updateLeadStatus(
 export interface LeadEnumOption {
   value: string;
   label: string;
+  /** Optional accent colour (used by temperature / priority dots). */
+  color?: string;
 }
 
 async function fetchLeadEnum(path: string): Promise<LeadEnumOption[]> {
   const { data } = await api.get<{ success: boolean; data: any[] }>(path);
   return (data.data ?? [])
     .filter((o) => o?.value && o.isActive !== false)
-    .map((o) => ({ value: o.value as string, label: (o.label ?? o.value) as string }));
+    .map((o) => ({
+      value: o.value as string,
+      label: (o.label ?? o.value) as string,
+      color: o.color as string | undefined,
+    }));
 }
 
 export const fetchLeadSources = () => fetchLeadEnum("/leads/enums/sources");
 export const fetchPriorityTypes = () => fetchLeadEnum("/leads/enums/priorities");
 export const fetchLeadStatuses = () => fetchLeadEnum("/leads/enums/statuses");
+export const fetchProjectStages = () => fetchLeadEnum("/leads/enums/project-stages");
+export const fetchLeadTemperatures = () => fetchLeadEnum("/leads/enums/temperatures");
+export const fetchBudgetRanges = () => fetchLeadEnum("/leads/enums/budget-ranges");
+export const fetchPropertyTypes = () => fetchLeadEnum("/leads/enums/property-types");
+export const fetchPropertyStatuses = () => fetchLeadEnum("/leads/enums/property-statuses");
+export const fetchSystemTypes = () => fetchLeadEnum("/leads/enums/system-types");
+export const fetchLeadPriorities = () => fetchLeadEnum("/leads/enums/lead-priorities");
+export const fetchExpectedTimelines = () => fetchLeadEnum("/leads/enums/expected-timelines");
+export const fetchDesignApprovals = () => fetchLeadEnum("/leads/enums/design-approvals");
+export const fetchAcousticPackages = () => fetchLeadEnum("/leads/enums/acoustic-packages");
+export const fetchLostReasons = () => fetchLeadEnum("/leads/enums/lost-reasons");
+
+/** Append a manual activity to a lead's timeline. */
+export async function addLeadActivity(
+  id: string,
+  activity: { type?: string; label: string; note?: string | null }
+): Promise<Lead> {
+  const { data } = await api.post<{ success: boolean; data: Lead }>(
+    `/leads/${id}/activities`,
+    activity
+  );
+  return data.data;
+}
+
+export interface ConvertLeadToProjectResult {
+  lead: Lead;
+  project: { _id: string; clientName: string; projectValue: number };
+}
+
+/** Convert a (won) lead into a Project linked back to the lead. */
+export async function convertLeadToProject(
+  id: string,
+  payload: { projectValue: number; serviceType?: string }
+): Promise<ConvertLeadToProjectResult> {
+  const { data } = await api.post<{ success: boolean; data: ConvertLeadToProjectResult }>(
+    `/leads/${id}/convert-to-project`,
+    payload
+  );
+  return data.data;
+}
+
+export interface LeadAttachment {
+  fileName: string;
+  fileUrl: string;
+}
+
+export interface LeadActivity {
+  type: string;
+  label: string;
+  note?: string | null;
+  at: string;
+}
 
 export interface CreateLeadPayload {
   customerName: string;
@@ -139,13 +197,59 @@ export interface CreateLeadPayload {
   alternativeNumber?: string | null;
   alternativeCountryCode?: string | null; // e.g., "+1", "+91", "+44"
   leadSource: string;
-  leadDate: string;
-  lastUpdate: string;
-  priorityType: string;
+  leadDate?: string;
+  lastUpdate?: string;
+  priorityType?: string; // legacy — superseded by leadPriority
   requirement: string;
   statusDescription: string;
   status?: string;
   nextCallTime?: string | null;
+
+  // ── Extended lead details (all optional) ──────────────────────────────
+  leadOwner?: string | null;
+  email?: string | null;
+  projectStage?: string | null;
+  leadTemperature?: string | null;
+  budgetRange?: string | null;
+  expectedPurchaseDate?: string | null;
+  propertyType?: string | null;
+  propertyStatus?: string | null;
+  systemType?: string | null;
+  roomLength?: number | null;
+  roomWidth?: number | null;
+  roomHeight?: number | null;
+  siteAddress?: string | null;
+  architectName?: string | null;
+  architectContact?: string | null;
+  architectCountryCode?: string | null;
+  designerName?: string | null;
+  designerContact?: string | null;
+  designerCountryCode?: string | null;
+  followupReminder?: string | null;
+  leadPriority?: string | null;
+  quoteSent?: boolean;
+  quoteValue?: number | null;
+  quoteDate?: string | null;
+  followUpDate?: string | null;
+  tags?: string[];
+  internalNotes?: string | null;
+  attachments?: LeadAttachment[];
+
+  // ── Project scoping / design tracking ──────────────────────────────────
+  expectedTimeline?: string | null;
+  dedicatedRoom?: boolean | null;
+  designDeliveryDate?: string | null;
+  designApproval?: string | null;
+  acousticPackage?: string | null;
+  viewedOn?: string | null;
+
+  // ── Outcome ────────────────────────────────────────────────────────────
+  lostReason?: string | null;
+  projectValue?: number | null;
+  /** Read-only — set when the lead is converted to a project. */
+  convertedProjectId?: string | null;
+  /** Read-only — activity timeline. */
+  activities?: LeadActivity[];
 }
 
 // Adds the editable lead fields (incl. contact/alternative country codes) onto
