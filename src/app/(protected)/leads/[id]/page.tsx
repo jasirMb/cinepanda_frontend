@@ -43,6 +43,8 @@ import {
   useDesignApprovals,
   useAcousticPackages,
   useLostReasons,
+  useDesignStatuses,
+  usePresentationStatuses,
 } from "@/hooks/useLeads";
 import {
   fetchLead,
@@ -163,6 +165,8 @@ export default function LeadDetailPage() {
   const designApprovals = useDesignApprovals().data;
   const acousticPackages = useAcousticPackages().data;
   const lostReasons = useLostReasons().data;
+  const designStatuses = useDesignStatuses().data;
+  const presentationStatuses = usePresentationStatuses().data;
 
   const statusOptions =
     useLeadStatuses().data ?? [
@@ -336,6 +340,11 @@ export default function LeadDetailPage() {
                   {labelOf(priorities, lead.leadPriority)}
                 </span>
               )}
+              {lead.leadScore != null && (
+                <span className="rounded-full bg-cine-primary/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-cine-primary">
+                  Score {lead.leadScore}/100
+                </span>
+              )}
             </div>
             <p className="mt-0.5 flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400">
               <MapPin className="h-3.5 w-3.5" />
@@ -349,19 +358,6 @@ export default function LeadDetailPage() {
               <ArrowLeft className="h-4 w-4" /> Back
             </Link>
           </Button>
-          {lead.convertedProjectId ? (
-            <Button size="sm" variant="outline" asChild>
-              <Link href={`/projects/${lead.convertedProjectId}`}>
-                <FolderKanban className="h-4 w-4" /> View project
-              </Link>
-            </Button>
-          ) : (
-            isWon && (
-              <Button size="sm" variant="outline" onClick={() => setProjectOpen(true)}>
-                <FolderKanban className="h-4 w-4" /> Convert to project
-              </Button>
-            )
-          )}
           {isWon &&
             (custId ? (
               <Button size="sm" variant="outline" asChild>
@@ -414,7 +410,7 @@ export default function LeadDetailPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Left column */}
-        <div className="space-y-4 lg:col-span-2">
+        <div className="min-w-0 space-y-4 lg:col-span-2">
           {/* Contact & source */}
           <Card title="Lead details">
             <Grid>
@@ -523,6 +519,110 @@ export default function LeadDetailPage() {
             </Card>
           )}
 
+          {/* Home theatre design & 3D */}
+          {(lead.threeDDesignRequired != null ||
+            lead.designStatus ||
+            lead.designer ||
+            lead.threeDDesignCost != null ||
+            lead.previewLink ||
+            lead.screenSize ||
+            lead.projector ||
+            lead.speakerLayout ||
+            lead.theme ||
+            lead.presentationStatus ||
+            lead.acousticPackage ||
+            lead.seatingCapacity != null ||
+            (lead.designFiles?.length ?? 0) > 0 ||
+            (lead.renderImages?.length ?? 0) > 0) && (
+            <Card title="Home theatre design & 3D">
+              <Grid>
+                {lead.seatingCapacity != null && (
+                  <DetailItem icon={<Building2 className="h-4 w-4" />} label="Seating capacity">
+                    {lead.seatingCapacity}
+                  </DetailItem>
+                )}
+                {lead.threeDDesignRequired != null && (
+                  <DetailItem icon={<Sparkles className="h-4 w-4" />} label="3D design required">
+                    {lead.threeDDesignRequired ? "Yes" : "No"}
+                  </DetailItem>
+                )}
+                <DetailItem icon={<Sparkles className="h-4 w-4" />} label="Design status">
+                  {labelOf(designStatuses, lead.designStatus)}
+                </DetailItem>
+                <DetailItem icon={<User className="h-4 w-4" />} label="Designer">
+                  {lead.designer || "—"}
+                </DetailItem>
+                <DetailItem icon={<Sparkles className="h-4 w-4" />} label="3D design cost">
+                  {fmtMoney(lead.threeDDesignCost)}
+                </DetailItem>
+                <DetailItem icon={<CalendarDays className="h-4 w-4" />} label="Design delivery">
+                  {fmtDate(lead.designDeliveryDate)}
+                </DetailItem>
+                <DetailItem icon={<CheckCircle2 className="h-4 w-4" />} label="Customer approval">
+                  {labelOf(designApprovals, lead.designApproval)}
+                </DetailItem>
+                <DetailItem icon={<CheckCircle2 className="h-4 w-4" />} label="Presentation">
+                  {labelOf(presentationStatuses, lead.presentationStatus)}
+                </DetailItem>
+                <DetailItem icon={<CalendarDays className="h-4 w-4" />} label="Viewed on">
+                  {fmtDate(lead.viewedOn)}
+                </DetailItem>
+                <DetailItem icon={<Sparkles className="h-4 w-4" />} label="Acoustic package">
+                  {labelOf(acousticPackages, lead.acousticPackage)}
+                </DetailItem>
+                <DetailItem icon={<Sparkles className="h-4 w-4" />} label="Screen size">
+                  {lead.screenSize || "—"}
+                </DetailItem>
+                <DetailItem icon={<Sparkles className="h-4 w-4" />} label="Projector">
+                  {lead.projector || "—"}
+                </DetailItem>
+                <DetailItem icon={<Sparkles className="h-4 w-4" />} label="Speaker layout">
+                  {lead.speakerLayout || "—"}
+                </DetailItem>
+                <DetailItem icon={<Sparkles className="h-4 w-4" />} label="Theme">
+                  {lead.theme || "—"}
+                </DetailItem>
+                {lead.previewLink && (
+                  <DetailItem icon={<Paperclip className="h-4 w-4" />} label="Preview link">
+                    <a
+                      href={lead.previewLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cine-primary hover:underline"
+                    >
+                      Open preview
+                    </a>
+                  </DetailItem>
+                )}
+              </Grid>
+              {((lead.designFiles?.length ?? 0) > 0 ||
+                (lead.renderImages?.length ?? 0) > 0) && (
+                <div className="mt-4 grid gap-4 border-t border-slate-100 pt-3 sm:grid-cols-2 dark:border-slate-800">
+                  {(lead.designFiles?.length ?? 0) > 0 && (
+                    <div>
+                      <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                        Design files
+                      </p>
+                      {lead.designFiles!.map((a) => (
+                        <FileLink key={a.fileUrl} fileName={a.fileName} fileUrl={a.fileUrl} />
+                      ))}
+                    </div>
+                  )}
+                  {(lead.renderImages?.length ?? 0) > 0 && (
+                    <div>
+                      <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                        Render images
+                      </p>
+                      {lead.renderImages!.map((a) => (
+                        <FileLink key={a.fileUrl} fileName={a.fileName} fileUrl={a.fileUrl} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </Card>
+          )}
+
           {/* People */}
           {(lead.architectName ||
             lead.architectContact ||
@@ -544,51 +644,6 @@ export default function LeadDetailPage() {
                 </DetailItem>
               </Grid>
             </Card>
-          )}
-
-          {/* Quotation tracking */}
-          {(lead.quoteSent ||
-            lead.quoteValue != null ||
-            lead.quoteDate ||
-            lead.followUpDate) && (
-            <Card title="Quotation tracking">
-              <Grid>
-                <DetailItem icon={<CheckCircle2 className="h-4 w-4" />} label="Quote sent">
-                  {lead.quoteSent ? "Yes" : "No"}
-                </DetailItem>
-                <DetailItem icon={<Sparkles className="h-4 w-4" />} label="Quote value">
-                  {fmtMoney(lead.quoteValue)}
-                </DetailItem>
-                <DetailItem icon={<CalendarDays className="h-4 w-4" />} label="Quote date">
-                  {fmtDate(lead.quoteDate)}
-                </DetailItem>
-                <DetailItem icon={<CalendarDays className="h-4 w-4" />} label="Follow-up date">
-                  {fmtDate(lead.followUpDate)}
-                </DetailItem>
-              </Grid>
-            </Card>
-          )}
-
-          {/* Outcome */}
-          {isLost && (
-            <div className="rounded-xl border border-red-200 bg-red-50/50 p-5 shadow-sm dark:border-red-900/40 dark:bg-red-950/20">
-              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-red-700 dark:text-red-300">
-                <XCircle className="h-4 w-4" /> Lost
-              </h3>
-              <p className="text-sm text-slate-700 dark:text-slate-200">
-                Reason: {labelOf(lostReasons, lead.lostReason)}
-              </p>
-            </div>
-          )}
-          {isWon && lead.projectValue != null && (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm dark:border-emerald-900/40 dark:bg-emerald-950/20">
-              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                <CheckCircle2 className="h-4 w-4" /> Won
-              </h3>
-              <p className="text-sm text-slate-700 dark:text-slate-200">
-                Project value: {fmtMoney(lead.projectValue)}
-              </p>
-            </div>
           )}
 
           {/* Requirement & notes */}
@@ -636,7 +691,7 @@ export default function LeadDetailPage() {
         </div>
 
         {/* Right column — activity + attachments */}
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <Card title="Activity timeline">
             <div className="mb-3 flex gap-2">
               <Input
@@ -701,6 +756,55 @@ export default function LeadDetailPage() {
                 ))}
               </div>
             </Card>
+          )}
+
+          {(lead.quoteSent ||
+            lead.quoteValue != null ||
+            lead.quoteDate ||
+            lead.followUpDate) && (
+            <Card title="Quotation tracking">
+              <div className="space-y-2">
+                <SideRow label="Quote sent">{lead.quoteSent ? "Yes" : "No"}</SideRow>
+                <SideRow label="Quote value">{fmtMoney(lead.quoteValue)}</SideRow>
+                <SideRow label="Quote date">{fmtDate(lead.quoteDate)}</SideRow>
+                <SideRow label="Follow-up date">{fmtDate(lead.followUpDate)}</SideRow>
+              </div>
+            </Card>
+          )}
+
+          {isLost && (
+            <div className="rounded-xl border border-red-200 bg-red-50/50 p-5 shadow-sm dark:border-red-900/40 dark:bg-red-950/20">
+              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-red-700 dark:text-red-300">
+                <XCircle className="h-4 w-4" /> Lost Reason
+              </h3>
+              <p className="text-sm text-slate-700 dark:text-slate-200">
+                {labelOf(lostReasons, lead.lostReason)}
+              </p>
+            </div>
+          )}
+
+          {isWon && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm dark:border-emerald-900/40 dark:bg-emerald-950/20">
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                <CheckCircle2 className="h-4 w-4" /> Won Details
+              </h3>
+              {lead.projectValue != null && (
+                <p className="mb-3 text-sm text-slate-700 dark:text-slate-200">
+                  Project value: {fmtMoney(lead.projectValue)}
+                </p>
+              )}
+              {lead.convertedProjectId ? (
+                <Button size="sm" variant="outline" className="w-full" asChild>
+                  <Link href={`/projects/${lead.convertedProjectId}`}>
+                    <FolderKanban className="h-4 w-4" /> View project
+                  </Link>
+                </Button>
+              ) : (
+                <Button size="sm" className="w-full" onClick={() => setProjectOpen(true)}>
+                  <FolderKanban className="h-4 w-4" /> Convert to Project
+                </Button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -840,6 +944,29 @@ function DetailItem({
         </p>
         <p className="text-sm text-slate-800 dark:text-slate-100">{children}</p>
       </div>
+    </div>
+  );
+}
+/** A file link row (design files / render images). */
+function FileLink({ fileName, fileUrl }: { fileName: string; fileUrl: string }) {
+  return (
+    <a
+      href={fileUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-1 flex items-center gap-2 rounded-md border border-slate-200 px-2 py-1.5 text-xs text-cine-primary hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+    >
+      <Paperclip className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{fileName}</span>
+    </a>
+  );
+}
+
+/** Compact label : value row for the sidebar cards. */
+function SideRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-2 text-sm">
+      <span className="text-slate-400">{label}</span>
+      <span className="text-slate-800 dark:text-slate-100">{children}</span>
     </div>
   );
 }

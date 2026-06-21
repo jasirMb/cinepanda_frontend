@@ -18,6 +18,8 @@ import {
   fetchDesignApprovals,
   fetchAcousticPackages,
   fetchLostReasons,
+  fetchDesignStatuses,
+  fetchPresentationStatuses,
   type FollowupQuery,
   type FollowupResponse,
   type LeadsListQuery,
@@ -96,4 +98,6 @@ export const useExpectedTimelines = makeEnumHook("expected-timelines", fetchExpe
 export const useDesignApprovals = makeEnumHook("design-approvals", fetchDesignApprovals);
 export const useAcousticPackages = makeEnumHook("acoustic-packages", fetchAcousticPackages);
 export const useLostReasons = makeEnumHook("lost-reasons", fetchLostReasons);
+export const useDesignStatuses = makeEnumHook("design-statuses", fetchDesignStatuses);
+export const usePresentationStatuses = makeEnumHook("presentation-statuses", fetchPresentationStatuses);
 

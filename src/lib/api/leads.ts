@@ -147,6 +147,8 @@ export const fetchExpectedTimelines = () => fetchLeadEnum("/leads/enums/expected
 export const fetchDesignApprovals = () => fetchLeadEnum("/leads/enums/design-approvals");
 export const fetchAcousticPackages = () => fetchLeadEnum("/leads/enums/acoustic-packages");
 export const fetchLostReasons = () => fetchLeadEnum("/leads/enums/lost-reasons");
+export const fetchDesignStatuses = () => fetchLeadEnum("/leads/enums/design-statuses");
+export const fetchPresentationStatuses = () => fetchLeadEnum("/leads/enums/presentation-statuses");
 
 /** Append a manual activity to a lead's timeline. */
 export async function addLeadActivity(
@@ -242,6 +244,23 @@ export interface CreateLeadPayload {
   designApproval?: string | null;
   acousticPackage?: string | null;
   viewedOn?: string | null;
+
+  // ── Home theatre design & 3D ───────────────────────────────────────────
+  seatingCapacity?: number | null;
+  threeDDesignRequired?: boolean | null;
+  designStatus?: string | null;
+  designer?: string | null;
+  threeDDesignCost?: number | null;
+  previewLink?: string | null;
+  screenSize?: string | null;
+  projector?: string | null;
+  speakerLayout?: string | null;
+  theme?: string | null;
+  presentationStatus?: string | null;
+  designFiles?: LeadAttachment[];
+  renderImages?: LeadAttachment[];
+  /** Read-only — auto-computed 0–100. */
+  leadScore?: number | null;
 
   // ── Outcome ────────────────────────────────────────────────────────────
   lostReason?: string | null;
