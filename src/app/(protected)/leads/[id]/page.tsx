@@ -23,6 +23,9 @@ import {
   Sparkles,
   Tag,
   Thermometer,
+  Trash2,
+  Check,
+  X,
   User,
   UserCheck,
   UserPlus,
@@ -52,6 +55,8 @@ import {
   convertLeadToCustomer,
   convertLeadToProject,
   addLeadActivity,
+  updateLeadActivity,
+  deleteLeadActivity,
   type Lead,
   type LeadEnumOption,
 } from "@/lib/api/leads";
@@ -66,6 +71,7 @@ import {
 } from "@/components/ui/select";
 import { Dialog } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
 
 /* ── helpers ── */
 function humanize(value?: string | null) {
@@ -252,23 +258,62 @@ export default function LeadDetailPage() {
 
   // Add activity
   const [activityLabel, setActivityLabel] = useState("");
+  const [activityDate, setActivityDate] = useState("");
+  // index (into the stored array) of the activity being edited, or null
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editDate, setEditDate] = useState("");
+
   const activityMutation = useMutation({
-    mutationFn: (label: string) => addLeadActivity(leadId, { label }),
+    mutationFn: () =>
+      addLeadActivity(leadId, {
+        label: activityLabel.trim(),
+        at: activityDate || undefined,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: leadsKeys.detail(leadId) });
       setActivityLabel("");
+      setActivityDate("");
       toast.success("Activity added");
     },
     onError: () => toast.error("Failed to add activity"),
   });
 
+  const editActivityMutation = useMutation({
+    mutationFn: (vars: { index: number; label: string; at?: string | null }) =>
+      updateLeadActivity(leadId, vars.index, { label: vars.label, at: vars.at }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: leadsKeys.detail(leadId) });
+      setEditIdx(null);
+      toast.success("Activity updated");
+    },
+    onError: () => toast.error("Failed to update activity"),
+  });
+
+  const deleteActivityMutation = useMutation({
+    mutationFn: (index: number) => deleteLeadActivity(leadId, index),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: leadsKeys.detail(leadId) });
+      toast.success("Activity removed");
+    },
+    onError: () => toast.error("Failed to remove activity"),
+  });
+
+  // Keep each activity's original array index (edits/deletes target that), then
+  // sort a copy newest-first for display.
   const sortedActivities = useMemo(
     () =>
-      [...(lead?.activities ?? [])].sort(
-        (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()
-      ),
+      (lead?.activities ?? [])
+        .map((a, idx) => ({ ...a, idx }))
+        .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()),
     [lead?.activities]
   );
+
+  function startEdit(a: { idx: number; label: string; at: string }) {
+    setEditIdx(a.idx);
+    setEditLabel(a.label);
+    setEditDate(a.at ? a.at.slice(0, 16) : "");
+  }
 
   if (leadQuery.isLoading) {
     return (
@@ -693,45 +738,115 @@ export default function LeadDetailPage() {
         {/* Right column — activity + attachments */}
         <div className="min-w-0 space-y-4">
           <Card title="Activity timeline">
-            <div className="mb-3 flex gap-2">
-              <Input
-                value={activityLabel}
-                onChange={(e) => setActivityLabel(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && activityLabel.trim()) {
-                    activityMutation.mutate(activityLabel.trim());
-                  }
-                }}
-                placeholder="Add an activity…"
-                className="h-9"
+            <div className="mb-3 space-y-2">
+              <div className="flex gap-2">
+                <Input
+                  value={activityLabel}
+                  onChange={(e) => setActivityLabel(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && activityLabel.trim()) activityMutation.mutate();
+                  }}
+                  placeholder="Add an activity…"
+                  className="h-9"
+                />
+                <Button
+                  size="sm"
+                  disabled={!activityLabel.trim() || activityMutation.isPending}
+                  onClick={() => activityMutation.mutate()}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              <DateTimePicker
+                value={activityDate}
+                onChange={(v) => setActivityDate(v)}
+                placeholder="Date & time (defaults to now)"
               />
-              <Button
-                size="sm"
-                disabled={!activityLabel.trim() || activityMutation.isPending}
-                onClick={() => activityMutation.mutate(activityLabel.trim())}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
             </div>
             {sortedActivities.length === 0 ? (
               <p className="text-sm text-slate-400">No activity yet.</p>
             ) : (
               <ol className="space-y-3">
-                {sortedActivities.map((a, i) => (
-                  <li key={i} className="flex gap-2.5">
-                    <span className="mt-1 flex h-2 w-2 shrink-0 rounded-full bg-cine-primary" />
-                    <div className="min-w-0">
-                      <p className="text-sm text-slate-800 dark:text-slate-100">
-                        {a.label}
-                      </p>
-                      {a.note && (
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          {a.note}
-                        </p>
+                {sortedActivities.map((a) => (
+                  <li key={a.idx} className="flex gap-2.5">
+                    <span className="mt-1.5 flex h-2 w-2 shrink-0 rounded-full bg-cine-primary" />
+                    <div className="min-w-0 flex-1">
+                      {editIdx === a.idx ? (
+                        <div className="space-y-2">
+                          <Input
+                            value={editLabel}
+                            onChange={(e) => setEditLabel(e.target.value)}
+                            className="h-8"
+                            placeholder="Activity"
+                          />
+                          <DateTimePicker
+                            value={editDate}
+                            onChange={(v) => setEditDate(v)}
+                            placeholder="Date & time"
+                          />
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              className="h-7"
+                              disabled={!editLabel.trim() || editActivityMutation.isPending}
+                              onClick={() =>
+                                editActivityMutation.mutate({
+                                  index: a.idx,
+                                  label: editLabel.trim(),
+                                  at: editDate || a.at,
+                                })
+                              }
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7"
+                              onClick={() => setEditIdx(null)}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="group flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm text-slate-800 dark:text-slate-100">
+                              {a.label}
+                            </p>
+                            {a.note && (
+                              <p className="text-xs text-slate-500 dark:text-slate-400">
+                                {a.note}
+                              </p>
+                            )}
+                            <p className="text-[11px] text-slate-400">
+                              {fmtDateTime(a.at)}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100">
+                            <button
+                              type="button"
+                              onClick={() => startEdit(a)}
+                              className="text-slate-400 hover:text-cine-primary"
+                              title="Edit"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (confirm("Delete this activity?"))
+                                  deleteActivityMutation.mutate(a.idx);
+                              }}
+                              className="text-slate-400 hover:text-red-500"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
                       )}
-                      <p className="text-[11px] text-slate-400">
-                        {fmtDateTime(a.at)}
-                      </p>
                     </div>
                   </li>
                 ))}

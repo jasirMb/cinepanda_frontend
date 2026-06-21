@@ -153,11 +153,32 @@ export const fetchPresentationStatuses = () => fetchLeadEnum("/leads/enums/prese
 /** Append a manual activity to a lead's timeline. */
 export async function addLeadActivity(
   id: string,
-  activity: { type?: string; label: string; note?: string | null }
+  activity: { type?: string; label: string; note?: string | null; at?: string | null }
 ): Promise<Lead> {
   const { data } = await api.post<{ success: boolean; data: Lead }>(
     `/leads/${id}/activities`,
     activity
+  );
+  return data.data;
+}
+
+/** Edit an activity (by its index in the stored array). */
+export async function updateLeadActivity(
+  id: string,
+  index: number,
+  patch: { label?: string; note?: string | null; at?: string | null }
+): Promise<Lead> {
+  const { data } = await api.patch<{ success: boolean; data: Lead }>(
+    `/leads/${id}/activities/${index}`,
+    patch
+  );
+  return data.data;
+}
+
+/** Delete an activity (by its index in the stored array). */
+export async function deleteLeadActivity(id: string, index: number): Promise<Lead> {
+  const { data } = await api.delete<{ success: boolean; data: Lead }>(
+    `/leads/${id}/activities/${index}`
   );
   return data.data;
 }
