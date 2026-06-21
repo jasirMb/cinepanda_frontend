@@ -21,9 +21,9 @@ export default function ProtectedLayout({
       <SettingsModal />
       <div className="flex h-screen overflow-hidden text-slate-900 dark:text-slate-50">
         <Sidebar />
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <Topbar />
-          <main className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">{children}</main>
+          <main className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">{children}</main>
         </div>
       </div>
     </AuthGuard>

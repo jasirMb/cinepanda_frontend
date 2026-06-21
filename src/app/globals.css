@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The app shell owns the full viewport; the inner <main> is the only scroller.
+   Locking html/body prevents a second (window) scrollbar on tall pages. */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   @apply bg-slate-50 text-slate-900;
 }
