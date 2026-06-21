@@ -812,43 +812,6 @@ export default function NewLeadPage() {
                 </div>
               </SectionCard>
 
-              <SectionCard title="Architect & designer">
-                <Rows cols={2}>
-                  <Field label="Architect Name">
-                    <Input
-                      value={formValues.architectName ?? ""}
-                      onChange={(e) => setField("architectName", e.target.value)}
-                      placeholder="Architect name"
-                    />
-                  </Field>
-                  <Field label="Architect Contact" error={formErrors.architectContact}>
-                    <PhoneField
-                      countryCode={formValues.architectCountryCode}
-                      number={formValues.architectContact ?? ""}
-                      onCountryCodeChange={(c) => setField("architectCountryCode", c)}
-                      onNumberChange={(n) => setPhone("architectContact", n)}
-                      placeholder="Architect contact number"
-                    />
-                  </Field>
-                  <Field label="Interior Designer Name">
-                    <Input
-                      value={formValues.designerName ?? ""}
-                      onChange={(e) => setField("designerName", e.target.value)}
-                      placeholder="Interior designer name"
-                    />
-                  </Field>
-                  <Field label="Interior Designer Contact" error={formErrors.designerContact}>
-                    <PhoneField
-                      countryCode={formValues.designerCountryCode}
-                      number={formValues.designerContact ?? ""}
-                      onCountryCodeChange={(c) => setField("designerCountryCode", c)}
-                      onNumberChange={(n) => setPhone("designerContact", n)}
-                      placeholder="Interior designer contact"
-                    />
-                  </Field>
-                </Rows>
-              </SectionCard>
-
               <SectionCard title="Scheduling & status">
                 <Rows cols={2}>
                   <Field label="Next Call Time">
@@ -896,51 +859,6 @@ export default function NewLeadPage() {
                 </div>
               </SectionCard>
 
-              <SectionCard title="Tags & notes">
-                <Rows cols={2}>
-                  <Field label="Tags / Labels">
-                    <div className="space-y-2">
-                      <Input
-                        value={tagDraft}
-                        onChange={(e) => setTagDraft(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === ",") {
-                            e.preventDefault();
-                            addTag();
-                          }
-                        }}
-                        placeholder="Type a tag and press Enter"
-                      />
-                      {(formValues.tags ?? []).length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {(formValues.tags ?? []).map((tag) => (
-                            <span
-                              key={tag}
-                              className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                            >
-                              {tag}
-                              <button
-                                type="button"
-                                onClick={() => removeTag(tag)}
-                                className="text-slate-400 hover:text-red-500"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </Field>
-                  <Field label="Internal Notes">
-                    <Textarea
-                      value={formValues.internalNotes ?? ""}
-                      onChange={(e) => setField("internalNotes", e.target.value)}
-                      placeholder="Add internal notes..."
-                    />
-                  </Field>
-                </Rows>
-              </SectionCard>
             </div>
 
             {/* ── Right sidebar ──────────────────────────────────────── */}
@@ -1083,6 +1001,89 @@ export default function NewLeadPage() {
                     />
                   </Field>
                 </div>
+              </SectionCard>
+
+              <SectionCard title="Architect & designer">
+                <Rows cols={1}>
+                  <Field label="Architect Name">
+                    <Input
+                      value={formValues.architectName ?? ""}
+                      onChange={(e) => setField("architectName", e.target.value)}
+                      placeholder="Architect name"
+                    />
+                  </Field>
+                  <Field label="Architect Contact" error={formErrors.architectContact}>
+                    <PhoneField
+                      countryCode={formValues.architectCountryCode}
+                      number={formValues.architectContact ?? ""}
+                      onCountryCodeChange={(c) => setField("architectCountryCode", c)}
+                      onNumberChange={(n) => setPhone("architectContact", n)}
+                      placeholder="Architect contact number"
+                    />
+                  </Field>
+                  <Field label="Interior Designer Name">
+                    <Input
+                      value={formValues.designerName ?? ""}
+                      onChange={(e) => setField("designerName", e.target.value)}
+                      placeholder="Interior designer name"
+                    />
+                  </Field>
+                  <Field label="Interior Designer Contact" error={formErrors.designerContact}>
+                    <PhoneField
+                      countryCode={formValues.designerCountryCode}
+                      number={formValues.designerContact ?? ""}
+                      onCountryCodeChange={(c) => setField("designerCountryCode", c)}
+                      onNumberChange={(n) => setPhone("designerContact", n)}
+                      placeholder="Interior designer contact"
+                    />
+                  </Field>
+                </Rows>
+              </SectionCard>
+
+              <SectionCard title="Tags & notes">
+                <Rows cols={1}>
+                  <Field label="Tags / Labels">
+                    <div className="space-y-2">
+                      <Input
+                        value={tagDraft}
+                        onChange={(e) => setTagDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === ",") {
+                            e.preventDefault();
+                            addTag();
+                          }
+                        }}
+                        placeholder="Type a tag and press Enter"
+                      />
+                      {(formValues.tags ?? []).length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {(formValues.tags ?? []).map((tag) => (
+                            <span
+                              key={tag}
+                              className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                            >
+                              {tag}
+                              <button
+                                type="button"
+                                onClick={() => removeTag(tag)}
+                                className="text-slate-400 hover:text-red-500"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </Field>
+                  <Field label="Internal Notes">
+                    <Textarea
+                      value={formValues.internalNotes ?? ""}
+                      onChange={(e) => setField("internalNotes", e.target.value)}
+                      placeholder="Add internal notes..."
+                    />
+                  </Field>
+                </Rows>
               </SectionCard>
 
               {formValues.status === "CLOSED_LOST" && (
