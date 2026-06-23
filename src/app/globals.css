@@ -18,6 +18,8 @@ body {
   @apply bg-slate-950 text-slate-50;
 }
 
+
+
 /* ── Slim, modern scrollbars app-wide ──────────────────────────────────── */
 * {
   scrollbar-width: thin;
