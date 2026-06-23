@@ -172,11 +172,15 @@ export function LeadsTable({ leads, onDelete }: LeadsTableProps) {
 
                   {/* Priority */}
                   <td className="px-4 py-2.5">
-                    <span
-                      className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${priorityTone(lead.priorityType)}`}
-                    >
-                      {lead.priorityType.replace(/_/g, " ")}
-                    </span>
+                    {lead.priorityType ? (
+                      <span
+                        className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${priorityTone(lead.priorityType)}`}
+                      >
+                        {lead.priorityType.replace(/_/g, " ")}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
                   </td>
 
                   {/* Next Call */}

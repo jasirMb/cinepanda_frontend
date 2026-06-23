@@ -12,7 +12,7 @@ export interface Lead {
   leadDate: string;
   lastUpdate: string;
   nextCallTime?: string;
-  priorityType: string;
+  priorityType: string | null;
   status: string;
   requirement: string;
   statusDescription: string;
