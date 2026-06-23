@@ -222,7 +222,7 @@ export interface CreateLeadPayload {
   leadSource: string;
   leadDate?: string;
   lastUpdate?: string;
-  priorityType?: string; // legacy — superseded by leadPriority
+  priorityType?: string | null; // legacy — superseded by leadPriority
   requirement: string;
   statusDescription: string;
   status?: string;

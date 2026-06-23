@@ -42,7 +42,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 
 type LeadCategory = "overdue" | "today" | "upcoming" | "unscheduled";
 
-function humanize(value?: string) {
+function humanize(value?: string | null) {
   if (!value) return "Not set";
   return value
     .replace(/_/g, " ")
@@ -74,7 +74,7 @@ function getCategory(lead: Lead): LeadCategory {
   return "unscheduled";
 }
 
-function priorityWeight(priority?: string) {
+function priorityWeight(priority?: string | null) {
   switch (priority) {
     case "URGENT_BUILD":
       return 0;
@@ -143,7 +143,7 @@ function statusBadgeClass(status?: string) {
   }
 }
 
-function priorityBadgeClass(priority?: string) {
+function priorityBadgeClass(priority?: string | null) {
   switch (priority) {
     case "URGENT_BUILD":
       return "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300";

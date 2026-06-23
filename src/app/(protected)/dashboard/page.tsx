@@ -1367,7 +1367,7 @@ function UpcomingLeadsCard({
 }
 
 function UpcomingLeadTile({ lead }: { lead: Lead }) {
-  const tone = PRIORITY_TONE[lead.priorityType] ?? "neutral";
+  const tone: Tone = (lead.priorityType ? PRIORITY_TONE[lead.priorityType] : undefined) ?? "neutral";
   const t = TONES[tone];
   const initials =
     lead.customerName
