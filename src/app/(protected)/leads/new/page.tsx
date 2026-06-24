@@ -34,7 +34,7 @@ import {
   usePropertyTypes,
   usePropertyStatuses,
   useSystemTypes,
-  useLeadPriorities,
+  usePriorityTypes,
   useExpectedTimelines,
   useDesignApprovals,
   useAcousticPackages,
@@ -187,7 +187,7 @@ export default function NewLeadPage() {
   const propertyTypeOptions = usePropertyTypes().data ?? [];
   const propertyStatusOptions = usePropertyStatuses().data ?? [];
   const systemTypeOptions = useSystemTypes().data ?? [];
-  const leadPriorityOptions = useLeadPriorities().data ?? [];
+  const priorityTypeOptions = usePriorityTypes().data ?? [];
   const expectedTimelineOptions = useExpectedTimelines().data ?? [];
   const designApprovalOptions = useDesignApprovals().data ?? [];
   const acousticPackageOptions = useAcousticPackages().data ?? [];
@@ -830,9 +830,9 @@ export default function NewLeadPage() {
                   </Field>
                   <Field label="Lead Priority">
                     <EnumSelect
-                      value={formValues.leadPriority ?? ""}
-                      onChange={(v) => setField("leadPriority", v)}
-                      options={leadPriorityOptions}
+                      value={formValues.priorityType ?? ""}
+                      onChange={(v) => setField("priorityType", v)}
+                      options={priorityTypeOptions}
                       placeholder="Select priority"
                     />
                   </Field>
