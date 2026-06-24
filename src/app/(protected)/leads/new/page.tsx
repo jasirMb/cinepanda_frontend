@@ -651,6 +651,14 @@ export default function NewLeadPage() {
                       placeholder="Select lead source"
                     />
                   </Field>
+                  <Field label="Project Type">
+                    <EnumSelect
+                      value={formValues.systemType ?? ""}
+                      onChange={(v) => setField("systemType", v)}
+                      options={systemTypeOptions}
+                      placeholder="Select project type"
+                    />
+                  </Field>
                   <Field label="Project Stage">
                     <EnumSelect
                       value={formValues.projectStage ?? ""}
@@ -703,14 +711,6 @@ export default function NewLeadPage() {
                       onChange={(v) => setField("propertyStatus", v)}
                       options={propertyStatusOptions}
                       placeholder="Select property status"
-                    />
-                  </Field>
-                  <Field label="Project Type">
-                    <EnumSelect
-                      value={formValues.systemType ?? ""}
-                      onChange={(v) => setField("systemType", v)}
-                      options={systemTypeOptions}
-                      placeholder="Select project type"
                     />
                   </Field>
                 </Rows>
