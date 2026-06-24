@@ -342,6 +342,12 @@ export default function LeadDetailPage() {
   const isLost = lead.status === "CLOSED_LOST";
   const dims = [lead.roomLength, lead.roomWidth, lead.roomHeight];
   const hasDims = dims.some((d) => d != null);
+  const roomUnit = lead.roomUnit ?? "ft";
+  const unitToFt: Record<string, number> = { ft: 1, m: 3.280839895, cm: 0.032808399, mm: 0.0032808399 };
+  const roomAreaSqFt =
+    lead.roomLength != null && lead.roomWidth != null
+      ? lead.roomLength * (unitToFt[roomUnit] ?? 1) * lead.roomWidth * (unitToFt[roomUnit] ?? 1)
+      : null;
 
   return (
     <div className="max-w-5xl space-y-4">
@@ -535,8 +541,14 @@ export default function LeadDetailPage() {
                   {labelOf(propStatuses, lead.propertyStatus)}
                 </DetailItem>
                 {hasDims && (
-                  <DetailItem icon={<Ruler className="h-4 w-4" />} label="Room (L×W×H ft)">
+                  <DetailItem icon={<Ruler className="h-4 w-4" />} label={`Room (L×W×H ${roomUnit})`}>
                     {dims.map((d) => d ?? "—").join(" × ")}
+                    {roomAreaSqFt != null && (
+                      <span className="text-slate-400">
+                        {" "}
+                        ({roomAreaSqFt.toLocaleString(undefined, { maximumFractionDigits: 2 })} sq ft)
+                      </span>
+                    )}
                   </DetailItem>
                 )}
                 {lead.dedicatedRoom != null && (

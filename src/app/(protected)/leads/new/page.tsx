@@ -68,6 +68,30 @@ const DEFAULT_STATUSES: Option[] = [
   { label: "On Hold", value: "ON_HOLD" },
 ];
 
+// Room dimension measurement units and their conversion factor to feet.
+const ROOM_UNIT_OPTIONS = [
+  { label: "Feet (ft)", value: "ft" },
+  { label: "Meters (m)", value: "m" },
+  { label: "Centimeters (cm)", value: "cm" },
+  { label: "Millimeters (mm)", value: "mm" },
+];
+const ROOM_UNIT_TO_FT: Record<string, number> = {
+  ft: 1,
+  m: 3.280839895,
+  cm: 0.032808399,
+  mm: 0.0032808399,
+};
+/** Floor area (length × width) in square feet, regardless of the input unit. */
+function roomAreaSqFt(
+  length: number | null | undefined,
+  width: number | null | undefined,
+  unit: string | null | undefined
+): number | null {
+  if (length == null || width == null) return null;
+  const f = ROOM_UNIT_TO_FT[unit ?? "ft"] ?? 1;
+  return length * f * width * f;
+}
+
 const initialFormValues: CreateLeadPayload = {
   customerName: "",
   place: "",
@@ -94,6 +118,7 @@ const initialFormValues: CreateLeadPayload = {
   roomLength: null,
   roomWidth: null,
   roomHeight: null,
+  roomUnit: "ft",
   siteAddress: "",
   architectName: "",
   architectContact: "",
@@ -271,6 +296,7 @@ export default function NewLeadPage() {
         roomLength: lead.roomLength ?? null,
         roomWidth: lead.roomWidth ?? null,
         roomHeight: lead.roomHeight ?? null,
+        roomUnit: lead.roomUnit ?? "ft",
         siteAddress: lead.siteAddress ?? "",
         architectName: lead.architectName ?? "",
         architectContact: lead.architectContact ?? "",
@@ -494,6 +520,7 @@ export default function NewLeadPage() {
       propertyType: blankToNull(formValues.propertyType),
       propertyStatus: blankToNull(formValues.propertyStatus),
       systemType: blankToNull(formValues.systemType),
+      roomUnit: blankToNull(formValues.roomUnit) ?? "ft",
       leadPriority: blankToNull(formValues.leadPriority),
       priorityType: blankToNull(formValues.priorityType) ?? undefined,
       nextCallTime: blankToNull(formValues.nextCallTime),
@@ -691,13 +718,31 @@ export default function NewLeadPage() {
 
               <SectionCard title="Room Details">
                 <Rows cols={2}>
-                  <Field label="Length (ft)">
+                  <Field label="Measurement Unit">
+                    <EnumSelect
+                      value={formValues.roomUnit ?? "ft"}
+                      onChange={(v) => setField("roomUnit", v)}
+                      options={ROOM_UNIT_OPTIONS}
+                      placeholder="Select unit"
+                    />
+                  </Field>
+                  <Field label="Floor Area (sq ft)">
+                    <div className="flex h-9 w-full items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                      {(() => {
+                        const a = roomAreaSqFt(formValues.roomLength, formValues.roomWidth, formValues.roomUnit);
+                        return a != null
+                          ? `${a.toLocaleString(undefined, { maximumFractionDigits: 2 })} sq ft`
+                          : "—";
+                      })()}
+                    </div>
+                  </Field>
+                  <Field label={`Length (${formValues.roomUnit ?? "ft"})`}>
                     <Input type="number" value={formValues.roomLength ?? ""} onChange={(e) => setNumber("roomLength", e.target.value)} placeholder="Length" />
                   </Field>
-                  <Field label="Width (ft)">
+                  <Field label={`Width (${formValues.roomUnit ?? "ft"})`}>
                     <Input type="number" value={formValues.roomWidth ?? ""} onChange={(e) => setNumber("roomWidth", e.target.value)} placeholder="Width" />
                   </Field>
-                  <Field label="Height (ft)">
+                  <Field label={`Height (${formValues.roomUnit ?? "ft"})`}>
                     <Input type="number" value={formValues.roomHeight ?? ""} onChange={(e) => setNumber("roomHeight", e.target.value)} placeholder="Height" />
                   </Field>
                   <Field label="Seating Capacity">

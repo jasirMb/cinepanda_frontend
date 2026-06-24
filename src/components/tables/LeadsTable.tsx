@@ -93,6 +93,7 @@ export function LeadsTable({ leads, onDelete }: LeadsTableProps) {
         <table className="w-full min-w-[860px] text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+              <th className="px-4 py-3 text-right font-medium w-12">#</th>
               <th className="px-4 py-3 text-left font-medium">Lead</th>
               <th className="px-4 py-3 text-left font-medium">Contact</th>
               <th className="px-4 py-3 text-left font-medium">Source</th>
@@ -103,7 +104,7 @@ export function LeadsTable({ leads, onDelete }: LeadsTableProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {leads.map((lead) => {
+            {leads.map((lead, index) => {
               const nc = nextCallInfo(lead.nextCallTime);
               const customerId =
                 lead.customerId && typeof lead.customerId === "object"
@@ -114,6 +115,11 @@ export function LeadsTable({ leads, onDelete }: LeadsTableProps) {
                   key={lead._id}
                   className="group transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40"
                 >
+                  {/* Row number */}
+                  <td className="px-4 py-2.5 text-right text-xs tabular-nums text-slate-400">
+                    {index + 1}
+                  </td>
+
                   {/* Lead */}
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-3">
@@ -253,7 +259,7 @@ export function LeadsTable({ leads, onDelete }: LeadsTableProps) {
             {leads.length === 0 && (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={8}
                   className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
                 >
                   No leads found.

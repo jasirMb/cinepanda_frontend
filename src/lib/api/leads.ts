@@ -241,6 +241,7 @@ export interface CreateLeadPayload {
   roomLength?: number | null;
   roomWidth?: number | null;
   roomHeight?: number | null;
+  roomUnit?: string | null; // ft | m | cm | mm
   siteAddress?: string | null;
   architectName?: string | null;
   architectContact?: string | null;
