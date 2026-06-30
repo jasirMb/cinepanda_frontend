@@ -861,13 +861,18 @@ export default function LeadDetailPage() {
             {sortedActivities.length === 0 ? (
               <p className="text-sm text-slate-400">No activity yet.</p>
             ) : (
-              <ol className="relative space-y-3 pl-4">
-                {/* vertical track line */}
-                <span className="absolute left-[7px] top-2 bottom-2 w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
-                {sortedActivities.map((a) => (
-                  <li key={a.idx} className="relative flex gap-2.5">
-                    <span className="relative z-10 mt-1.5 flex h-2.5 w-2.5 shrink-0 rounded-full border-2 border-cine-primary bg-white dark:bg-slate-900" />
-                    <div className="min-w-0 flex-1">
+              <ol>
+                {sortedActivities.map((a, i) => (
+                  <li key={a.idx} className="flex gap-3">
+                    {/* Track column: dot + connecting line */}
+                    <div className="flex flex-col items-center">
+                      <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full border-2 border-cine-primary bg-white dark:bg-slate-900" />
+                      {i < sortedActivities.length - 1 && (
+                        <span className="my-1 w-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                      )}
+                    </div>
+                    {/* Content */}
+                    <div className={`min-w-0 flex-1 ${i < sortedActivities.length - 1 ? "pb-3" : ""}`}>
                       {editIdx === a.idx ? (
                         <div className="space-y-2">
                           <Input

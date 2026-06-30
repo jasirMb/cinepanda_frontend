@@ -101,12 +101,22 @@ const ROOM_UNIT_TO_FT: Record<string, number> = {
   mm: 0.0032808399,
 };
 const PREFIX_OPTIONS = [
+  { value: "Adv.", label: "Adv." },
+  { value: "Arch.", label: "Arch." },
+  { value: "CA", label: "CA" },
+  { value: "Col.", label: "Col." },
+  { value: "Dr.", label: "Dr." },
+  { value: "Eng.", label: "Eng." },
+  { value: "Er.", label: "Er." },
+  { value: "He/Him", label: "He/Him" },
+  { value: "Hon.", label: "Hon." },
+  { value: "IAS", label: "IAS" },
+  { value: "IPS", label: "IPS" },
+  { value: "Miss", label: "Miss" },
   { value: "Mr.", label: "Mr." },
   { value: "Mrs.", label: "Mrs." },
-  { value: "Miss", label: "Miss" },
   { value: "Ms.", label: "Ms." },
-  { value: "Dr.", label: "Dr." },
-  { value: "He/Him", label: "He/Him" },
+  { value: "Prof.", label: "Prof." },
   { value: "She/Her", label: "She/Her" },
   { value: "They/Them", label: "They/Them" },
 ];
@@ -1031,11 +1041,18 @@ export default function NewLeadPage() {
             <div className="min-w-0 space-y-4">
               <SectionCard title="Lead Activities">
                 {isEditMode && sortedActivities.length > 0 ? (
-                  <ol className="space-y-3">
+                  <ol>
                     {sortedActivities.map((a, i) => (
-                      <li key={i} className="flex gap-2.5">
-                        <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-cine-primary" />
-                        <div className="min-w-0">
+                      <li key={i} className="flex gap-3">
+                        {/* Track column */}
+                        <div className="flex flex-col items-center">
+                          <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full border-2 border-cine-primary bg-white dark:bg-slate-900" />
+                          {i < sortedActivities.length - 1 && (
+                            <span className="my-1 w-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                          )}
+                        </div>
+                        {/* Content */}
+                        <div className={`min-w-0 flex-1 ${i < sortedActivities.length - 1 ? "pb-3" : ""}`}>
                           <p className="text-sm text-slate-800 dark:text-slate-100">
                             {a.label}
                           </p>
@@ -1728,22 +1745,26 @@ function Segmented({
     <div className="flex gap-2">
       {options.map((opt) => {
         const active = value === opt.value;
+        const activeColor = opt.color || "#6366f1";
         return (
           <button
             key={opt.value}
             type="button"
             onClick={() => onChange(active ? "" : opt.value)}
             className={cn(
-              "flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md border text-sm",
+              "flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md border-2 text-sm font-medium transition-colors",
               active
-                ? "border-cine-primary bg-cine-primary/10 text-slate-900 dark:text-slate-50"
+                ? "text-white"
                 : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
             )}
+            style={active ? { backgroundColor: activeColor, borderColor: activeColor } : undefined}
           >
-            <span
-              className="h-2 w-2 rounded-full"
-              style={{ backgroundColor: opt.color || "#94a3b8" }}
-            />
+            {!active && (
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: opt.color || "#94a3b8" }}
+              />
+            )}
             {opt.label}
           </button>
         );
