@@ -68,6 +68,23 @@ const DEFAULT_STATUSES: Option[] = [
   { label: "On Hold", value: "ON_HOLD" },
 ];
 
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+/** Convert a UTC ISO string → "YYYY-MM-DDTHH:mm" in IST (for DateTimePicker pre-fill). */
+function utcToISTPicker(isoStr: string): string {
+  const d = new Date(new Date(isoStr).getTime() + IST_OFFSET_MS);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+}
+
+/** Convert "YYYY-MM-DDTHH:mm" IST picker value → UTC ISO string (for API submit). */
+function istPickerToUTC(localStr: string): string {
+  const [datePart, timePart = "00:00"] = localStr.split("T");
+  const [y, m, d] = datePart.split("-").map(Number);
+  const [h, min] = timePart.split(":").map(Number);
+  return new Date(Date.UTC(y, m - 1, d, h, min) - IST_OFFSET_MS).toISOString();
+}
+
 // Room dimension measurement units and their conversion factor to feet.
 const ROOM_UNIT_OPTIONS = [
   { label: "Feet (ft)", value: "ft" },
@@ -281,7 +298,7 @@ export default function NewLeadPage() {
         requirement: lead.requirement ?? "",
         statusDescription: lead.statusDescription ?? "",
         status: lead.status ?? "NEW_LEAD",
-        nextCallTime: lead.nextCallTime ? lead.nextCallTime.slice(0, 16) : null,
+        nextCallTime: lead.nextCallTime ? utcToISTPicker(lead.nextCallTime) : null,
         leadOwner: lead.leadOwner ?? "",
         email: lead.email ?? "",
         projectStage: lead.projectStage ?? "",
@@ -305,7 +322,7 @@ export default function NewLeadPage() {
         designerContact: lead.designerContact ?? "",
         designerCountryCode: lead.designerCountryCode ?? "+91",
         followupReminder: lead.followupReminder
-          ? lead.followupReminder.slice(0, 16)
+          ? utcToISTPicker(lead.followupReminder)
           : null,
         leadPriority: lead.leadPriority ?? "",
         quoteSent: lead.quoteSent ?? false,
@@ -523,8 +540,8 @@ export default function NewLeadPage() {
       roomUnit: blankToNull(formValues.roomUnit) ?? "ft",
       leadPriority: blankToNull(formValues.leadPriority),
       priorityType: blankToNull(formValues.priorityType) ?? undefined,
-      nextCallTime: blankToNull(formValues.nextCallTime),
-      followupReminder: blankToNull(formValues.followupReminder),
+      nextCallTime: formValues.nextCallTime ? istPickerToUTC(formValues.nextCallTime) : null,
+      followupReminder: formValues.followupReminder ? istPickerToUTC(formValues.followupReminder) : null,
       expectedPurchaseDate: blankToNull(formValues.expectedPurchaseDate),
       quoteDate: blankToNull(formValues.quoteDate),
       followUpDate: blankToNull(formValues.followUpDate),

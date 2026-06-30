@@ -69,20 +69,32 @@ function avatarColor(seed: string) {
   return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length];
 }
 
+const IST = "Asia/Kolkata";
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+function getISTDayBounds() {
+  const istNow = new Date(Date.now() + IST_OFFSET_MS);
+  const midnight = Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate());
+  return {
+    startOfToday: new Date(midnight - IST_OFFSET_MS),
+    endOfToday: new Date(midnight - IST_OFFSET_MS + 24 * 60 * 60 * 1000 - 1),
+  };
+}
+
 function nextCallInfo(iso?: string) {
   if (!iso) return { text: "No follow-up", tone: "text-slate-400" };
   const d = new Date(iso);
-  const now = new Date();
-  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const endToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-  const text = d.toLocaleString([], {
+  const text = d.toLocaleString("en-IN", {
+    timeZone: IST,
     day: "2-digit",
     month: "short",
-    hour: "2-digit",
+    hour: "numeric",
     minute: "2-digit",
+    hour12: true,
   });
-  if (d < startToday) return { text, tone: "text-red-600 dark:text-red-400 font-medium" };
-  if (d <= endToday) return { text, tone: "text-amber-600 dark:text-amber-400 font-medium" };
+  const { startOfToday, endOfToday } = getISTDayBounds();
+  if (d < startOfToday) return { text, tone: "text-red-600 dark:text-red-400 font-medium" };
+  if (d <= endOfToday) return { text, tone: "text-amber-600 dark:text-amber-400 font-medium" };
   return { text, tone: "text-slate-600 dark:text-slate-300" };
 }
 

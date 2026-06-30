@@ -9,9 +9,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   CalendarClock,
+  Check,
   CheckCircle2,
   Clock,
   Eye,
+  LayoutGrid,
+  LayoutList,
   MapPin,
   Lock,
   Pencil,
@@ -50,23 +53,38 @@ function humanize(value?: string | null) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+const IST = "Asia/Kolkata";
+
 function formatDateLabel(value?: string | null) {
   if (!value) return "No follow-up set";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "Invalid date";
-  return `${parsed.toLocaleDateString()} at ${parsed.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit"
-  })}`;
+  return parsed.toLocaleString("en-IN", {
+    timeZone: IST,
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function getISTDayBounds() {
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  const nowUTC = Date.now();
+  const istNow = new Date(nowUTC + IST_OFFSET_MS);
+  const midnight = Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate());
+  return {
+    startOfToday: new Date(midnight - IST_OFFSET_MS),
+    endOfToday: new Date(midnight - IST_OFFSET_MS + 24 * 60 * 60 * 1000 - 1),
+  };
 }
 
 function getCategory(lead: Lead): LeadCategory {
   if (lead.nextCallTime) {
     const next = new Date(lead.nextCallTime);
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-
+    const { startOfToday, endOfToday } = getISTDayBounds();
     if (next < startOfToday) return "overdue";
     if (next >= startOfToday && next <= endOfToday) return "today";
     return "upcoming";
@@ -183,8 +201,14 @@ export default function LeadsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
+  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
+  const [listMode, setListMode] = useState<"grid" | "table">("grid");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const CARDS_SECTION_LIMIT = 8;
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+  function toggleSection(key: string) {
+    setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
 
   const deleteMutation = useMutation({
     mutationFn: deleteLead,
@@ -251,10 +275,17 @@ export default function LeadsPage() {
     { label: "Other", value: "OTHER" }
   ];
 
-  const leadsParams = useMemo(
+  const LIST_LIMIT = 20;
+  const [listPage, setListPage] = useState(1);
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => { setListPage(1); }, [filters]);
+
+  // Cards view: load enough for grouping + stats (no UI pagination needed)
+  const cardsParams = useMemo(
     () => ({
       page: 1,
-      limit: 50,
+      limit: 100,
       search: filters.search || undefined,
       status: filters.status || undefined,
       priorityType: filters.priorityType || undefined,
@@ -265,7 +296,23 @@ export default function LeadsPage() {
     [filters]
   );
 
-  const leadsQuery = useLeads(leadsParams);
+  // List view: real pagination
+  const listParams = useMemo(
+    () => ({
+      page: listPage,
+      limit: LIST_LIMIT,
+      search: filters.search || undefined,
+      status: filters.status || undefined,
+      priorityType: filters.priorityType || undefined,
+      leadSource: filters.leadSource || undefined,
+      startDate: filters.startDate || undefined,
+      endDate: filters.endDate || undefined
+    }),
+    [filters, listPage]
+  );
+
+  const leadsQuery = useLeads(cardsParams);
+  const listQuery = useLeads(listParams);
 
   useEffect(() => {
     const created = searchParams.get("created");
@@ -375,7 +422,7 @@ export default function LeadsPage() {
     [allLeads]
   );
 
-  function LeadCard({ lead }: { lead: Lead }) {
+  function LeadCard({ lead, compact = false }: { lead: Lead; compact?: boolean }) {
     const category = getCategory(lead);
     const [statusValue, setStatusValue] = useState(lead.status);
     const statusMutation = useMutation({
@@ -422,20 +469,18 @@ export default function LeadsPage() {
           aria-hidden
         />
 
-        <div className="flex flex-1 flex-col gap-3 p-4 pl-5">
+        <div className={`flex flex-1 flex-col gap-2 ${compact ? "p-3 pl-4" : "gap-3 p-4 pl-5"}`}>
           {/* Header */}
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-2.5">
             <div
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-sm font-bold text-white shadow-sm ${avatarColor(
-                lead.customerName
-              )}`}
+              className={`flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-bold text-white shadow-sm ${compact ? "h-8 w-8 text-[11px]" : "h-11 w-11 text-sm"} ${avatarColor(lead.customerName)}`}
             >
               {getInitials(lead.customerName)}
             </div>
             <div className="min-w-0 flex-1">
               <Link
                 href={`/leads/${lead._id}`}
-                className="block truncate text-base font-semibold text-slate-900 hover:text-cine-primary dark:text-slate-50"
+                className={`block truncate font-semibold text-slate-900 hover:text-cine-primary dark:text-slate-50 ${compact ? "text-sm" : "text-base"}`}
               >
                 {lead.customerName}
               </Link>
@@ -474,16 +519,17 @@ export default function LeadsPage() {
           </div>
 
           {/* Info rows */}
-          <div className="space-y-1.5 text-sm text-slate-700 dark:text-slate-300">
+          <div className="space-y-1 text-xs text-slate-700 dark:text-slate-300">
             <p className="flex items-center gap-2">
-              <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+              <Phone className="h-3 w-3 shrink-0 text-slate-400" />
               <span>{lead.contactNumber}</span>
             </p>
             <p className="flex items-center gap-2">
-              <CalendarClock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+              <CalendarClock className="h-3 w-3 shrink-0 text-slate-400" />
+              <span className="text-slate-400">Next call:</span>
               <span>{formatDateLabel(lead.nextCallTime)}</span>
             </p>
-            {lead.requirement && (
+            {!compact && lead.requirement && (
               <p className="line-clamp-2 text-xs text-slate-600 dark:text-slate-400">
                 {lead.requirement}
               </p>
@@ -491,77 +537,75 @@ export default function LeadsPage() {
           </div>
 
           {/* Footer */}
-          <div className="mt-auto flex items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+          <div className={`mt-auto flex items-center gap-1 border-t border-slate-100 dark:border-slate-800 ${compact ? "pt-2" : "pt-3"}`}>
             <Select
               value={statusValue || "__all__"}
-              onValueChange={(v) =>
-                setStatusValue(v === "__all__" ? "" : v)
-              }
+              onValueChange={(v) => setStatusValue(v === "__all__" ? "" : v)}
               disabled={statusMutation.isPending}
             >
-              <SelectTrigger className="h-8 flex-1 text-xs">
+              <SelectTrigger className="h-7 flex-1 min-w-0 px-2 text-[11px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {statusOptions.map((opt) => (
-                  <SelectItem
-                    key={opt.value || "__all__"}
-                    value={opt.value || "__all__"}
-                  >
+                  <SelectItem key={opt.value || "__all__"} value={opt.value || "__all__"}>
                     {opt.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 px-3 text-xs"
-              disabled={
-                statusMutation.isPending || statusValue === lead.status
-              }
+            <button
+              type="button"
+              title="Save status"
+              aria-label="Save status"
+              disabled={statusMutation.isPending || statusValue === lead.status}
               onClick={() => statusMutation.mutate(statusValue)}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-emerald-400 hover:text-emerald-600 disabled:opacity-30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
             >
-              {statusMutation.isPending ? "..." : "Save"}
-            </Button>
+              <Check className="h-3.5 w-3.5" />
+            </button>
             <Link
               href={`/leads/${lead._id}`}
+              title="View lead"
               aria-label="View lead"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
             >
               <Eye className="h-3.5 w-3.5" />
             </Link>
             <Link
               href={`/leads/new?edit=${lead._id}`}
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              title="Edit lead"
+              aria-label="Edit lead"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
             >
-              <Pencil className="h-3 w-3" />
-              Edit
+              <Pencil className="h-3.5 w-3.5" />
             </Link>
             {lead.locked ? (
               lead.lockHref ? (
                 <Link
                   href={lead.lockHref}
                   title={`${lead.lockReason ?? "Locked"} — open it`}
-                  className="inline-flex h-8 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 text-xs font-medium text-amber-700 transition hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50"
+                  aria-label={`${lead.lockReason ?? "Locked"} — open it`}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-amber-200 bg-amber-50 text-amber-600 transition hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
                 >
-                  <Lock className="h-3 w-3" /> Locked
+                  <Lock className="h-3.5 w-3.5" />
                 </Link>
               ) : (
                 <span
                   title={lead.lockReason ?? "Linked — can't be deleted"}
                   aria-label={lead.lockReason ?? "Locked"}
-                  className="inline-flex h-8 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 text-xs font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
                 >
-                  <Lock className="h-3 w-3" /> Locked
+                  <Lock className="h-3.5 w-3.5" />
                 </span>
               )
             ) : (
               <button
                 type="button"
+                title="Delete lead"
                 onClick={() => handleDelete(lead._id)}
                 aria-label="Delete lead"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-red-950/30"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-red-950/30"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -708,20 +752,30 @@ export default function LeadsPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant={viewMode === "cards" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewMode("cards")}
-          >
-            Priority cards
-          </Button>
-          <Button
-            variant={viewMode === "table" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewMode("table")}
-          >
-            Table view
-          </Button>
+          <div className="flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <button
+              type="button"
+              onClick={() => setViewMode("cards")}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                viewMode === "cards"
+                  ? "bg-cine-primary text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              }`}
+            >
+              Priority cards
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("list")}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                viewMode === "list"
+                  ? "bg-cine-primary text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              }`}
+            >
+              Leads list
+            </button>
+          </div>
           <Button asChild>
             <Link href="/leads/new">Add lead</Link>
           </Button>
@@ -769,7 +823,7 @@ export default function LeadsPage() {
         />
       </div>
 
-      {viewMode === "table" && (
+      {viewMode === "list" && (
         <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 md:grid-cols-3 lg:grid-cols-6">
           <Input
             placeholder="Search name, place, contact"
@@ -852,100 +906,198 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {viewMode === "table" ? (
-        <LeadsTable leads={allLeads} onDelete={handleDelete} />
-      ) : (
+      {viewMode === "list" ? (() => {
+        const listLeads = listQuery.data?.data ?? [];
+        const listTotal = listQuery.data?.total ?? 0;
+        const totalPages = Math.ceil(listTotal / LIST_LIMIT);
+
+        return (
+        <div className="space-y-3">
+          {/* Grid / Table sub-toggle */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              {listQuery.isLoading ? "Loading…" : `${listTotal} lead${listTotal === 1 ? "" : "s"}`}
+            </p>
+            <div className="flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <button
+                type="button"
+                onClick={() => setListMode("grid")}
+                title="Grid view"
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  listMode === "grid"
+                    ? "bg-cine-primary text-white shadow-sm"
+                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                }`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Grid
+              </button>
+              <button
+                type="button"
+                onClick={() => setListMode("table")}
+                title="Table view"
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  listMode === "table"
+                    ? "bg-cine-primary text-white shadow-sm"
+                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                }`}
+              >
+                <LayoutList className="h-3.5 w-3.5" />
+                Table
+              </button>
+            </div>
+          </div>
+
+          {listQuery.isLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : listLeads.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
+              No leads found. Try adjusting your filters.
+            </div>
+          ) : listMode === "table" ? (
+            <LeadsTable leads={listLeads} onDelete={handleDelete} />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {listLeads.map((lead) => (
+                <LeadCard key={lead._id} lead={lead} compact />
+              ))}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-slate-200 pt-3 dark:border-slate-800">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Page {listPage} of {totalPages} · {listTotal} total
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={listPage <= 1}
+                  onClick={() => setListPage(1)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-xs text-slate-600 transition hover:bg-slate-50 disabled:opacity-30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                >
+                  «
+                </button>
+                <button
+                  type="button"
+                  disabled={listPage <= 1}
+                  onClick={() => setListPage((p) => p - 1)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-xs text-slate-600 transition hover:bg-slate-50 disabled:opacity-30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                >
+                  ‹
+                </button>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let page: number;
+                  if (totalPages <= 5) {
+                    page = i + 1;
+                  } else if (listPage <= 3) {
+                    page = i + 1;
+                  } else if (listPage >= totalPages - 2) {
+                    page = totalPages - 4 + i;
+                  } else {
+                    page = listPage - 2 + i;
+                  }
+                  return (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => setListPage(page)}
+                      className={`flex h-7 w-7 items-center justify-center rounded-md border text-xs font-medium transition ${
+                        page === listPage
+                          ? "border-cine-primary bg-cine-primary text-white"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  disabled={listPage >= totalPages}
+                  onClick={() => setListPage((p) => p + 1)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-xs text-slate-600 transition hover:bg-slate-50 disabled:opacity-30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                >
+                  ›
+                </button>
+                <button
+                  type="button"
+                  disabled={listPage >= totalPages}
+                  onClick={() => setListPage(totalPages)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-xs text-slate-600 transition hover:bg-slate-50 disabled:opacity-30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                >
+                  »
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        );
+      })() : (
         <div className="space-y-10">
           {attentionLeads.length > 0 && (
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
-                    Needs attention
-                  </h3>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Overdue and due-today follow-ups are shown first.
-                  </p>
-                </div>
-                <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-200">
-                  {attentionLeads.length} lead{attentionLeads.length === 1 ? "" : "s"}
-                </span>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                {attentionLeads.map((lead) => (
-                  <LeadCard key={lead._id} lead={lead} />
-                ))}
-              </div>
-            </section>
+            <SectionCards
+              sectionKey="attention"
+              leads={attentionLeads}
+              title="Needs attention"
+              subtitle="Overdue and due-today follow-ups are shown first."
+              badge={`${attentionLeads.length} lead${attentionLeads.length === 1 ? "" : "s"}`}
+              badgeClass="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200"
+              expanded={!!expandedSections["attention"]}
+              onToggle={() => toggleSection("attention")}
+              limit={CARDS_SECTION_LIMIT}
+              LeadCard={LeadCard}
+            />
           )}
 
           {grouped.upcoming.length > 0 && (
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
-                    Upcoming follow-ups
-                  </h3>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Ordered by the next call time so you can glide through the day.
-                  </p>
-                </div>
-                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100">
-                  {grouped.upcoming.length} scheduled
-                </span>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                {grouped.upcoming.map((lead) => (
-                  <LeadCard key={lead._id} lead={lead} />
-                ))}
-              </div>
-            </section>
+            <SectionCards
+              sectionKey="upcoming"
+              leads={grouped.upcoming}
+              title="Upcoming follow-ups"
+              subtitle="Ordered by the next call time so you can glide through the day."
+              badge={`${grouped.upcoming.length} scheduled`}
+              badgeClass="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100"
+              expanded={!!expandedSections["upcoming"]}
+              onToggle={() => toggleSection("upcoming")}
+              limit={CARDS_SECTION_LIMIT}
+              LeadCard={LeadCard}
+            />
           )}
 
           {grouped.unscheduled.length > 0 && (
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
-                    Unscheduled
-                  </h3>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Leads without a next call time, sorted by priority.
-                  </p>
-                </div>
-                <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-800 dark:bg-slate-800/70 dark:text-slate-100">
-                  {grouped.unscheduled.length} waiting
-                </span>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                {grouped.unscheduled.map((lead) => (
-                  <LeadCard key={lead._id} lead={lead} />
-                ))}
-              </div>
-            </section>
+            <SectionCards
+              sectionKey="unscheduled"
+              leads={grouped.unscheduled}
+              title="Unscheduled"
+              subtitle="Leads without a next call time, sorted by priority."
+              badge={`${grouped.unscheduled.length} waiting`}
+              badgeClass="bg-slate-200 text-slate-800 dark:bg-slate-800/70 dark:text-slate-100"
+              expanded={!!expandedSections["unscheduled"]}
+              onToggle={() => toggleSection("unscheduled")}
+              limit={CARDS_SECTION_LIMIT}
+              LeadCard={LeadCard}
+            />
           )}
 
           {toConvertLeads.length > 0 && (
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
-                    To convert
-                  </h3>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Won leads not yet linked to a customer.
-                  </p>
-                </div>
-                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100">
-                  {toConvertLeads.length} to convert
-                </span>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                {toConvertLeads.map((lead) => (
-                  <LeadCard key={lead._id} lead={lead} />
-                ))}
-              </div>
-            </section>
+            <SectionCards
+              sectionKey="toconvert"
+              leads={toConvertLeads}
+              title="To convert"
+              subtitle="Won leads not yet linked to a customer."
+              badge={`${toConvertLeads.length} to convert`}
+              badgeClass="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100"
+              expanded={!!expandedSections["toconvert"]}
+              onToggle={() => toggleSection("toconvert")}
+              limit={CARDS_SECTION_LIMIT}
+              LeadCard={LeadCard}
+            />
           )}
 
           {attentionLeads.length === 0 &&
@@ -973,6 +1125,60 @@ export default function LeadsPage() {
         }}
       />
     </div>
+  );
+}
+
+function SectionCards({
+  leads,
+  title,
+  subtitle,
+  badge,
+  badgeClass,
+  expanded,
+  onToggle,
+  limit,
+  LeadCard,
+}: {
+  sectionKey: string;
+  leads: Lead[];
+  title: string;
+  subtitle: string;
+  badge: string;
+  badgeClass: string;
+  expanded: boolean;
+  onToggle: () => void;
+  limit: number;
+  LeadCard: React.ComponentType<{ lead: Lead }>;
+}) {
+  const visible = expanded ? leads : leads.slice(0, limit);
+  const hidden = leads.length - limit;
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">{title}</h3>
+          <p className="text-sm text-slate-600 dark:text-slate-400">{subtitle}</p>
+        </div>
+        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${badgeClass}`}>
+          {badge}
+        </span>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        {visible.map((lead) => (
+          <LeadCard key={lead._id} lead={lead} />
+        ))}
+      </div>
+      {leads.length > limit && (
+        <button
+          type="button"
+          onClick={onToggle}
+          className="w-full rounded-lg border border-dashed border-slate-300 py-2 text-xs font-medium text-slate-500 transition hover:border-slate-400 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:text-slate-200"
+        >
+          {expanded ? "Show less" : `Show ${hidden} more`}
+        </button>
+      )}
+    </section>
   );
 }
 
