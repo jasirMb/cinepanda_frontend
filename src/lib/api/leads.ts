@@ -218,6 +218,7 @@ export interface LeadActivity {
 }
 
 export interface CreateLeadPayload {
+  leadId?: string | null;
   customerName: string;
   place: string;
   contactNumber: string;
@@ -225,7 +226,7 @@ export interface CreateLeadPayload {
   alternativeNumber?: string | null;
   alternativeCountryCode?: string | null; // e.g., "+1", "+91", "+44"
   leadSource: string;
-  leadDate?: string;
+  leadDate?: string | null;
   lastUpdate?: string;
   priorityType?: string | null; // legacy — superseded by leadPriority
   requirement: string;
@@ -325,6 +326,11 @@ export async function createLead(
 ): Promise<CreateLeadResponse> {
   const { data } = await api.post<CreateLeadResponse>("/leads", payload);
   return data;
+}
+
+export async function fetchNextLeadId(): Promise<string> {
+  const { data } = await api.get<{ success: boolean; data: string }>("/leads/next-id");
+  return data.data;
 }
 
 export async function fetchLead(id: string): Promise<Lead> {

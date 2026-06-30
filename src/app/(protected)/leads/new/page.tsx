@@ -46,6 +46,7 @@ import {
 import {
   createLead,
   fetchLead,
+  fetchNextLeadId,
   updateLead,
   type CreateLeadPayload,
   type LeadAttachment,
@@ -122,6 +123,7 @@ function roomAreaSqFt(
 }
 
 const initialFormValues: CreateLeadPayload = {
+  leadId: "",
   customerName: "",
   place: "",
   contactNumber: "",
@@ -138,6 +140,7 @@ const initialFormValues: CreateLeadPayload = {
   leadOwner: "",
   email: "",
   projectStage: "",
+  leadDate: null as string | null,
   leadTemperature: "",
   budgetRange: "",
   expectedPurchaseDate: null,
@@ -266,6 +269,13 @@ export default function NewLeadPage() {
     enabled: isEditMode,
   });
 
+  const nextIdQuery = useQuery({
+    queryKey: ["leads", "next-id"],
+    queryFn: fetchNextLeadId,
+    enabled: !isEditMode,
+    staleTime: 0,
+  });
+
   const createMutation = useMutation({
     mutationFn: createLead,
     onSuccess: () => {
@@ -308,6 +318,7 @@ export default function NewLeadPage() {
     if (leadQuery.data) {
       const lead = leadQuery.data;
       setFormValues({
+        leadId: lead.leadId ?? "",
         customerName: lead.customerName ?? "",
         place: lead.place ?? "",
         contactNumber: lead.contactNumber ?? "",
@@ -323,6 +334,7 @@ export default function NewLeadPage() {
         leadOwner: lead.leadOwner ?? "",
         email: lead.email ?? "",
         projectStage: lead.projectStage ?? "",
+        leadDate: lead.leadDate ? lead.leadDate.slice(0, 10) : null,
         leadTemperature: lead.leadTemperature ?? "",
         budgetRange: lead.budgetRange ?? "",
         expectedPurchaseDate: lead.expectedPurchaseDate
@@ -571,6 +583,7 @@ export default function NewLeadPage() {
       statusDescription: formValues.statusDescription ?? "",
       // Empty-string enum selections must become null (not "") to pass validation.
       projectStage: blankToNull(formValues.projectStage),
+      leadDate: formValues.leadDate || undefined,
       leadTemperature: blankToNull(formValues.leadTemperature),
       budgetRange: blankToNull(formValues.budgetRange),
       propertyType: blankToNull(formValues.propertyType),
@@ -647,6 +660,13 @@ export default function NewLeadPage() {
             <div className="min-w-0 space-y-4 lg:col-span-2">
               <SectionCard title="Contact">
                 <Rows cols={2}>
+                  <Field label="Lead ID">
+                    <div className="flex h-10 items-center rounded-md border border-slate-200 bg-slate-50 px-3 font-mono text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                      {isEditMode
+                        ? (formValues.leadId || "—")
+                        : (nextIdQuery.data ?? "Loading…")}
+                    </div>
+                  </Field>
                   <Field label="Customer Name *" error={formErrors.customerName}>
                     <div className="flex gap-2">
                       <Select value={formValues.customerPrefix || ""} onValueChange={(v) => setField("customerPrefix", v)}>
@@ -736,11 +756,11 @@ export default function NewLeadPage() {
                       placeholder="Select project stage"
                     />
                   </Field>
-                  <Field label="Lead Temperature">
-                    <Segmented
-                      value={formValues.leadTemperature ?? ""}
-                      onChange={(v) => setField("leadTemperature", v)}
-                      options={temperatureOptions}
+                  <Field label="Lead Date">
+                    <DatePicker
+                      value={formValues.leadDate ?? ""}
+                      onChange={(v) => setField("leadDate", v || null)}
+                      placeholder="Defaults to creation date"
                     />
                   </Field>
                   <Field label="Budget Range">
@@ -780,6 +800,13 @@ export default function NewLeadPage() {
                       onChange={(v) => setField("propertyStatus", v)}
                       options={propertyStatusOptions}
                       placeholder="Select property status"
+                    />
+                  </Field>
+                  <Field label="Lead Temperature">
+                    <Segmented
+                      value={formValues.leadTemperature ?? ""}
+                      onChange={(v) => setField("leadTemperature", v)}
+                      options={temperatureOptions}
                     />
                   </Field>
                 </Rows>

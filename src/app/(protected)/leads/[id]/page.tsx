@@ -365,6 +365,11 @@ export default function LeadDetailPage() {
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
+              {lead.leadId && (
+                <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                  {lead.leadId}
+                </span>
+              )}
               <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
                 {lead.customerPrefix ? `${lead.customerPrefix} ` : ""}{lead.customerName}
               </h2>

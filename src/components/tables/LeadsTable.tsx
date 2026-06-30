@@ -150,9 +150,16 @@ export function LeadsTable({ leads, onDelete }: LeadsTableProps) {
                         >
                           {lead.customerName}
                         </Link>
-                        {lead.place && (
-                          <p className="truncate text-xs text-slate-400">{lead.place}</p>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {lead.place && (
+                            <p className="truncate text-xs text-slate-400">{lead.place}</p>
+                          )}
+                          {lead.leadId && (
+                            <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                              {lead.leadId}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </td>
