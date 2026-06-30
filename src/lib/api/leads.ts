@@ -220,6 +220,7 @@ export interface LeadActivity {
 export interface CreateLeadPayload {
   leadId?: string | null;
   customerName: string;
+  companyName?: string | null;
   place: string;
   pincode?: string | null;
   contactNumber: string;
@@ -257,7 +258,11 @@ export interface CreateLeadPayload {
   designerContact?: string | null;
   designerCountryCode?: string | null;
   architectPrefix?: string | null;
+  architectCompany?: string | null;
+  architectNote?: string | null;
   designerPrefix?: string | null;
+  designerCompany?: string | null;
+  designerNote?: string | null;
   customerPrefix?: string | null;
   referralPrefix?: string | null;
   referralName?: string | null;
@@ -265,6 +270,7 @@ export interface CreateLeadPayload {
   referralCountryCode?: string | null;
   referralAmount?: number | null;
   referralCommissionPercent?: number | null;
+  referralNote?: string | null;
   followupReminder?: string | null;
   leadPriority?: string | null;
   quoteSent?: boolean;

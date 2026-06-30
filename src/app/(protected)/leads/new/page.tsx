@@ -125,8 +125,8 @@ function roomAreaSqFt(
 const initialFormValues: CreateLeadPayload = {
   leadId: "",
   customerName: "",
+  companyName: "",
   place: "",
-  pincode: "",
   contactNumber: "",
   contactCountryCode: "+91",
   alternativeNumber: "",
@@ -156,9 +156,13 @@ const initialFormValues: CreateLeadPayload = {
   architectName: "",
   architectContact: "",
   architectCountryCode: "+91",
+  architectCompany: "",
+  architectNote: "",
   designerName: "",
   designerContact: "",
   designerCountryCode: "+91",
+  designerCompany: "",
+  designerNote: "",
   customerPrefix: "",
   architectPrefix: "",
   designerPrefix: "",
@@ -168,6 +172,7 @@ const initialFormValues: CreateLeadPayload = {
   referralCountryCode: "+91",
   referralAmount: null,
   referralCommissionPercent: null,
+  referralNote: "",
   followupReminder: null,
   leadPriority: "",
   quoteSent: false,
@@ -245,9 +250,6 @@ export default function NewLeadPage() {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [pincodeLoading, setPincodeLoading] = useState(false);
-  const [pincodeSuggestion, setPincodeSuggestion] = useState<string | null>(null);
-
   // Dropdown options (from the backend enums so values always match).
   const leadSourceOptions = useLeadSources().data ?? DEFAULT_LEAD_SOURCES;
   const statusOptions = useLeadStatuses().data ?? DEFAULT_STATUSES;
@@ -264,34 +266,6 @@ export default function NewLeadPage() {
   const lostReasonOptions = useLostReasons().data ?? [];
   const designStatusOptions = useDesignStatuses().data ?? [];
   const presentationStatusOptions = usePresentationStatuses().data ?? [];
-
-  async function fetchPincodeCity(pin: string) {
-    if (pin.length !== 6 || !/^\d{6}$/.test(pin)) {
-      setPincodeSuggestion(null);
-      return;
-    }
-    setPincodeLoading(true);
-    setPincodeSuggestion(null);
-    try {
-      const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
-      const json = await res.json();
-      const po = json?.[0];
-      if (po?.Status === "Success" && po?.PostOffice?.length > 0) {
-        const { District, State } = po.PostOffice[0];
-        const city = District ? `${District}, ${State}` : State;
-        setPincodeSuggestion(city);
-        if (!formValues.place || formValues.place.trim() === "") {
-          setField("place", city);
-        }
-      } else {
-        setPincodeSuggestion(null);
-      }
-    } catch {
-      setPincodeSuggestion(null);
-    } finally {
-      setPincodeLoading(false);
-    }
-  }
 
   const liveScore = useMemo(() => computeLeadScore(formValues), [formValues]);
 
@@ -352,8 +326,8 @@ export default function NewLeadPage() {
       setFormValues({
         leadId: lead.leadId ?? "",
         customerName: lead.customerName ?? "",
+        companyName: lead.companyName ?? "",
         place: lead.place ?? "",
-        pincode: lead.pincode ?? "",
         contactNumber: lead.contactNumber ?? "",
         contactCountryCode: lead.contactCountryCode ?? "+91",
         alternativeNumber: lead.alternativeNumber ?? "",
@@ -384,9 +358,13 @@ export default function NewLeadPage() {
         architectName: lead.architectName ?? "",
         architectContact: lead.architectContact ?? "",
         architectCountryCode: lead.architectCountryCode ?? "+91",
+        architectCompany: lead.architectCompany ?? "",
+        architectNote: lead.architectNote ?? "",
         designerName: lead.designerName ?? "",
         designerContact: lead.designerContact ?? "",
         designerCountryCode: lead.designerCountryCode ?? "+91",
+        designerCompany: lead.designerCompany ?? "",
+        designerNote: lead.designerNote ?? "",
         customerPrefix: lead.customerPrefix ?? "",
         architectPrefix: lead.architectPrefix ?? "",
         designerPrefix: lead.designerPrefix ?? "",
@@ -396,6 +374,7 @@ export default function NewLeadPage() {
         referralCountryCode: lead.referralCountryCode ?? "+91",
         referralAmount: lead.referralAmount ?? null,
         referralCommissionPercent: lead.referralCommissionPercent ?? null,
+        referralNote: lead.referralNote ?? "",
         followupReminder: lead.followupReminder
           ? utcToISTPicker(lead.followupReminder)
           : null,
@@ -598,12 +577,16 @@ export default function NewLeadPage() {
         : null,
       architectContact: blankToNull(formValues.architectContact),
       designerContact: blankToNull(formValues.designerContact),
-      pincode: blankToNull(formValues.pincode),
+      companyName: blankToNull(formValues.companyName as string),
       leadOwner: blankToNull(formValues.leadOwner),
       email: blankToNull(formValues.email),
       siteAddress: blankToNull(formValues.siteAddress),
       architectName: blankToNull(formValues.architectName),
+      architectCompany: blankToNull(formValues.architectCompany as string),
+      architectNote: blankToNull(formValues.architectNote as string),
       designerName: blankToNull(formValues.designerName),
+      designerCompany: blankToNull(formValues.designerCompany as string),
+      designerNote: blankToNull(formValues.designerNote as string),
       customerPrefix: blankToNull(formValues.customerPrefix),
       architectPrefix: blankToNull(formValues.architectPrefix),
       designerPrefix: blankToNull(formValues.designerPrefix),
@@ -613,6 +596,7 @@ export default function NewLeadPage() {
       referralCountryCode: formValues.referralContact ? (formValues.referralCountryCode || "+91") : null,
       referralAmount: formValues.referralAmount ?? null,
       referralCommissionPercent: formValues.referralCommissionPercent ?? null,
+      referralNote: blankToNull(formValues.referralNote as string),
       internalNotes: blankToNull(formValues.internalNotes),
       statusDescription: formValues.statusDescription ?? "",
       // Empty-string enum selections must become null (not "") to pass validation.
@@ -721,44 +705,19 @@ export default function NewLeadPage() {
                       />
                     </div>
                   </Field>
+                  <Field label="Company / Firm Name">
+                    <Input
+                      value={formValues.companyName ?? ""}
+                      onChange={(e) => setField("companyName", e.target.value)}
+                      placeholder="Company or firm name (optional)"
+                    />
+                  </Field>
                   <Field label="Place / City *" error={formErrors.place}>
                     <Input
                       value={formValues.place}
                       onChange={(e) => setField("place", e.target.value)}
                       placeholder="City / Area"
                     />
-                    {pincodeSuggestion && formValues.place !== pincodeSuggestion && (
-                      <button
-                        type="button"
-                        onClick={() => setField("place", pincodeSuggestion)}
-                        className="mt-1 text-xs text-cine-primary hover:underline"
-                      >
-                        Use: {pincodeSuggestion}
-                      </button>
-                    )}
-                  </Field>
-                  <Field label="Pincode">
-                    <div className="flex gap-2">
-                      <Input
-                        value={formValues.pincode ?? ""}
-                        onChange={(e) => {
-                          const v = e.target.value.replace(/\D/g, "").slice(0, 6);
-                          setField("pincode", v);
-                          fetchPincodeCity(v);
-                        }}
-                        placeholder="6-digit pincode"
-                        maxLength={6}
-                        className="flex-1"
-                      />
-                      {pincodeLoading && (
-                        <div className="flex h-10 w-10 items-center justify-center text-slate-400">
-                          <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                          </svg>
-                        </div>
-                      )}
-                    </div>
                   </Field>
                   <Field label="Lead Owner">
                     <Input
@@ -1241,6 +1200,21 @@ export default function NewLeadPage() {
                       placeholder="Architect contact number"
                     />
                   </Field>
+                  <Field label="Architect Company">
+                    <Input
+                      value={formValues.architectCompany ?? ""}
+                      onChange={(e) => setField("architectCompany", e.target.value)}
+                      placeholder="Company / firm name"
+                    />
+                  </Field>
+                  <Field label="Architect Note" className="sm:col-span-2">
+                    <Textarea
+                      value={formValues.architectNote ?? ""}
+                      onChange={(e) => setField("architectNote", e.target.value)}
+                      placeholder="Notes about the architect…"
+                      rows={2}
+                    />
+                  </Field>
                   <Field label="Interior Designer Name">
                     <div className="flex gap-2">
                       <Select value={formValues.designerPrefix || ""} onValueChange={(v) => setField("designerPrefix", v)}>
@@ -1268,6 +1242,21 @@ export default function NewLeadPage() {
                       onCountryCodeChange={(c) => setField("designerCountryCode", c)}
                       onNumberChange={(n) => setPhone("designerContact", n)}
                       placeholder="Interior designer contact"
+                    />
+                  </Field>
+                  <Field label="Interior Designer Company">
+                    <Input
+                      value={formValues.designerCompany ?? ""}
+                      onChange={(e) => setField("designerCompany", e.target.value)}
+                      placeholder="Company / firm name"
+                    />
+                  </Field>
+                  <Field label="Interior Designer Note" className="sm:col-span-2">
+                    <Textarea
+                      value={formValues.designerNote ?? ""}
+                      onChange={(e) => setField("designerNote", e.target.value)}
+                      placeholder="Notes about the interior designer…"
+                      rows={2}
                     />
                   </Field>
                 </Rows>
@@ -1327,6 +1316,14 @@ export default function NewLeadPage() {
                           setField("referralCommissionPercent", e.target.value ? Number(e.target.value) : null)
                         }
                         placeholder="Commission percentage"
+                      />
+                    </Field>
+                    <Field label="Referral Note" className="sm:col-span-2">
+                      <Textarea
+                        value={formValues.referralNote ?? ""}
+                        onChange={(e) => setField("referralNote", e.target.value)}
+                        placeholder="Notes about the referral…"
+                        rows={2}
                       />
                     </Field>
                   </Rows>

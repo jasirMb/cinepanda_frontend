@@ -9,6 +9,7 @@ import {
   Activity,
   ArrowLeft,
   Building2,
+  FileText,
   CalendarClock,
   CalendarDays,
   CheckCircle2,
@@ -123,6 +124,19 @@ function statusBadgeClass(status?: string) {
 function fmtDate(iso?: string | null) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-IN", { dateStyle: "long" });
+}
+function leadAge(leadDate?: string | null, createdAt?: string): string {
+  const from = leadDate ? new Date(leadDate) : createdAt ? new Date(createdAt) : new Date();
+  const days = Math.floor((Date.now() - from.getTime()) / (1000 * 60 * 60 * 24));
+  if (days === 0) return "Today";
+  if (days === 1) return "1 day old";
+  if (days < 7) return `${days} days old`;
+  const weeks = Math.floor(days / 7);
+  if (days < 30) return `${weeks} week${weeks > 1 ? "s" : ""} old`;
+  const months = Math.floor(days / 30);
+  if (days < 365) return `${months} month${months > 1 ? "s" : ""} old`;
+  const years = Math.floor(days / 365);
+  return `${years} year${years > 1 ? "s" : ""} old`;
 }
 function fmtDateTime(iso?: string | null) {
   if (!iso) return "Not scheduled";
@@ -370,6 +384,9 @@ export default function LeadDetailPage() {
                   {lead.leadId}
                 </span>
               )}
+              <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500 ring-1 ring-inset ring-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700">
+                {leadAge(lead.leadDate, lead.createdAt)}
+              </span>
               <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
                 {lead.customerPrefix ? `${lead.customerPrefix} ` : ""}{lead.customerName}
               </h2>
@@ -485,7 +502,7 @@ export default function LeadDetailPage() {
                 {lead.leadOwner || "—"}
               </DetailItem>
               <DetailItem icon={<MapPin className="h-4 w-4" />} label="Place">
-                {lead.place}{lead.pincode ? ` — ${lead.pincode}` : ""}
+                {lead.place}{lead.companyName ? ` · ${lead.companyName}` : ""}
               </DetailItem>
               <DetailItem icon={<Sparkles className="h-4 w-4" />} label="Source">
                 {humanize(lead.leadSource)}
@@ -688,8 +705,12 @@ export default function LeadDetailPage() {
           {/* People */}
           {(lead.architectName ||
             lead.architectContact ||
+            lead.architectCompany ||
+            lead.architectNote ||
             lead.designerName ||
-            lead.designerContact) && (
+            lead.designerContact ||
+            lead.designerCompany ||
+            lead.designerNote) && (
             <Card title="Architect & designer">
               <Grid>
                 <DetailItem icon={<User className="h-4 w-4" />} label="Architect">
@@ -698,12 +719,32 @@ export default function LeadDetailPage() {
                 <DetailItem icon={<Phone className="h-4 w-4" />} label="Architect contact">
                   {lead.architectContact || "—"}
                 </DetailItem>
+                {lead.architectCompany && (
+                  <DetailItem icon={<Building2 className="h-4 w-4" />} label="Architect company">
+                    {lead.architectCompany}
+                  </DetailItem>
+                )}
+                {lead.architectNote && (
+                  <DetailItem icon={<FileText className="h-4 w-4" />} label="Architect note" className="sm:col-span-2">
+                    <span className="whitespace-pre-wrap">{lead.architectNote}</span>
+                  </DetailItem>
+                )}
                 <DetailItem icon={<User className="h-4 w-4" />} label="Interior designer">
                   {lead.designerPrefix ? `${lead.designerPrefix} ` : ""}{lead.designerName || "—"}
                 </DetailItem>
                 <DetailItem icon={<Phone className="h-4 w-4" />} label="Designer contact">
                   {lead.designerContact || "—"}
                 </DetailItem>
+                {lead.designerCompany && (
+                  <DetailItem icon={<Building2 className="h-4 w-4" />} label="Designer company">
+                    {lead.designerCompany}
+                  </DetailItem>
+                )}
+                {lead.designerNote && (
+                  <DetailItem icon={<FileText className="h-4 w-4" />} label="Designer note" className="sm:col-span-2">
+                    <span className="whitespace-pre-wrap">{lead.designerNote}</span>
+                  </DetailItem>
+                )}
               </Grid>
             </Card>
           )}
@@ -734,6 +775,11 @@ export default function LeadDetailPage() {
                 {lead.referralCommissionPercent != null && (
                   <DetailItem icon={<Sparkles className="h-4 w-4" />} label="Commission %">
                     {lead.referralCommissionPercent}%
+                  </DetailItem>
+                )}
+                {lead.referralNote && (
+                  <DetailItem icon={<FileText className="h-4 w-4" />} label="Referral note" className="sm:col-span-2">
+                    <span className="whitespace-pre-wrap">{lead.referralNote}</span>
                   </DetailItem>
                 )}
               </Grid>
@@ -1146,15 +1192,17 @@ function DetailItem({
   icon,
   label,
   children,
+  className,
 }: {
   icon: React.ReactNode;
   label: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   // Hide fields that have no value (avoids rows of "—").
   if (isEmptyValue(children)) return null;
   return (
-    <div className="flex items-start gap-2.5">
+    <div className={`flex items-start gap-2.5${className ? ` ${className}` : ""}`}>
       <span className="mt-0.5 text-slate-400">{icon}</span>
       <div className="min-w-0">
         <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">

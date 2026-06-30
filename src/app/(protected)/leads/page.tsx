@@ -176,6 +176,19 @@ function priorityBadgeClass(priority?: string | null) {
   }
 }
 
+function leadAge(leadDate?: string | null, createdAt?: string): string {
+  const from = leadDate ? new Date(leadDate) : createdAt ? new Date(createdAt) : new Date();
+  const days = Math.floor((Date.now() - from.getTime()) / (1000 * 60 * 60 * 24));
+  if (days === 0) return "Today";
+  if (days === 1) return "1d";
+  if (days < 7) return `${days}d`;
+  const weeks = Math.floor(days / 7);
+  if (days < 30) return `${weeks}w`;
+  const months = Math.floor(days / 30);
+  if (days < 365) return `${months}mo`;
+  return `${Math.floor(days / 365)}y`;
+}
+
 function getInitials(name: string) {
   return name
     .trim()
@@ -485,6 +498,10 @@ export default function LeadsPage() {
                 <span className="truncate">{lead.place}</span>
                 <span className="text-slate-300 dark:text-slate-600">•</span>
                 <span className="truncate">{humanize(lead.leadSource)}</span>
+                <span className="text-slate-300 dark:text-slate-600">•</span>
+                <span className="shrink-0 font-medium text-slate-400 dark:text-slate-500">
+                  {leadAge(lead.leadDate, lead.createdAt)}
+                </span>
               </p>
             </div>
             <span
