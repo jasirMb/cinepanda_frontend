@@ -254,6 +254,15 @@ export interface CreateLeadPayload {
   designerName?: string | null;
   designerContact?: string | null;
   designerCountryCode?: string | null;
+  architectPrefix?: string | null;
+  designerPrefix?: string | null;
+  customerPrefix?: string | null;
+  referralPrefix?: string | null;
+  referralName?: string | null;
+  referralContact?: string | null;
+  referralCountryCode?: string | null;
+  referralAmount?: number | null;
+  referralCommissionPercent?: number | null;
   followupReminder?: string | null;
   leadPriority?: string | null;
   quoteSent?: boolean;

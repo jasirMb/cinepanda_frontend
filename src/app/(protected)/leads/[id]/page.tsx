@@ -129,6 +129,7 @@ function fmtDateTime(iso?: string | null) {
   return new Date(iso).toLocaleString("en-IN", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: "Asia/Kolkata",
   });
 }
 function fmtMoney(n?: number | null) {
@@ -365,7 +366,7 @@ export default function LeadDetailPage() {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
-                {lead.customerName}
+                {lead.customerPrefix ? `${lead.customerPrefix} ` : ""}{lead.customerName}
               </h2>
               <span
                 className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ring-1 ring-inset ring-black/5 dark:ring-white/10 ${statusBadgeClass(
@@ -687,17 +688,49 @@ export default function LeadDetailPage() {
             <Card title="Architect & designer">
               <Grid>
                 <DetailItem icon={<User className="h-4 w-4" />} label="Architect">
-                  {lead.architectName || "—"}
+                  {lead.architectPrefix ? `${lead.architectPrefix} ` : ""}{lead.architectName || "—"}
                 </DetailItem>
                 <DetailItem icon={<Phone className="h-4 w-4" />} label="Architect contact">
                   {lead.architectContact || "—"}
                 </DetailItem>
                 <DetailItem icon={<User className="h-4 w-4" />} label="Interior designer">
-                  {lead.designerName || "—"}
+                  {lead.designerPrefix ? `${lead.designerPrefix} ` : ""}{lead.designerName || "—"}
                 </DetailItem>
                 <DetailItem icon={<Phone className="h-4 w-4" />} label="Designer contact">
                   {lead.designerContact || "—"}
                 </DetailItem>
+              </Grid>
+            </Card>
+          )}
+
+          {/* Referral details */}
+          {(lead.leadSource === "REFERENCE" || lead.leadSource === "REFERRAL") &&
+            (lead.referralName ||
+              lead.referralContact ||
+              lead.referralAmount != null ||
+              lead.referralCommissionPercent != null) && (
+            <Card title="Referral details">
+              <Grid>
+                {(lead.referralName || lead.referralPrefix) && (
+                  <DetailItem icon={<User className="h-4 w-4" />} label="Referred by">
+                    {lead.referralPrefix ? `${lead.referralPrefix} ` : ""}{lead.referralName || "—"}
+                  </DetailItem>
+                )}
+                {lead.referralContact && (
+                  <DetailItem icon={<Phone className="h-4 w-4" />} label="Referral contact">
+                    {lead.referralContact}
+                  </DetailItem>
+                )}
+                {lead.referralAmount != null && (
+                  <DetailItem icon={<Sparkles className="h-4 w-4" />} label="Commission amount">
+                    {fmtMoney(lead.referralAmount)}
+                  </DetailItem>
+                )}
+                {lead.referralCommissionPercent != null && (
+                  <DetailItem icon={<Sparkles className="h-4 w-4" />} label="Commission %">
+                    {lead.referralCommissionPercent}%
+                  </DetailItem>
+                )}
               </Grid>
             </Card>
           )}
