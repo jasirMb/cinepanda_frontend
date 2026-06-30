@@ -126,6 +126,7 @@ const initialFormValues: CreateLeadPayload = {
   leadId: "",
   customerName: "",
   place: "",
+  pincode: "",
   contactNumber: "",
   contactCountryCode: "+91",
   alternativeNumber: "",
@@ -244,6 +245,9 @@ export default function NewLeadPage() {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [pincodeLoading, setPincodeLoading] = useState(false);
+  const [pincodeSuggestion, setPincodeSuggestion] = useState<string | null>(null);
+
   // Dropdown options (from the backend enums so values always match).
   const leadSourceOptions = useLeadSources().data ?? DEFAULT_LEAD_SOURCES;
   const statusOptions = useLeadStatuses().data ?? DEFAULT_STATUSES;
@@ -260,6 +264,34 @@ export default function NewLeadPage() {
   const lostReasonOptions = useLostReasons().data ?? [];
   const designStatusOptions = useDesignStatuses().data ?? [];
   const presentationStatusOptions = usePresentationStatuses().data ?? [];
+
+  async function fetchPincodeCity(pin: string) {
+    if (pin.length !== 6 || !/^\d{6}$/.test(pin)) {
+      setPincodeSuggestion(null);
+      return;
+    }
+    setPincodeLoading(true);
+    setPincodeSuggestion(null);
+    try {
+      const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+      const json = await res.json();
+      const po = json?.[0];
+      if (po?.Status === "Success" && po?.PostOffice?.length > 0) {
+        const { District, State } = po.PostOffice[0];
+        const city = District ? `${District}, ${State}` : State;
+        setPincodeSuggestion(city);
+        if (!formValues.place || formValues.place.trim() === "") {
+          setField("place", city);
+        }
+      } else {
+        setPincodeSuggestion(null);
+      }
+    } catch {
+      setPincodeSuggestion(null);
+    } finally {
+      setPincodeLoading(false);
+    }
+  }
 
   const liveScore = useMemo(() => computeLeadScore(formValues), [formValues]);
 
@@ -321,6 +353,7 @@ export default function NewLeadPage() {
         leadId: lead.leadId ?? "",
         customerName: lead.customerName ?? "",
         place: lead.place ?? "",
+        pincode: lead.pincode ?? "",
         contactNumber: lead.contactNumber ?? "",
         contactCountryCode: lead.contactCountryCode ?? "+91",
         alternativeNumber: lead.alternativeNumber ?? "",
@@ -565,6 +598,7 @@ export default function NewLeadPage() {
         : null,
       architectContact: blankToNull(formValues.architectContact),
       designerContact: blankToNull(formValues.designerContact),
+      pincode: blankToNull(formValues.pincode),
       leadOwner: blankToNull(formValues.leadOwner),
       email: blankToNull(formValues.email),
       siteAddress: blankToNull(formValues.siteAddress),
@@ -693,6 +727,38 @@ export default function NewLeadPage() {
                       onChange={(e) => setField("place", e.target.value)}
                       placeholder="City / Area"
                     />
+                    {pincodeSuggestion && formValues.place !== pincodeSuggestion && (
+                      <button
+                        type="button"
+                        onClick={() => setField("place", pincodeSuggestion)}
+                        className="mt-1 text-xs text-cine-primary hover:underline"
+                      >
+                        Use: {pincodeSuggestion}
+                      </button>
+                    )}
+                  </Field>
+                  <Field label="Pincode">
+                    <div className="flex gap-2">
+                      <Input
+                        value={formValues.pincode ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value.replace(/\D/g, "").slice(0, 6);
+                          setField("pincode", v);
+                          fetchPincodeCity(v);
+                        }}
+                        placeholder="6-digit pincode"
+                        maxLength={6}
+                        className="flex-1"
+                      />
+                      {pincodeLoading && (
+                        <div className="flex h-10 w-10 items-center justify-center text-slate-400">
+                          <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                          </svg>
+                        </div>
+                      )}
+                    </div>
                   </Field>
                   <Field label="Lead Owner">
                     <Input

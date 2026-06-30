@@ -221,6 +221,7 @@ export interface CreateLeadPayload {
   leadId?: string | null;
   customerName: string;
   place: string;
+  pincode?: string | null;
   contactNumber: string;
   contactCountryCode: string; // e.g., "+1", "+91", "+44"
   alternativeNumber?: string | null;

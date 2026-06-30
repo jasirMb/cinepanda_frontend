@@ -485,7 +485,7 @@ export default function LeadDetailPage() {
                 {lead.leadOwner || "—"}
               </DetailItem>
               <DetailItem icon={<MapPin className="h-4 w-4" />} label="Place">
-                {lead.place || "—"}
+                {lead.place}{lead.pincode ? ` — ${lead.pincode}` : ""}
               </DetailItem>
               <DetailItem icon={<Sparkles className="h-4 w-4" />} label="Source">
                 {humanize(lead.leadSource)}
