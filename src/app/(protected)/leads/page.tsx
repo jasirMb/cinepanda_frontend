@@ -15,6 +15,7 @@ import {
   Eye,
   LayoutGrid,
   LayoutList,
+  Loader2,
   MapPin,
   Lock,
   Pencil,
@@ -27,7 +28,7 @@ import {
   XCircle,
 } from "lucide-react";
 
-import { leadsKeys, useLeads, useLeadStatuses } from "@/hooks/useLeads";
+import { leadsKeys, useLeads, useLeadStatuses, useLeadSources, usePriorityTypes } from "@/hooks/useLeads";
 import { LeadsTable } from "@/components/tables/LeadsTable";
 import { Button } from "@/components/ui/button";
 import {
@@ -251,29 +252,14 @@ export default function LeadsPage() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  const statusEnum = useLeadStatuses().data ?? [
-    { value: "NEW_LEAD", label: "New Lead" },
-    { value: "CLOSED_WON", label: "Won" },
-    { value: "CLOSED_LOST", label: "Lost" },
-    { value: "ON_HOLD", label: "On Hold" },
-  ];
+  const statusEnum = useLeadStatuses().data ?? [];
   const statusOptions = [{ label: "All statuses", value: "" }, ...statusEnum];
 
-  const priorityTypeOptions = [
-    { label: "All priorities", value: "" },
-    { label: "Enquired", value: "ENQUIRED" },
-    { label: "Takes time", value: "TAKES_TIME" },
-    { label: "Urgent building", value: "URGENT_BUILD" }
-  ];
+  const priorityEnum = usePriorityTypes().data ?? [];
+  const priorityTypeOptions = [{ label: "All priorities", value: "" }, ...priorityEnum];
 
-  const leadSourceOptions = [
-    { label: "All sources", value: "" },
-    { label: "Meta", value: "META" },
-    { label: "Youtube", value: "YOUTUBE" },
-    { label: "Reference", value: "REFERENCE" },
-    { label: "Walk-in", value: "WALKIN" },
-    { label: "Other", value: "OTHER" }
-  ];
+  const sourceEnum = useLeadSources().data ?? [];
+  const leadSourceOptions = [{ label: "All sources", value: "" }, ...sourceEnum];
 
   const LIST_LIMIT = 20;
   const [listPage, setListPage] = useState(1);
@@ -281,22 +267,26 @@ export default function LeadsPage() {
   // Reset to page 1 whenever filters change
   useEffect(() => { setListPage(1); }, [filters]);
 
-  // Cards view: load enough for grouping + stats (no UI pagination needed)
-  const cardsParams = useMemo(
+  // Cards view: fetch page 1 + page 2 in parallel (100 each) → up to 200 leads
+  const cardsBase = useMemo(
     () => ({
-      page: 1,
       limit: 100,
       search: filters.search || undefined,
       status: filters.status || undefined,
       priorityType: filters.priorityType || undefined,
       leadSource: filters.leadSource || undefined,
       startDate: filters.startDate || undefined,
-      endDate: filters.endDate || undefined
+      endDate: filters.endDate || undefined,
     }),
     [filters]
   );
+  const cardsPage1Params = useMemo(() => ({ ...cardsBase, page: 1 }), [cardsBase]);
+  const cardsPage2Params = useMemo(() => ({ ...cardsBase, page: 2 }), [cardsBase]);
 
-  // List view: real pagination
+  const leadsQuery  = useLeads(cardsPage1Params);
+  const leadsQuery2 = useLeads(cardsPage2Params);
+
+  // List view: real backend pagination
   const listParams = useMemo(
     () => ({
       page: listPage,
@@ -306,12 +296,11 @@ export default function LeadsPage() {
       priorityType: filters.priorityType || undefined,
       leadSource: filters.leadSource || undefined,
       startDate: filters.startDate || undefined,
-      endDate: filters.endDate || undefined
+      endDate: filters.endDate || undefined,
     }),
     [filters, listPage]
   );
 
-  const leadsQuery = useLeads(cardsParams);
   const listQuery = useLeads(listParams);
 
   useEffect(() => {
@@ -331,7 +320,11 @@ export default function LeadsPage() {
     }
   }, [router, searchParams]);
 
-  const allLeadsRaw = leadsQuery.data?.data ?? [];
+  const cardsTotal = leadsQuery.data?.pagination?.total ?? 0;
+  const allLeadsRaw = useMemo(
+    () => [...(leadsQuery.data?.data ?? []), ...(leadsQuery2.data?.data ?? [])],
+    [leadsQuery.data, leadsQuery2.data]
+  );
   const sortedAllLeads = useMemo(() => {
     const [field, dir] = filters.sort.split("_") as [keyof Lead | string, "asc" | "desc"];
     const factor = dir === "asc" ? 1 : -1;
@@ -464,12 +457,14 @@ export default function LeadsPage() {
 
     return (
       <div className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
-        <div
-          className={`absolute left-0 top-0 h-full w-1 ${categoryStripe(category)}`}
-          aria-hidden
-        />
+        {!compact && (
+          <div
+            className={`absolute left-0 top-0 h-full w-1 ${categoryStripe(category)}`}
+            aria-hidden
+          />
+        )}
 
-        <div className={`flex flex-1 flex-col gap-2 ${compact ? "p-3 pl-4" : "gap-3 p-4 pl-5"}`}>
+        <div className={`flex flex-1 flex-col gap-2 ${compact ? "p-3" : "gap-3 p-4 pl-5"}`}>
           {/* Header */}
           <div className="flex items-start gap-2.5">
             <div
@@ -710,7 +705,7 @@ export default function LeadsPage() {
     );
   }
 
-  const isLoading = leadsQuery.isLoading;
+  const isLoading = leadsQuery.isLoading || leadsQuery2.isLoading;
   const isError = leadsQuery.isError;
 
   if (isLoading) {
@@ -908,15 +903,17 @@ export default function LeadsPage() {
 
       {viewMode === "list" ? (() => {
         const listLeads = listQuery.data?.data ?? [];
-        const listTotal = listQuery.data?.total ?? 0;
+        const listTotal = listQuery.data?.pagination?.total ?? 0;
         const totalPages = Math.ceil(listTotal / LIST_LIMIT);
 
         return (
         <div className="space-y-3">
           {/* Grid / Table sub-toggle */}
           <div className="flex items-center justify-between">
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              {listQuery.isLoading ? "Loading…" : `${listTotal} lead${listTotal === 1 ? "" : "s"}`}
+            <p className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+              {listQuery.isFetching
+                ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…</>
+                : `${listTotal} lead${listTotal === 1 ? "" : "s"}`}
             </p>
             <div className="flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
               <button
@@ -954,17 +951,29 @@ export default function LeadsPage() {
                 <Skeleton key={i} className="h-16 w-full rounded-lg" />
               ))}
             </div>
-          ) : listLeads.length === 0 ? (
+          ) : listLeads.length === 0 && !listQuery.isFetching ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
               No leads found. Try adjusting your filters.
             </div>
-          ) : listMode === "table" ? (
-            <LeadsTable leads={listLeads} onDelete={handleDelete} />
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {listLeads.map((lead) => (
-                <LeadCard key={lead._id} lead={lead} compact />
-              ))}
+            <div className={`relative transition-opacity duration-200 ${listQuery.isFetching ? "pointer-events-none opacity-50" : "opacity-100"}`}>
+              {listQuery.isFetching && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center">
+                  <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 shadow-md dark:border-slate-700 dark:bg-slate-900">
+                    <Loader2 className="h-4 w-4 animate-spin text-cine-primary" />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Updating…</span>
+                  </div>
+                </div>
+              )}
+              {listMode === "table" ? (
+                <LeadsTable leads={listLeads} onDelete={handleDelete} />
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  {listLeads.map((lead) => (
+                    <LeadCard key={lead._id} lead={lead} compact />
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -1108,6 +1117,23 @@ export default function LeadsPage() {
                 No leads to show. Add a lead or adjust your filters.
               </div>
             )}
+
+          {cardsTotal > 200 && (
+            <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+              <span className="text-base">⚠️</span>
+              <span>
+                Showing 200 of <strong>{cardsTotal}</strong> leads. Switch to{" "}
+                <button
+                  type="button"
+                  className="font-semibold underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-200"
+                  onClick={() => setViewMode("list")}
+                >
+                  Leads list
+                </button>{" "}
+                to browse all leads with full pagination.
+              </span>
+            </div>
+          )}
         </div>
       )}
 

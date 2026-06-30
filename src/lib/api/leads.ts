@@ -62,9 +62,14 @@ export interface LeadsListQuery {
 
 export interface LeadsListResponse {
   data: Lead[];
-  total: number;
-  page: number;
-  limit: number;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
 }
 
 export async function fetchLeads(
