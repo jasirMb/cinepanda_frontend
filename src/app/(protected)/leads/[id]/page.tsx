@@ -861,10 +861,12 @@ export default function LeadDetailPage() {
             {sortedActivities.length === 0 ? (
               <p className="text-sm text-slate-400">No activity yet.</p>
             ) : (
-              <ol className="space-y-3">
+              <ol className="relative space-y-3 pl-4">
+                {/* vertical track line */}
+                <span className="absolute left-[7px] top-2 bottom-2 w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
                 {sortedActivities.map((a) => (
-                  <li key={a.idx} className="flex gap-2.5">
-                    <span className="mt-1.5 flex h-2 w-2 shrink-0 rounded-full bg-cine-primary" />
+                  <li key={a.idx} className="relative flex gap-2.5">
+                    <span className="relative z-10 mt-1.5 flex h-2.5 w-2.5 shrink-0 rounded-full border-2 border-cine-primary bg-white dark:bg-slate-900" />
                     <div className="min-w-0 flex-1">
                       {editIdx === a.idx ? (
                         <div className="space-y-2">

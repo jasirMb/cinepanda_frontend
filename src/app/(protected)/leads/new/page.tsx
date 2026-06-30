@@ -1773,10 +1773,10 @@ function YesNo({
             type="button"
             onClick={() => onChange(opt.v)}
             className={cn(
-              "h-10 flex-1 rounded-md border text-sm",
+              "h-10 flex-1 rounded-md border-2 text-sm font-medium transition-colors",
               active
-                ? "border-cine-primary bg-cine-primary/10 font-medium text-slate-900 dark:text-slate-50"
-                : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                ? "border-cine-primary bg-cine-primary text-white"
+                : "border-slate-200 bg-transparent text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-600"
             )}
           >
             {opt.label}
