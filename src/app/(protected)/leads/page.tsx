@@ -31,6 +31,7 @@ import {
 import { leadsKeys, useLeads, useLeadStatuses, useLeadSources, usePriorityTypes } from "@/hooks/useLeads";
 import { LeadsTable } from "@/components/tables/LeadsTable";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import {
   type Lead,
   updateLeadStatus,
@@ -825,36 +826,30 @@ export default function LeadsPage() {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
           />
-          <Select value={filters.status || "__all__"} onValueChange={(v) => setFilters((prev) => ({ ...prev, status: v === "__all__" ? "" : v }))}>
-            <SelectTrigger>
-              <SelectValue placeholder="All statuses" />
-            </SelectTrigger>
-            <SelectContent>
-              {statusOptions.map((opt) => (
-                <SelectItem key={opt.value || "__all__"} value={opt.value || "__all__"}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filters.priorityType || "__all__"} onValueChange={(v) => setFilters((prev) => ({ ...prev, priorityType: v === "__all__" ? "" : v }))}>
-            <SelectTrigger>
-              <SelectValue placeholder="All priorities" />
-            </SelectTrigger>
-            <SelectContent>
-              {priorityTypeOptions.map((opt) => (
-                <SelectItem key={opt.value || "__all__"} value={opt.value || "__all__"}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filters.leadSource || "__all__"} onValueChange={(v) => setFilters((prev) => ({ ...prev, leadSource: v === "__all__" ? "" : v }))}>
-            <SelectTrigger>
-              <SelectValue placeholder="All sources" />
-            </SelectTrigger>
-            <SelectContent>
-              {leadSourceOptions.map((opt) => (
-                <SelectItem key={opt.value || "__all__"} value={opt.value || "__all__"}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Combobox
+            options={[...statusOptions].sort((a, b) => a.label.localeCompare(b.label))}
+            value={filters.status}
+            onChange={(v) => setFilters((prev) => ({ ...prev, status: v }))}
+            placeholder="All statuses"
+            clearable
+            clearLabel="All statuses"
+          />
+          <Combobox
+            options={[...priorityTypeOptions].sort((a, b) => a.label.localeCompare(b.label))}
+            value={filters.priorityType}
+            onChange={(v) => setFilters((prev) => ({ ...prev, priorityType: v }))}
+            placeholder="All priorities"
+            clearable
+            clearLabel="All priorities"
+          />
+          <Combobox
+            options={[...leadSourceOptions].sort((a, b) => a.label.localeCompare(b.label))}
+            value={filters.leadSource}
+            onChange={(v) => setFilters((prev) => ({ ...prev, leadSource: v }))}
+            placeholder="All sources"
+            clearable
+            clearLabel="All sources"
+          />
           <DatePicker
             value={filters.startDate}
             onChange={(v) => setFilters((prev) => ({ ...prev, startDate: v }))}

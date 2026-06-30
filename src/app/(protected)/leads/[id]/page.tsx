@@ -69,6 +69,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { Dialog } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
@@ -440,22 +441,14 @@ export default function LeadDetailPage() {
         <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
           Update status
         </span>
-        <Select
+        <Combobox
+          options={[...statusOptions].sort((a, b) => a.label.localeCompare(b.label))}
           value={statusValue || "NEW_LEAD"}
-          onValueChange={(v) => v && setStatusValue(v)}
+          onChange={(v) => v && setStatusValue(v)}
+          placeholder="Select status"
+          className="w-48"
           disabled={statusMutation.isPending}
-        >
-          <SelectTrigger className="h-9 w-48">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {statusOptions.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
         <Button
           size="sm"
           disabled={statusMutation.isPending || statusValue === lead.status}

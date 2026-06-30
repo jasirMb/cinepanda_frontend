@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { PhoneField } from "@/components/ui/phone-field";
@@ -1469,19 +1470,20 @@ function EnumSelect({
   options: { value: string; label: string }[];
   placeholder: string;
 }) {
+  const sorted = useMemo(
+    () => [...options].sort((a, b) => a.label.localeCompare(b.label)),
+    [options]
+  );
   return (
-    <Select value={value || undefined} onValueChange={(v) => v && onChange(v)}>
-      <SelectTrigger>
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((opt) => (
-          <SelectItem key={opt.value} value={opt.value}>
-            {opt.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <Combobox
+      options={sorted}
+      value={value || ""}
+      onChange={(v) => onChange(v)}
+      placeholder={placeholder}
+      searchPlaceholder="Search…"
+      clearable
+      clearLabel={placeholder}
+    />
   );
 }
 
