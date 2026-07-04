@@ -32,7 +32,8 @@ import { ProjectFilter } from "@/components/ui/project-filter";
 type Period = "all" | "week" | "month" | "year" | "custom";
 
 function inr(n: number) {
-  return `₹${(n ?? 0).toLocaleString("en-IN")}`;
+  // `+ 0` normalizes negative zero (−0) to 0 so we never render "₹-0".
+  return `₹${((n ?? 0) + 0).toLocaleString("en-IN")}`;
 }
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-GB", {
@@ -156,6 +157,7 @@ export default function PaymentAccountStatementPage({
   const openingSeed = stmt?.broughtForward ?? account?.openingBalance ?? 0;
   const totalIn = stmt?.periodIn ?? 0;
   const totalOut = stmt?.periodOut ?? 0;
+  const isCredit = account?.type === "CARD" && account?.cardType === "CREDIT";
 
   // Project options for the filter — every project (the server filters by id).
   const projectsList = useProjects().data?.data ?? [];
@@ -397,11 +399,27 @@ export default function PaymentAccountStatementPage({
         </Button>
       </div>
 
-      {/* Stats */}
+      {/* Stats — for a credit card, "in" = payments toward the card and "out" =
+          spending on it, so the labels are card-specific. */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Stat icon={<ArrowUpRight className="h-4 w-4" />} label="Received in" value={inr(totalIn)} tone="emerald" />
-        <Stat icon={<ArrowDownRight className="h-4 w-4" />} label="Paid out" value={inr(totalOut)} tone="red" />
-        <Stat icon={<Banknote className="h-4 w-4" />} label="Net" value={inr(totalIn - totalOut)} tone={totalIn - totalOut >= 0 ? "emerald" : "red"} />
+        <Stat
+          icon={<ArrowUpRight className="h-4 w-4" />}
+          label={isCredit ? "Payments to card" : "Received in"}
+          value={inr(totalIn)}
+          tone="emerald"
+        />
+        <Stat
+          icon={<ArrowDownRight className="h-4 w-4" />}
+          label={isCredit ? "Spent on card" : "Paid out"}
+          value={inr(totalOut)}
+          tone="red"
+        />
+        <Stat
+          icon={<Banknote className="h-4 w-4" />}
+          label={isCredit ? "Net owed change" : "Net"}
+          value={inr(totalIn - totalOut)}
+          tone={totalIn - totalOut >= 0 ? "emerald" : "red"}
+        />
       </div>
 
       {/* Statement table */}

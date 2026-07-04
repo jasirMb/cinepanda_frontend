@@ -44,7 +44,9 @@ export default function LedgerTransferPage() {
   const projects = useProjects().data?.data ?? [];
 
   const [form, setForm] = useState({
+    fromType: "" as AccountTypeFilter,
     fromAccountId: "",
+    toType: "" as AccountTypeFilter,
     toAccountId: "",
     amount: 0,
     entryDate: todayISO(),
@@ -65,6 +67,13 @@ export default function LedgerTransferPage() {
   const destinationAccounts = accounts.filter(
     (a) => !(a.type === "CARD" && a.cardType === "CREDIT")
   );
+  // Optional type category filters (Bank / UPI / Cash / …) for each side.
+  const visibleFrom = form.fromType
+    ? accounts.filter((a) => a.type === form.fromType)
+    : accounts;
+  const visibleTo = form.toType
+    ? destinationAccounts.filter((a) => a.type === form.toType)
+    : destinationAccounts;
 
   // Charge: a % of the transfer amount OR a fixed ₹ amount.
   const feeAmount = useMemo(() => {
@@ -181,27 +190,73 @@ export default function LedgerTransferPage() {
         className="max-w-2xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
       >
         {/* From → To */}
-        <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_auto_1fr]">
+        <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[1fr_auto_1fr]">
           <Field label="From (money leaves) *">
-            <AccountSelect
-              accounts={accounts}
-              value={form.fromAccountId}
-              exclude={form.toAccountId}
-              placeholder="Source account"
-              onChange={(v) => setForm((f) => ({ ...f, fromAccountId: v }))}
-            />
+            <div className="space-y-2">
+              <TypeSelect
+                value={form.fromType}
+                onChange={(t) =>
+                  setForm((f) => {
+                    const acc = accounts.find((a) => a._id === f.fromAccountId);
+                    const keep = !f.fromAccountId || !t || acc?.type === t;
+                    return {
+                      ...f,
+                      fromType: t,
+                      fromAccountId: keep ? f.fromAccountId : "",
+                    };
+                  })
+                }
+              />
+              <AccountSelect
+                accounts={visibleFrom}
+                value={form.fromAccountId}
+                exclude={form.toAccountId}
+                placeholder="Source account"
+                onChange={(v) => {
+                  const acc = accounts.find((a) => a._id === v);
+                  setForm((f) => ({
+                    ...f,
+                    fromAccountId: v,
+                    fromType: acc ? (acc.type as AccountTypeFilter) : f.fromType,
+                  }));
+                }}
+              />
+            </div>
           </Field>
-          <div className="hidden justify-center pb-2 sm:flex">
+          <div className="hidden justify-center pt-14 sm:flex">
             <ArrowRight className="h-5 w-5 text-slate-400" />
           </div>
           <Field label="To (money arrives) *">
-            <AccountSelect
-              accounts={destinationAccounts}
-              value={form.toAccountId}
-              exclude={form.fromAccountId}
-              placeholder="Destination account"
-              onChange={(v) => setForm((f) => ({ ...f, toAccountId: v }))}
-            />
+            <div className="space-y-2">
+              <TypeSelect
+                value={form.toType}
+                onChange={(t) =>
+                  setForm((f) => {
+                    const acc = accounts.find((a) => a._id === f.toAccountId);
+                    const keep = !f.toAccountId || !t || acc?.type === t;
+                    return {
+                      ...f,
+                      toType: t,
+                      toAccountId: keep ? f.toAccountId : "",
+                    };
+                  })
+                }
+              />
+              <AccountSelect
+                accounts={visibleTo}
+                value={form.toAccountId}
+                exclude={form.fromAccountId}
+                placeholder="Destination account"
+                onChange={(v) => {
+                  const acc = accounts.find((a) => a._id === v);
+                  setForm((f) => ({
+                    ...f,
+                    toAccountId: v,
+                    toType: acc ? (acc.type as AccountTypeFilter) : f.toType,
+                  }));
+                }}
+              />
+            </div>
             <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
               Paying a credit card? Use{" "}
               <span className="font-medium">Pay Card Bill</span> instead.
@@ -350,6 +405,46 @@ export default function LedgerTransferPage() {
         </div>
       </form>
     </div>
+  );
+}
+
+const ACCOUNT_TYPES = [
+  { value: "BANK", label: "Bank" },
+  { value: "UPI", label: "UPI" },
+  { value: "CASH", label: "Cash" },
+  { value: "CARD", label: "Card" },
+  { value: "OTHER", label: "Other" },
+] as const;
+
+type AccountTypeFilter = "" | (typeof ACCOUNT_TYPES)[number]["value"];
+
+function TypeSelect({
+  value,
+  onChange,
+}: {
+  value: AccountTypeFilter;
+  onChange: (v: AccountTypeFilter) => void;
+}) {
+  return (
+    <Select
+      value={value || "NONE"}
+      onValueChange={(v) => {
+        if (!v) return;
+        onChange((v === "NONE" ? "" : v) as AccountTypeFilter);
+      }}
+    >
+      <SelectTrigger>
+        <SelectValue placeholder="Any type" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="NONE">All types</SelectItem>
+        {ACCOUNT_TYPES.map((t) => (
+          <SelectItem key={t.value} value={t.value}>
+            {t.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 

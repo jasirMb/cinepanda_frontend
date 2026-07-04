@@ -86,7 +86,8 @@ function QrGlyph() {
 }
 
 function inr(n: number) {
-  return `₹${(n ?? 0).toLocaleString("en-IN")}`;
+  // `+ 0` normalizes negative zero (−0) to 0 so we never render "₹-0".
+  return `₹${((n ?? 0) + 0).toLocaleString("en-IN")}`;
 }
 
 // Per-account-type avatar gradient + tinted type badge, like the quotation cards.
