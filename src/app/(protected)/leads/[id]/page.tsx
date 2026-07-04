@@ -978,7 +978,8 @@ export default function LeadDetailPage() {
           {(lead.quoteSent ||
             lead.quoteValue != null ||
             lead.quoteDate ||
-            lead.followUpDate) && (
+            lead.followUpDate ||
+            (lead.quotations?.length ?? 0) > 0) && (
             <Card title="Quotation tracking">
               <div className="space-y-2">
                 <SideRow label="Quote sent">{lead.quoteSent ? "Yes" : "No"}</SideRow>
@@ -986,6 +987,41 @@ export default function LeadDetailPage() {
                 <SideRow label="Quote date">{fmtDate(lead.quoteDate)}</SideRow>
                 <SideRow label="Follow-up date">{fmtDate(lead.followUpDate)}</SideRow>
               </div>
+              {(lead.quotations?.length ?? 0) > 0 && (
+                <div className="mt-3 space-y-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+                  {lead.quotations!.map((q, i) => (
+                    <div
+                      key={i}
+                      className="rounded-md border border-slate-200 p-2.5 text-sm dark:border-slate-700"
+                    >
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                          Quotation {i + 1}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1">
+                        <span className="text-slate-500 dark:text-slate-400">
+                          Real:{" "}
+                          <span className="text-slate-700 dark:text-slate-200">
+                            {fmtMoney(q.realPrice)}
+                          </span>
+                        </span>
+                        <span className="text-slate-500 dark:text-slate-400">
+                          Offer:{" "}
+                          <span className="text-slate-700 dark:text-slate-200">
+                            {fmtMoney(q.offerPrice)}
+                          </span>
+                        </span>
+                      </div>
+                      {q.description && (
+                        <p className="mt-1 text-slate-600 dark:text-slate-300">
+                          {q.description}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card>
           )}
 

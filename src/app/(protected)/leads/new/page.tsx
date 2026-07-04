@@ -50,6 +50,7 @@ import {
   updateLead,
   type CreateLeadPayload,
   type LeadAttachment,
+  type LeadQuotation,
 } from "@/lib/api/leads";
 
 type Option = { label: string; value: string };
@@ -188,6 +189,7 @@ const initialFormValues: CreateLeadPayload = {
   quoteSent: false,
   quoteValue: null,
   quoteDate: null,
+  quotations: [],
   followUpDate: null,
   tags: [],
   internalNotes: "",
@@ -392,6 +394,7 @@ export default function NewLeadPage() {
         quoteSent: lead.quoteSent ?? false,
         quoteValue: lead.quoteValue ?? null,
         quoteDate: lead.quoteDate ? lead.quoteDate.slice(0, 10) : null,
+        quotations: lead.quotations ?? [],
         followUpDate: lead.followUpDate ? lead.followUpDate.slice(0, 10) : null,
         tags: lead.tags ?? [],
         internalNotes: lead.internalNotes ?? "",
@@ -484,6 +487,32 @@ export default function NewLeadPage() {
   function setNumber(field: keyof CreateLeadPayload, raw: string): void {
     const parsed = raw.trim() === "" ? null : Number(raw);
     setField(field, (Number.isNaN(parsed as number) ? null : parsed) as CreateLeadPayload[typeof field]);
+  }
+
+  function addQuotation(): void {
+    setField("quotations", [
+      ...(formValues.quotations ?? []),
+      { realPrice: null, offerPrice: null, description: "" },
+    ]);
+  }
+
+  function updateQuotation(
+    index: number,
+    patch: Partial<LeadQuotation>
+  ): void {
+    setField(
+      "quotations",
+      (formValues.quotations ?? []).map((q, i) =>
+        i === index ? { ...q, ...patch } : q
+      )
+    );
+  }
+
+  function removeQuotation(index: number): void {
+    setField(
+      "quotations",
+      (formValues.quotations ?? []).filter((_, i) => i !== index)
+    );
   }
 
   function addTag(): void {
@@ -624,6 +653,18 @@ export default function NewLeadPage() {
       followupReminder: formValues.followupReminder ? istPickerToUTC(formValues.followupReminder) : null,
       expectedPurchaseDate: blankToNull(formValues.expectedPurchaseDate),
       quoteDate: blankToNull(formValues.quoteDate),
+      quotations: (formValues.quotations ?? [])
+        .filter(
+          (q) =>
+            q.realPrice != null ||
+            q.offerPrice != null ||
+            blankToNull(q.description as string) != null
+        )
+        .map((q) => ({
+          realPrice: q.realPrice ?? null,
+          offerPrice: q.offerPrice ?? null,
+          description: blankToNull(q.description as string),
+        })),
       followUpDate: blankToNull(formValues.followUpDate),
       // project scoping / design
       expectedTimeline: blankToNull(formValues.expectedTimeline),
@@ -1176,6 +1217,107 @@ export default function NewLeadPage() {
                       placeholder="Select date"
                     />
                   </Field>
+
+                  <div className="space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                        Quotations
+                      </label>
+                      <button
+                        type="button"
+                        onClick={addQuotation}
+                        className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                      >
+                        + Add quotation
+                      </button>
+                    </div>
+
+                    {(formValues.quotations ?? []).length === 0 && (
+                      <p className="text-xs text-slate-400">
+                        No quotations added yet. Click “Add quotation” to add one.
+                      </p>
+                    )}
+
+                    {(formValues.quotations ?? []).map((q, i) => (
+                      <div
+                        key={i}
+                        className="space-y-2 rounded-md border border-slate-200 p-3 dark:border-slate-700"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                            Quotation {i + 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeQuotation(i)}
+                            className="text-xs font-medium text-red-500 hover:underline"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          <div>
+                            <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">
+                              Real Price
+                            </label>
+                            <div className="relative">
+                              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+                                ₹
+                              </span>
+                              <Input
+                                type="number"
+                                min={0}
+                                className="pl-7"
+                                value={q.realPrice ?? ""}
+                                onChange={(e) =>
+                                  updateQuotation(i, {
+                                    realPrice: e.target.value ? Number(e.target.value) : null,
+                                  })
+                                }
+                                placeholder="Real price"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">
+                              Offer Price
+                            </label>
+                            <div className="relative">
+                              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+                                ₹
+                              </span>
+                              <Input
+                                type="number"
+                                min={0}
+                                className="pl-7"
+                                value={q.offerPrice ?? ""}
+                                onChange={(e) =>
+                                  updateQuotation(i, {
+                                    offerPrice: e.target.value ? Number(e.target.value) : null,
+                                  })
+                                }
+                                placeholder="Offer price"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs text-slate-500 dark:text-slate-400">
+                            Description
+                          </label>
+                          <Textarea
+                            value={q.description ?? ""}
+                            onChange={(e) =>
+                              updateQuotation(i, { description: e.target.value })
+                            }
+                            placeholder="Quotation description…"
+                            rows={2}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
                   <Field label="Follow Up Date">
                     <DatePicker
                       value={formValues.followUpDate ?? ""}

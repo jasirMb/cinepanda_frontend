@@ -210,6 +210,12 @@ export interface LeadAttachment {
   fileUrl: string;
 }
 
+export interface LeadQuotation {
+  realPrice?: number | null;
+  offerPrice?: number | null;
+  description?: string | null;
+}
+
 export interface LeadActivity {
   type: string;
   label: string;
@@ -276,6 +282,7 @@ export interface CreateLeadPayload {
   quoteSent?: boolean;
   quoteValue?: number | null;
   quoteDate?: string | null;
+  quotations?: LeadQuotation[];
   followUpDate?: string | null;
   tags?: string[];
   internalNotes?: string | null;
