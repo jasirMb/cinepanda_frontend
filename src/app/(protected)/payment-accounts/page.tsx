@@ -32,6 +32,7 @@ import {
   type PaymentAccount,
   type PaymentAccountPayload,
   type PaymentAccountType,
+  type CardType,
 } from "@/lib/api/payment-accounts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,6 +52,8 @@ const EMPTY = {
   upiApp: "",
   cardNetwork: "",
   cardLast4: "",
+  cardType: "",
+  creditLimit: "",
   linkedAccountId: "",
   notes: "",
 };
@@ -180,6 +183,8 @@ export default function PaymentAccountsPage() {
       upiApp: a.upiApp ?? "",
       cardNetwork: a.cardNetwork ?? "",
       cardLast4: a.cardLast4 ?? "",
+      cardType: a.cardType ?? "",
+      creditLimit: a.creditLimit != null ? String(a.creditLimit) : "",
       linkedAccountId: a.linkedAccountId ?? "",
       notes: a.notes ?? "",
     });
@@ -212,6 +217,12 @@ export default function PaymentAccountsPage() {
       upiApp: form.upiApp.trim() || undefined,
       cardNetwork: form.cardNetwork.trim() || undefined,
       cardLast4: form.cardLast4.trim() || undefined,
+      // Card type only applies to a CARD; credit limit only to a credit card.
+      cardType: form.type === "CARD" ? (form.cardType as CardType) || null : null,
+      creditLimit:
+        form.type === "CARD" && form.cardType === "CREDIT" && form.creditLimit.trim() !== ""
+          ? Number(form.creditLimit)
+          : null,
       // Only a UPI links to a bank; clear it otherwise.
       linkedAccountId:
         form.type === "UPI" ? form.linkedAccountId || null : null,
@@ -244,10 +255,45 @@ export default function PaymentAccountsPage() {
     () => accounts.filter((a) => !a.linkedAccountId),
     [accounts]
   );
-  const moneyAccountCount = moneyAccounts.length;
-  const totalBalance = useMemo(
-    () => moneyAccounts.reduce((s, a) => s + (a.balance ?? 0), 0),
+  // Credit cards hold money you OWE, not money you have — keep them out of the
+  // "money you have" total and report their dues separately.
+  const isCreditCard = (a: PaymentAccount) =>
+    a.type === "CARD" && a.cardType === "CREDIT";
+  const ownAccounts = useMemo(
+    () => moneyAccounts.filter((a) => !isCreditCard(a)),
     [moneyAccounts]
+  );
+  const creditCards = useMemo(
+    () => moneyAccounts.filter(isCreditCard),
+    [moneyAccounts]
+  );
+  const moneyAccountCount = ownAccounts.length;
+  const totalBalance = useMemo(
+    () => ownAccounts.reduce((s, a) => s + (a.balance ?? 0), 0),
+    [ownAccounts]
+  );
+  // A credit card's balance IS the amount spent on it. So: spent = balance;
+  // available (remaining) = limit − spent (only for cards with a limit set).
+  const creditCardSpent = useMemo(
+    () => creditCards.reduce((s, a) => s + (a.balance ?? 0), 0),
+    [creditCards]
+  );
+  const creditCardLimitTotal = useMemo(
+    () =>
+      creditCards.reduce(
+        (s, a) => s + (a.creditLimit != null ? a.creditLimit : 0),
+        0
+      ),
+    [creditCards]
+  );
+  const creditCardAvailable = useMemo(
+    () =>
+      creditCards.reduce(
+        (s, a) =>
+          a.creditLimit != null ? s + (a.creditLimit - (a.balance ?? 0)) : s,
+        0
+      ),
+    [creditCards]
   );
 
   if (query.isLoading) {
@@ -326,6 +372,21 @@ export default function PaymentAccountsPage() {
                   balance of its own.
                 </p>
               </Field>
+            ) : form.type === "CARD" && form.cardType === "CREDIT" ? (
+              <Field label="Amount spent (₹)">
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="Amount already spent on this card"
+                  value={form.openingBalance}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, openingBalance: e.target.value }))
+                  }
+                />
+                <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                  How much of the credit limit is used. Available = limit − spent.
+                </p>
+              </Field>
             ) : (
               <Field label="Opening balance (₹)">
                 <Input
@@ -337,8 +398,7 @@ export default function PaymentAccountsPage() {
                   }
                 />
                 <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                  What&apos;s in the account right now. For a credit card use a
-                  negative number for what you owe.
+                  What&apos;s in the account right now.
                 </p>
               </Field>
             )}
@@ -439,6 +499,19 @@ export default function PaymentAccountsPage() {
             )}
             {form.type === "CARD" && (
               <>
+                <Field label="Card type">
+                  <select
+                    value={form.cardType}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, cardType: e.target.value }))
+                    }
+                    className="flex h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                  >
+                    <option value="">Select…</option>
+                    <option value="CREDIT">Credit card</option>
+                    <option value="DEBIT">Debit card</option>
+                  </select>
+                </Field>
                 <Field label="Card network">
                   <select
                     value={form.cardNetwork}
@@ -465,6 +538,19 @@ export default function PaymentAccountsPage() {
                     }
                   />
                 </Field>
+                {form.cardType === "CREDIT" && (
+                  <Field label="Credit limit (₹)">
+                    <Input
+                      type="number"
+                      min={0}
+                      placeholder="e.g. 50000"
+                      value={form.creditLimit}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, creditLimit: e.target.value }))
+                      }
+                    />
+                  </Field>
+                )}
               </>
             )}
           </div>
@@ -486,33 +572,101 @@ export default function PaymentAccountsPage() {
       )}
 
       {accounts.length > 0 && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-cine-primary/20 bg-cine-primary/5 px-5 py-4 dark:border-cine-primary/30 dark:bg-cine-primary/10">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cine-primary/15 text-cine-primary">
-              <Banknote className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Total money you have
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Across {moneyAccountCount} account
-                {moneyAccountCount !== 1 ? "s" : ""}
-                {accounts.length !== moneyAccountCount
-                  ? ` · ${accounts.length - moneyAccountCount} linked`
-                  : ""}
-              </p>
+        <div className={creditCards.length > 0 ? "grid gap-4 lg:grid-cols-2" : ""}>
+          {/* Your money (credit cards excluded) */}
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-cine-primary/20 bg-cine-primary/5 px-5 py-4 dark:border-cine-primary/30 dark:bg-cine-primary/10">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cine-primary/15 text-cine-primary">
+                <Banknote className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Total money you have
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Across {moneyAccountCount} account
+                  {moneyAccountCount !== 1 ? "s" : ""}
+                  {accounts.length - moneyAccounts.length > 0
+                    ? ` · ${accounts.length - moneyAccounts.length} linked`
+                    : ""}
+                  {creditCards.length > 0
+                    ? ` · ${creditCards.length} credit card${creditCards.length !== 1 ? "s" : ""} excluded`
+                    : ""}
+                </p>
+              </div>
             </div>
+            <p
+              className={`text-2xl font-bold tracking-tight ${
+                totalBalance >= 0
+                  ? "text-slate-900 dark:text-slate-50"
+                  : "text-rose-600 dark:text-rose-400"
+              }`}
+            >
+              {inr(totalBalance)}
+            </p>
           </div>
-          <p
-            className={`text-2xl font-bold tracking-tight ${
-              totalBalance >= 0
-                ? "text-slate-900 dark:text-slate-50"
-                : "text-rose-600 dark:text-rose-400"
-            }`}
-          >
-            {inr(totalBalance)}
-          </p>
+
+          {/* Credit cards — separate, card-styled panel */}
+          {creditCards.length > 0 && (
+            <div className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50/50 px-5 py-4 dark:border-violet-900/50 dark:from-violet-950/40 dark:to-fuchsia-950/20">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/15 text-violet-600 dark:text-violet-300">
+                    <CreditCard className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-700/80 dark:text-violet-300/80">
+                      Credit cards
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {creditCards.length} card
+                      {creditCards.length !== 1 ? "s" : ""}
+                      {creditCardLimitTotal > 0
+                        ? ` · Limit ${inr(creditCardLimitTotal)}`
+                        : ""}
+                    </p>
+                  </div>
+                </div>
+                {creditCardLimitTotal > 0 && (
+                  <div className="text-right">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Available
+                    </p>
+                    <p className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">
+                      {inr(creditCardAvailable)}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {creditCardLimitTotal > 0 && (
+                <div className="mt-3">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-violet-200/70 dark:bg-violet-900/50">
+                    <div
+                      className="h-full rounded-full bg-rose-500 transition-all"
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          Math.max(
+                            0,
+                            (creditCardSpent / creditCardLimitTotal) * 100
+                          )
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between text-[11px] font-medium">
+                    <span className="text-rose-600 dark:text-rose-400">
+                      Spent {inr(creditCardSpent)}
+                    </span>
+                    <span className="text-slate-500 dark:text-slate-400">
+                      of {inr(creditCardLimitTotal)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -549,9 +703,16 @@ export default function PaymentAccountsPage() {
                     ? a.upiId || ""
                     : "";
             // Bottom-right caption (network / bank / app).
+            const cardTypeLabel =
+              a.cardType === "CREDIT"
+                ? "Credit"
+                : a.cardType === "DEBIT"
+                  ? "Debit"
+                  : "";
             const caption =
               a.type === "CARD"
-                ? a.cardNetwork || "Card"
+                ? [cardTypeLabel, a.cardNetwork].filter(Boolean).join(" • ") ||
+                  "Card"
                 : a.type === "BANK"
                   ? a.bankName || "Bank"
                   : a.type === "UPI"
@@ -606,7 +767,7 @@ export default function PaymentAccountsPage() {
                         </span>
                       ) : (
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                          Balance now
+                          {isCreditCard(a) ? "Spent" : "Balance now"}
                         </p>
                       )}
                       <p
@@ -625,6 +786,16 @@ export default function PaymentAccountsPage() {
                           Linked to {a.linkedAccountName}
                         </p>
                       )}
+                      {a.type === "CARD" &&
+                        a.cardType === "CREDIT" &&
+                        a.creditLimit != null && (
+                          <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                            Limit {inr(a.creditLimit)}
+                            <span className="text-emerald-600 dark:text-emerald-400">
+                              {" · "}Avail {inr(a.creditLimit - balance)}
+                            </span>
+                          </p>
+                        )}
                     </div>
 
                     {/* type motif — bare frosted icons, no box/border */}

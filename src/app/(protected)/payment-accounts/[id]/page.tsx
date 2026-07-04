@@ -305,17 +305,25 @@ export default function PaymentAccountStatementPage({
             {account.ifsc && <span>IFSC: {account.ifsc}</span>}
             {account.upiApp && <span>{account.upiApp}</span>}
             {account.upiId && <span>{account.upiId}</span>}
+            {account.cardType && (
+              <span>{account.cardType === "CREDIT" ? "Credit card" : "Debit card"}</span>
+            )}
             {account.cardNetwork && (
               <span>
                 {account.cardNetwork}
                 {account.cardLast4 ? ` ••${account.cardLast4}` : ""}
               </span>
             )}
+            {account.cardType === "CREDIT" && account.creditLimit != null && (
+              <span>Limit: {inr(account.creditLimit)}</span>
+            )}
           </div>
         </div>
         <div className="shrink-0 text-right">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-            Balance now
+            {account.type === "CARD" && account.cardType === "CREDIT"
+              ? "Spent"
+              : "Balance now"}
           </p>
           <p
             className={`text-2xl font-bold tracking-tight ${
@@ -326,6 +334,13 @@ export default function PaymentAccountStatementPage({
           >
             {inr(currentBalance)}
           </p>
+          {account.type === "CARD" &&
+            account.cardType === "CREDIT" &&
+            account.creditLimit != null && (
+              <p className="mt-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                {inr(account.creditLimit - currentBalance)} available
+              </p>
+            )}
         </div>
       </div>
 

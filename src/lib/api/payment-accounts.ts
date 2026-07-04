@@ -3,6 +3,9 @@ import api from "@/lib/axios-client";
 export const PAYMENT_ACCOUNT_TYPES = ["BANK", "CASH", "UPI", "CARD", "OTHER"] as const;
 export type PaymentAccountType = (typeof PAYMENT_ACCOUNT_TYPES)[number];
 
+export const CARD_TYPES = ["CREDIT", "DEBIT"] as const;
+export type CardType = (typeof CARD_TYPES)[number];
+
 export const UPI_APPS = [
   "GPay",
   "PhonePe",
@@ -25,6 +28,10 @@ export interface PaymentAccount {
   upiApp?: string;
   cardNetwork?: string;
   cardLast4?: string;
+  /** For a CARD: CREDIT or DEBIT. */
+  cardType?: CardType | null;
+  /** Sanctioned credit limit — only for a credit card. */
+  creditLimit?: number | null;
   /** For a UPI linked to a bank: the bank account id it draws from. */
   linkedAccountId?: string | null;
   /** Computed on the list endpoint: the linked bank's name. */
@@ -59,6 +66,10 @@ export interface PaymentAccountPayload {
   upiApp?: string;
   cardNetwork?: string;
   cardLast4?: string;
+  /** For a CARD: CREDIT or DEBIT. */
+  cardType?: CardType | null;
+  /** Sanctioned credit limit — only for a credit card. */
+  creditLimit?: number | null;
   linkedAccountId?: string | null;
   notes?: string;
   openingBalance?: number;
