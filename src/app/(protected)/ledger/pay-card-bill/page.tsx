@@ -4,10 +4,9 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, ArrowLeftRight } from "lucide-react";
+import { CreditCard, ArrowRight } from "lucide-react";
 
 import { ledgerKeys } from "@/hooks/useLedger";
-import { useProjects } from "@/hooks/useProjects";
 import { usePaymentAccounts } from "@/hooks/usePaymentAccounts";
 import {
   createLedgerEntry,
@@ -15,12 +14,10 @@ import {
   type CreateLedgerPayload,
   type TransferPayload,
 } from "@/lib/api/ledger";
-import type { ProjectPopulated } from "@/lib/api/projects";
 import type { PaymentAccount } from "@/lib/api/payment-accounts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Combobox } from "@/components/ui/combobox";
 import {
   Select,
   SelectContent,
@@ -29,6 +26,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+// Account-type categories for the "pay from" source (credit cards excluded — you
+// can't pay a card bill with another credit card).
+const FROM_TYPES = [
+  { value: "BANK", label: "Bank" },
+  { value: "UPI", label: "UPI" },
+  { value: "CASH", label: "Cash" },
+  { value: "CARD", label: "Debit card" },
+  { value: "OTHER", label: "Other" },
+] as const;
+
+type FromType = "" | (typeof FROM_TYPES)[number]["value"];
+
 function todayISO(): string {
   const d = new Date();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -36,37 +45,58 @@ function todayISO(): string {
   return `${d.getFullYear()}-${m}-${dd}`;
 }
 
-export default function LedgerTransferPage() {
+function inr(n: number): string {
+  return `₹${(n ?? 0).toLocaleString("en-IN")}`;
+}
+
+export default function PayCardBillPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
   const accounts = usePaymentAccounts().data?.data ?? [];
-  const projects = useProjects().data?.data ?? [];
 
   const [form, setForm] = useState({
+    cardId: "",
+    fromType: "" as FromType,
     fromAccountId: "",
-    toAccountId: "",
     amount: 0,
     entryDate: todayISO(),
     description: "",
-    projectId: "",
-    // Optional charge/tax on the transfer (e.g. a card or bill-pay fee).
+    // Optional charge/tax on the payment (e.g. a bill-pay or convenience fee).
     feeMode: "percent" as "percent" | "amount",
     feeValue: "",
     feeCategory: "BANK_CHARGES" as "BANK_CHARGES" | "TAXES",
   });
 
-  const fromAccount = accounts.find((a) => a._id === form.fromAccountId);
-  const toAccount = accounts.find((a) => a._id === form.toAccountId);
-
-  // You can't transfer money INTO a credit card here — settling a card is a bill
-  // payment (use "Pay Card Bill"). A credit card can still be the source (you can
-  // take money out of it). So credit cards are excluded from the destination.
-  const destinationAccounts = accounts.filter(
-    (a) => !(a.type === "CARD" && a.cardType === "CREDIT")
+  // Credit cards you can pay a bill for; money can come from any non-credit-card
+  // account (bank / cash / UPI / debit card).
+  const creditCards = useMemo(
+    () => accounts.filter((a) => a.type === "CARD" && a.cardType === "CREDIT"),
+    [accounts]
+  );
+  const sourceAccounts = useMemo(
+    () => accounts.filter((a) => !(a.type === "CARD" && a.cardType === "CREDIT")),
+    [accounts]
+  );
+  // "Pay from" accounts, filtered to the chosen type category.
+  const visibleSources = useMemo(
+    () =>
+      form.fromType
+        ? sourceAccounts.filter((a) => a.type === form.fromType)
+        : sourceAccounts,
+    [sourceAccounts, form.fromType]
   );
 
-  // Charge: a % of the transfer amount OR a fixed ₹ amount.
+  const card = accounts.find((a) => a._id === form.cardId);
+  // Credit cards store a negative balance (money owed).
+  const cardBalance = card?.balance ?? 0;
+  const cardSpent = -cardBalance;
+  const cardAvail =
+    card?.creditLimit != null ? card.creditLimit + cardBalance : null;
+  const availAfter =
+    cardAvail != null ? cardAvail + (form.amount || 0) : null;
+
+  // Charge: a % of the payment amount OR a fixed ₹ amount.
   const feeAmount = useMemo(() => {
     const v = Number(form.feeValue);
     if (!(v > 0)) return 0;
@@ -77,7 +107,7 @@ export default function LedgerTransferPage() {
   const feePctEquiv =
     form.amount > 0 && feeAmount > 0 ? (feeAmount / form.amount) * 100 : 0;
 
-  const transferMutation = useMutation({
+  const payMutation = useMutation({
     mutationFn: async ({
       transfer,
       fee,
@@ -90,31 +120,27 @@ export default function LedgerTransferPage() {
     },
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ledgerKeys.all });
-      toast.success(vars.fee ? "Transfer + fee recorded" : "Transfer recorded");
-      router.push("/ledger");
+      toast.success(
+        vars.fee ? "Card bill payment + fee recorded" : "Card bill payment recorded"
+      );
+      router.push("/payment-accounts");
     },
     onError: (err: unknown) => {
       const message =
         (err as { response?: { data?: { error?: string } } })?.response?.data
-          ?.error ?? "Failed to record transfer";
+          ?.error ?? "Failed to record payment";
       toast.error(message);
     },
   });
 
-  const projectOptions = projects.map((p: ProjectPopulated) => ({
-    value: p._id,
-    label: p.clientName,
-    hint: p.serviceType,
-  }));
-
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.fromAccountId || !form.toAccountId) {
-      toast.error("Choose both a source and destination account");
+    if (!form.cardId) {
+      toast.error("Choose the credit card to pay");
       return;
     }
-    if (form.fromAccountId === form.toAccountId) {
-      toast.error("Source and destination must be different accounts");
+    if (!form.fromAccountId) {
+      toast.error("Choose the account to pay from");
       return;
     }
     if (form.amount <= 0) {
@@ -126,21 +152,22 @@ export default function LedgerTransferPage() {
       return;
     }
 
-    const payload: TransferPayload = {
+    const from = accounts.find((a) => a._id === form.fromAccountId);
+    const transfer: TransferPayload = {
+      // A transfer records money OUT of the source and INTO the card, which
+      // lowers what's owed on the card and raises its available credit.
       fromAccountId: form.fromAccountId,
-      toAccountId: form.toAccountId,
+      toAccountId: form.cardId,
       amount: form.amount,
       entryDate: form.entryDate,
+      description:
+        form.description.trim() ||
+        `Credit card bill payment — ${card?.name ?? "card"}${
+          from ? ` from ${from.name}` : ""
+        }`,
     };
-    const desc =
-      form.description.trim() ||
-      (fromAccount && toAccount
-        ? `Transfer from ${fromAccount.name} to ${toAccount.name}`
-        : "");
-    if (desc) payload.description = desc;
-    if (form.projectId) payload.projectId = form.projectId;
 
-    // Optional charge/tax on the transfer → a separate expense on the FROM account.
+    // Optional charge/tax → a separate expense on the paying account.
     let fee: CreateLedgerPayload | undefined;
     if (feeAmount > 0) {
       fee = {
@@ -149,30 +176,30 @@ export default function LedgerTransferPage() {
         amount: feeAmount,
         description: `${form.feeCategory === "TAXES" ? "Tax" : "Fee"} ${
           form.feeMode === "amount" ? `₹${feeAmount}` : `${form.feeValue}%`
-        } on transfer${fromAccount ? ` from ${fromAccount.name}` : ""}${
-          toAccount ? ` to ${toAccount.name}` : ""
-        }`,
+        } on card bill payment${card ? ` — ${card.name}` : ""}`,
         entryDate: form.entryDate,
         paymentStatus: "PAID",
         paymentAccountId: form.fromAccountId,
       };
-      if (form.projectId) fee.projectId = form.projectId;
     }
 
-    transferMutation.mutate({ transfer: payload, fee });
+    payMutation.mutate({ transfer, fee });
   }
+
+  const overpay = cardSpent > 0 && form.amount > cardSpent;
 
   return (
     <div className="space-y-4">
       <div>
         <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-900 dark:text-slate-50">
-          <ArrowLeftRight className="h-5 w-5 text-cine-primary" />
-          Transfer Between Accounts
+          <CreditCard className="h-5 w-5 text-cine-primary" />
+          Pay Credit Card Bill
         </h2>
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Move money between your own accounts (e.g. credit card → project cash).
-          This records both sides and does <strong>not</strong> affect profit or
-          loss.
+          Pay a credit card bill from a bank / cash / UPI account. The paying
+          account&apos;s balance goes down and the card&apos;s available credit
+          goes up. This is a transfer and does <strong>not</strong> affect
+          profit or loss.
         </p>
       </div>
 
@@ -180,43 +207,58 @@ export default function LedgerTransferPage() {
         onSubmit={handleSubmit}
         className="max-w-2xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
       >
-        {/* From → To */}
-        <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_auto_1fr]">
-          <Field label="From (money leaves) *">
-            <AccountSelect
-              accounts={accounts}
-              value={form.fromAccountId}
-              exclude={form.toAccountId}
-              placeholder="Source account"
-              onChange={(v) => setForm((f) => ({ ...f, fromAccountId: v }))}
-            />
+        {/* Pay-from type → account */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Pay from — type *">
+            <Select
+              value={form.fromType || "NONE"}
+              onValueChange={(v) => {
+                if (!v) return;
+                const t = (v === "NONE" ? "" : v) as FromType;
+                setForm((f) => {
+                  const acc = accounts.find((a) => a._id === f.fromAccountId);
+                  const keep = !f.fromAccountId || !t || acc?.type === t;
+                  return {
+                    ...f,
+                    fromType: t,
+                    fromAccountId: keep ? f.fromAccountId : "",
+                  };
+                });
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Bank / UPI / Cash…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NONE">All types</SelectItem>
+                {FROM_TYPES.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
-          <div className="hidden justify-center pb-2 sm:flex">
-            <ArrowRight className="h-5 w-5 text-slate-400" />
-          </div>
-          <Field label="To (money arrives) *">
+          <Field label="Pay from — account *">
             <AccountSelect
-              accounts={destinationAccounts}
-              value={form.toAccountId}
-              exclude={form.fromAccountId}
-              placeholder="Destination account"
-              onChange={(v) => setForm((f) => ({ ...f, toAccountId: v }))}
+              accounts={visibleSources}
+              value={form.fromAccountId}
+              exclude={form.cardId}
+              placeholder="Select account"
+              onChange={(v) => {
+                const acc = accounts.find((a) => a._id === v);
+                setForm((f) => ({
+                  ...f,
+                  fromAccountId: v,
+                  fromType: acc ? (acc.type as FromType) : f.fromType,
+                }));
+              }}
             />
-            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-              Paying a credit card? Use{" "}
-              <span className="font-medium">Pay Card Bill</span> instead.
-            </p>
           </Field>
         </div>
 
-        {accounts.length < 2 && (
-          <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
-            You need at least two payment accounts to record a transfer. Add them
-            under Payment Accounts.
-          </p>
-        )}
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {/* Card to pay */}
+        <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_auto_1fr]">
           <Field label="Amount (INR) *">
             <Input
               type="number"
@@ -229,46 +271,91 @@ export default function LedgerTransferPage() {
               required
             />
           </Field>
-          <Field label="Date *">
-            <DatePicker
-              value={form.entryDate}
-              onChange={(v) => setForm((f) => ({ ...f, entryDate: v }))}
-              placeholder="Transfer date"
+          <div className="hidden justify-center pb-2 sm:flex">
+            <ArrowRight className="h-5 w-5 text-slate-400" />
+          </div>
+          <Field label="Credit card (bill to pay) *">
+            <AccountSelect
+              accounts={creditCards}
+              value={form.cardId}
+              exclude={form.fromAccountId}
+              placeholder="Select credit card"
+              onChange={(v) => setForm((f) => ({ ...f, cardId: v }))}
             />
           </Field>
         </div>
 
-        <Field label="Note (optional)">
-          <Input
-            value={form.description}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, description: e.target.value }))
-            }
-            placeholder="e.g. Topping up project cash from my credit card"
-          />
-        </Field>
+        {creditCards.length === 0 && (
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+            No credit cards yet. Add one under Payment Accounts (type Card →
+            Credit).
+          </p>
+        )}
 
-        <Field label="Link to project (optional)">
-          <Combobox
-            options={projectOptions}
-            value={form.projectId}
-            onChange={(v) => setForm((f) => ({ ...f, projectId: v }))}
-            placeholder="No project"
-            searchPlaceholder="Search projects…"
-            clearable
-            clearLabel="No project"
-          />
-        </Field>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Date *">
+            <DatePicker
+              value={form.entryDate}
+              onChange={(v) => setForm((f) => ({ ...f, entryDate: v }))}
+              placeholder="Payment date"
+            />
+          </Field>
+          <Field label="Note (optional)">
+            <Input
+              value={form.description}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, description: e.target.value }))
+              }
+              placeholder="e.g. February statement"
+            />
+          </Field>
+        </div>
 
-        {/* Extra charge / fee on the transfer (optional) */}
+        {card && (
+          <div className="rounded-md border border-violet-200 bg-violet-50/60 p-3 text-sm dark:border-violet-900/50 dark:bg-violet-950/20">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span className="text-slate-500 dark:text-slate-400">
+                Spent now:{" "}
+                <span className="font-semibold text-slate-700 dark:text-slate-200">
+                  {inr(cardSpent)}
+                </span>
+              </span>
+              {cardAvail != null && (
+                <span className="text-slate-500 dark:text-slate-400">
+                  Available:{" "}
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    {inr(cardAvail)}
+                  </span>
+                  {form.amount > 0 && availAfter != null && (
+                    <>
+                      {" → "}
+                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                        {inr(availAfter)}
+                      </span>
+                    </>
+                  )}
+                </span>
+              )}
+            </div>
+            {overpay && (
+              <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+                You&apos;re paying more than the ₹
+                {cardSpent.toLocaleString("en-IN")} spent — the extra becomes a
+                credit balance on the card.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Extra charge / fee (optional) */}
         <div className="rounded-md border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-800/40">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-            Extra charge / fee (optional)
+            Extra charge / tax (optional)
           </p>
           <p className="mb-3 mt-0.5 text-xs text-slate-500 dark:text-slate-400">
             A <strong>%</strong> of the amount or a fixed <strong>₹</strong> — e.g.
-            a transfer or bill-pay charge. Recorded as a separate expense on the
-            “from” account.
+            a bill-pay or convenience charge. Recorded as a separate expense on
+            the paying account.
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Charge">
@@ -332,7 +419,7 @@ export default function LedgerTransferPage() {
               </span>
               {feePctEquiv > 0 ? ` (${feePctEquiv.toFixed(2)}% of the amount)` : ""}{" "}
               — separate {form.feeCategory === "TAXES" ? "Taxes" : "Bank Charges"}{" "}
-              expense on {fromAccount ? fromAccount.name : "the from account"}.
+              expense on the paying account.
             </p>
           )}
         </div>
@@ -340,9 +427,9 @@ export default function LedgerTransferPage() {
         <div className="flex gap-3 pt-2">
           <Button
             type="submit"
-            disabled={transferMutation.isPending || accounts.length < 2}
+            disabled={payMutation.isPending || creditCards.length === 0}
           >
-            {transferMutation.isPending ? "Recording..." : "Record Transfer"}
+            {payMutation.isPending ? "Recording..." : "Pay Bill"}
           </Button>
           <Button type="button" variant="outline" onClick={() => router.back()}>
             Cancel
@@ -380,7 +467,7 @@ function AccountSelect({
         ))}
         {options.length === 0 && (
           <div className="px-2 py-1.5 text-xs text-slate-500">
-            No other accounts available.
+            No accounts available.
           </div>
         )}
       </SelectContent>

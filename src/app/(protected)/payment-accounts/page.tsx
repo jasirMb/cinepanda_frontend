@@ -173,7 +173,16 @@ export default function PaymentAccountsPage() {
     setForm({
       name: a.name ?? "",
       type: a.type,
-      openingBalance: a.openingBalance != null ? String(a.openingBalance) : "",
+      // Credit card stores the spent amount as a negative balance; show it as a
+      // positive "amount spent" in the form.
+      openingBalance:
+        a.openingBalance != null
+          ? String(
+              a.type === "CARD" && a.cardType === "CREDIT"
+                ? -a.openingBalance
+                : a.openingBalance
+            )
+          : "",
       bankName: a.bankName ?? "",
       accountNumber: a.accountNumber ?? "",
       accountHolderName: a.accountHolderName ?? "",
@@ -199,15 +208,21 @@ export default function PaymentAccountsPage() {
       return;
     }
     const isLinkedUpi = form.type === "UPI" && !!form.linkedAccountId;
+    const isCreditCardForm = form.type === "CARD" && form.cardType === "CREDIT";
+    const enteredOpening =
+      form.openingBalance.trim() === "" ? 0 : Number(form.openingBalance);
     const payload: PaymentAccountPayload = {
       name: form.name.trim(),
       type: form.type,
       // A linked UPI shares the bank's balance — no opening balance of its own.
+      // For a credit card, the field is "amount spent"; we store it NEGATIVE so
+      // the account balance = money owed (spending is an expense that lowers it,
+      // paying the bill is money in that raises it back toward zero).
       openingBalance: isLinkedUpi
         ? 0
-        : form.openingBalance.trim() === ""
-          ? 0
-          : Number(form.openingBalance),
+        : isCreditCardForm
+          ? -enteredOpening
+          : enteredOpening,
       bankName: form.bankName.trim() || undefined,
       accountNumber: form.accountNumber.trim() || undefined,
       accountHolderName: form.accountHolderName.trim() || undefined,
@@ -272,10 +287,11 @@ export default function PaymentAccountsPage() {
     () => ownAccounts.reduce((s, a) => s + (a.balance ?? 0), 0),
     [ownAccounts]
   );
-  // A credit card's balance IS the amount spent on it. So: spent = balance;
-  // available (remaining) = limit − spent (only for cards with a limit set).
+  // A credit card's balance is negative = money owed. So: spent = −balance;
+  // available (remaining) = limit − spent = limit + balance (only for cards
+  // that have a limit set).
   const creditCardSpent = useMemo(
-    () => creditCards.reduce((s, a) => s + (a.balance ?? 0), 0),
+    () => creditCards.reduce((s, a) => s - (a.balance ?? 0), 0),
     [creditCards]
   );
   const creditCardLimitTotal = useMemo(
@@ -290,7 +306,7 @@ export default function PaymentAccountsPage() {
     () =>
       creditCards.reduce(
         (s, a) =>
-          a.creditLimit != null ? s + (a.creditLimit - (a.balance ?? 0)) : s,
+          a.creditLimit != null ? s + (a.creditLimit + (a.balance ?? 0)) : s,
         0
       ),
     [creditCards]
@@ -721,6 +737,10 @@ export default function PaymentAccountsPage() {
                       ? "Cash in hand"
                       : a.notes || "";
             const balance = a.balance ?? 0;
+            const credit = isCreditCard(a);
+            // Credit cards store a negative balance (money owed); show it as a
+            // positive "spent" figure. Available = limit + balance.
+            const shownValue = credit ? -balance : balance;
             return (
               <div
                 key={a._id}
@@ -774,12 +794,14 @@ export default function PaymentAccountsPage() {
                         className={`mt-0.5 text-2xl font-bold tracking-tight ${
                           a.linkedAccountName
                             ? "text-teal-600 dark:text-teal-400"
-                            : balance >= 0
+                            : credit
                               ? "text-slate-900 dark:text-slate-50"
-                              : "text-rose-600 dark:text-rose-400"
+                              : shownValue >= 0
+                                ? "text-slate-900 dark:text-slate-50"
+                                : "text-rose-600 dark:text-rose-400"
                         }`}
                       >
-                        {inr(balance)}
+                        {inr(shownValue)}
                       </p>
                       {a.linkedAccountName && (
                         <p className="mt-0.5 truncate text-[11px] font-medium text-teal-600/80 dark:text-teal-400/80">
@@ -792,7 +814,7 @@ export default function PaymentAccountsPage() {
                           <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                             Limit {inr(a.creditLimit)}
                             <span className="text-emerald-600 dark:text-emerald-400">
-                              {" · "}Avail {inr(a.creditLimit - balance)}
+                              {" · "}Avail {inr(a.creditLimit + balance)}
                             </span>
                           </p>
                         )}

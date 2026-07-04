@@ -327,18 +327,24 @@ export default function PaymentAccountStatementPage({
           </p>
           <p
             className={`text-2xl font-bold tracking-tight ${
-              currentBalance >= 0
+              account.type === "CARD" && account.cardType === "CREDIT"
                 ? "text-slate-900 dark:text-slate-50"
-                : "text-rose-600 dark:text-rose-400"
+                : currentBalance >= 0
+                  ? "text-slate-900 dark:text-slate-50"
+                  : "text-rose-600 dark:text-rose-400"
             }`}
           >
-            {inr(currentBalance)}
+            {inr(
+              account.type === "CARD" && account.cardType === "CREDIT"
+                ? -currentBalance
+                : currentBalance
+            )}
           </p>
           {account.type === "CARD" &&
             account.cardType === "CREDIT" &&
             account.creditLimit != null && (
               <p className="mt-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                {inr(account.creditLimit - currentBalance)} available
+                {inr(account.creditLimit + currentBalance)} available
               </p>
             )}
         </div>

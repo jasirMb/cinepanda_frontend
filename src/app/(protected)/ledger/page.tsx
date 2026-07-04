@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  CreditCard,
   HandCoins,
   Pencil,
   PiggyBank,
@@ -281,6 +282,12 @@ export default function LedgerPage() {
             <Button variant="outline" className="gap-1.5">
               <ArrowLeftRight className="h-4 w-4" />
               Transfer
+            </Button>
+          </Link>
+          <Link href="/ledger/pay-card-bill">
+            <Button variant="outline" className="gap-1.5">
+              <CreditCard className="h-4 w-4" />
+              Pay Card Bill
             </Button>
           </Link>
           <Link href="/ledger/new">
