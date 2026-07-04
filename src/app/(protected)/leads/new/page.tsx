@@ -1188,35 +1188,37 @@ export default function NewLeadPage() {
 
               <SectionCard title="Architect & designer">
                 <Rows cols={2}>
-                  <Field label="Architect Name">
-                    <div className="flex gap-2">
-                      <Select value={formValues.architectPrefix || ""} onValueChange={(v) => setField("architectPrefix", v)}>
-                        <SelectTrigger className="w-28 shrink-0">
-                          <SelectValue placeholder="Prefix" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PREFIX_OPTIONS.map((p) => (
-                            <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        value={formValues.architectName ?? ""}
-                        onChange={(e) => setField("architectName", e.target.value)}
-                        placeholder="Architect name"
-                        className="flex-1"
+                  <div className="space-y-4 sm:col-span-2">
+                    <Field label="Architect Name">
+                      <div className="flex gap-2">
+                        <Select value={formValues.architectPrefix || ""} onValueChange={(v) => setField("architectPrefix", v)}>
+                          <SelectTrigger className="w-28 shrink-0">
+                            <SelectValue placeholder="Prefix" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PREFIX_OPTIONS.map((p) => (
+                              <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          value={formValues.architectName ?? ""}
+                          onChange={(e) => setField("architectName", e.target.value)}
+                          placeholder="Architect name"
+                          className="flex-1"
+                        />
+                      </div>
+                    </Field>
+                    <Field label="Architect Contact" error={formErrors.architectContact}>
+                      <PhoneField
+                        countryCode={formValues.architectCountryCode}
+                        number={formValues.architectContact ?? ""}
+                        onCountryCodeChange={(c) => setField("architectCountryCode", c)}
+                        onNumberChange={(n) => setPhone("architectContact", n)}
+                        placeholder="Architect contact number"
                       />
-                    </div>
-                  </Field>
-                  <Field label="Architect Contact" error={formErrors.architectContact}>
-                    <PhoneField
-                      countryCode={formValues.architectCountryCode}
-                      number={formValues.architectContact ?? ""}
-                      onCountryCodeChange={(c) => setField("architectCountryCode", c)}
-                      onNumberChange={(n) => setPhone("architectContact", n)}
-                      placeholder="Architect contact number"
-                    />
-                  </Field>
+                    </Field>
+                  </div>
                   <Field label="Architect Company">
                     <Input
                       value={formValues.architectCompany ?? ""}
@@ -1232,35 +1234,37 @@ export default function NewLeadPage() {
                       rows={2}
                     />
                   </Field>
-                  <Field label="Interior Designer Name">
-                    <div className="flex gap-2">
-                      <Select value={formValues.designerPrefix || ""} onValueChange={(v) => setField("designerPrefix", v)}>
-                        <SelectTrigger className="w-28 shrink-0">
-                          <SelectValue placeholder="Prefix" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PREFIX_OPTIONS.map((p) => (
-                            <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        value={formValues.designerName ?? ""}
-                        onChange={(e) => setField("designerName", e.target.value)}
-                        placeholder="Interior designer name"
-                        className="flex-1"
+                  <div className="space-y-4 sm:col-span-2">
+                    <Field label="Interior Designer Name">
+                      <div className="flex gap-2">
+                        <Select value={formValues.designerPrefix || ""} onValueChange={(v) => setField("designerPrefix", v)}>
+                          <SelectTrigger className="w-28 shrink-0">
+                            <SelectValue placeholder="Prefix" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PREFIX_OPTIONS.map((p) => (
+                              <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          value={formValues.designerName ?? ""}
+                          onChange={(e) => setField("designerName", e.target.value)}
+                          placeholder="Interior designer name"
+                          className="flex-1"
+                        />
+                      </div>
+                    </Field>
+                    <Field label="Interior Designer Contact" error={formErrors.designerContact}>
+                      <PhoneField
+                        countryCode={formValues.designerCountryCode}
+                        number={formValues.designerContact ?? ""}
+                        onCountryCodeChange={(c) => setField("designerCountryCode", c)}
+                        onNumberChange={(n) => setPhone("designerContact", n)}
+                        placeholder="Interior designer contact"
                       />
-                    </div>
-                  </Field>
-                  <Field label="Interior Designer Contact" error={formErrors.designerContact}>
-                    <PhoneField
-                      countryCode={formValues.designerCountryCode}
-                      number={formValues.designerContact ?? ""}
-                      onCountryCodeChange={(c) => setField("designerCountryCode", c)}
-                      onNumberChange={(n) => setPhone("designerContact", n)}
-                      placeholder="Interior designer contact"
-                    />
-                  </Field>
+                    </Field>
+                  </div>
                   <Field label="Interior Designer Company">
                     <Input
                       value={formValues.designerCompany ?? ""}
@@ -1282,35 +1286,37 @@ export default function NewLeadPage() {
               {(formValues.leadSource === "REFERENCE" || formValues.leadSource === "REFERRAL") && (
                 <SectionCard title="Referral details">
                   <Rows cols={2}>
-                    <Field label="Referral Name">
-                      <div className="flex gap-2">
-                        <Select value={formValues.referralPrefix || ""} onValueChange={(v) => setField("referralPrefix", v)}>
-                          <SelectTrigger className="w-28 shrink-0">
-                            <SelectValue placeholder="Prefix" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {PREFIX_OPTIONS.map((p) => (
-                              <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Input
-                          value={formValues.referralName ?? ""}
-                          onChange={(e) => setField("referralName", e.target.value)}
-                          placeholder="Referral person name"
-                          className="flex-1"
+                    <div className="space-y-4 sm:col-span-2">
+                      <Field label="Referral Name">
+                        <div className="flex gap-2">
+                          <Select value={formValues.referralPrefix || ""} onValueChange={(v) => setField("referralPrefix", v)}>
+                            <SelectTrigger className="w-28 shrink-0">
+                              <SelectValue placeholder="Prefix" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PREFIX_OPTIONS.map((p) => (
+                                <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            value={formValues.referralName ?? ""}
+                            onChange={(e) => setField("referralName", e.target.value)}
+                            placeholder="Referral person name"
+                            className="flex-1"
+                          />
+                        </div>
+                      </Field>
+                      <Field label="Referral Contact">
+                        <PhoneField
+                          countryCode={formValues.referralCountryCode}
+                          number={formValues.referralContact ?? ""}
+                          onCountryCodeChange={(c) => setField("referralCountryCode", c)}
+                          onNumberChange={(n) => setPhone("referralContact", n)}
+                          placeholder="Referral contact number"
                         />
-                      </div>
-                    </Field>
-                    <Field label="Referral Contact">
-                      <PhoneField
-                        countryCode={formValues.referralCountryCode}
-                        number={formValues.referralContact ?? ""}
-                        onCountryCodeChange={(c) => setField("referralCountryCode", c)}
-                        onNumberChange={(n) => setPhone("referralContact", n)}
-                        placeholder="Referral contact number"
-                      />
-                    </Field>
+                      </Field>
+                    </div>
                     <Field label="Commission Amount (₹)">
                       <Input
                         type="number"
