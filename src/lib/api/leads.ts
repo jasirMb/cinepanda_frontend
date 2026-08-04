@@ -58,6 +58,8 @@ export interface LeadsListQuery {
   leadSource?: string;
   priorityType?: string;
   status?: string;
+  /** `field_dir`, e.g. "createdAt_desc". Server whitelists the field. */
+  sort?: string;
 }
 
 export interface LeadsListResponse {

@@ -327,6 +327,9 @@ export default function LeadsPage() {
       leadSource: filters.leadSource || undefined,
       startDate: filters.startDate || undefined,
       endDate: filters.endDate || undefined,
+      // The list view is server-paginated, so sorting has to happen server-side
+      // — sorting the 20 rows of the current page client-side would be wrong.
+      sort: filters.sort,
     }),
     [filters, listPage]
   );
@@ -911,12 +914,12 @@ export default function LeadsPage() {
             <SelectContent>
               <SelectItem value="nextCallTime_asc">Next call (soonest)</SelectItem>
               <SelectItem value="nextCallTime_desc">Next call (latest)</SelectItem>
-              <SelectItem value="createdAt_desc">Created (newest)</SelectItem>
-              <SelectItem value="createdAt_asc">Created (oldest)</SelectItem>
+              <SelectItem value="createdAt_desc">Last added (newest first)</SelectItem>
+              <SelectItem value="createdAt_asc">First added (oldest first)</SelectItem>
+              <SelectItem value="lastUpdate_desc">Last edited (most recent)</SelectItem>
+              <SelectItem value="lastUpdate_asc">Last edited (longest ago)</SelectItem>
               <SelectItem value="leadDate_desc">Lead date (newest)</SelectItem>
               <SelectItem value="leadDate_asc">Lead date (oldest)</SelectItem>
-              <SelectItem value="lastUpdate_desc">Last update (newest)</SelectItem>
-              <SelectItem value="lastUpdate_asc">Last update (oldest)</SelectItem>
             </SelectContent>
           </Select>
           <Button
