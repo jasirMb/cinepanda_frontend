@@ -216,8 +216,24 @@ export default function LeadsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
-  const [listMode, setListMode] = useState<"grid" | "table">("grid");
+  // View mode lives in the URL (?view=list&list=table) rather than in component
+  // state, so opening a lead and coming back returns to the view you left —
+  // local state would remount as "cards" every time.
+  const viewMode: "cards" | "list" =
+    searchParams.get("view") === "list" ? "list" : "cards";
+  const listMode: "grid" | "table" =
+    searchParams.get("list") === "table" ? "table" : "grid";
+
+  function setViewParam(key: string, value: string, fallback: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === fallback) params.delete(key);
+    else params.set(key, value);
+    const qs = params.toString();
+    router.replace(qs ? `/leads?${qs}` : "/leads", { scroll: false });
+  }
+  const setViewMode = (v: "cards" | "list") => setViewParam("view", v, "cards");
+  const setListMode = (v: "grid" | "table") => setViewParam("list", v, "grid");
+
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const CARDS_SECTION_LIMIT = 8;
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
@@ -322,15 +338,26 @@ export default function LeadsPage() {
     const error = searchParams.get("error");
     const updated = searchParams.get("updated");
 
+    // Strip only the one-shot toast flags — keep view/list so clearing the
+    // notice doesn't bounce the user back to the default cards view.
+    const clearFlags = () => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("created");
+      params.delete("updated");
+      params.delete("error");
+      const qs = params.toString();
+      router.replace(qs ? `/leads?${qs}` : "/leads", { scroll: false });
+    };
+
     if (created === "1") {
       toast.success("Lead created successfully");
-      router.replace("/leads");
+      clearFlags();
     } else if (updated === "1") {
       toast.success("Lead updated successfully");
-      router.replace("/leads");
+      clearFlags();
     } else if (typeof error === "string" && error.trim().length > 0) {
       toast.error(decodeURIComponent(error));
-      router.replace("/leads");
+      clearFlags();
     }
   }, [router, searchParams]);
 

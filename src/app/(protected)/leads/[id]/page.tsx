@@ -168,6 +168,14 @@ export default function LeadDetailPage() {
   const queryClient = useQueryClient();
   const leadId = params.id as string;
 
+  // Step back through history so the leads list is restored exactly as it was
+  // (view mode, filters, scroll). Pushing /leads instead would reset it to the
+  // default priority-cards view. Falls back to /leads on a direct deep link.
+  function goBack() {
+    if (typeof window !== "undefined" && window.history.length > 1) router.back();
+    else router.push("/leads");
+  }
+
   const leadQuery = useQuery<Lead>({
     queryKey: leadsKeys.detail(leadId),
     queryFn: () => fetchLead(leadId),
@@ -434,10 +442,8 @@ export default function LeadDetailPage() {
               </span>
             </div>
           )}
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/leads">
-              <ArrowLeft className="h-4 w-4" /> Back
-            </Link>
+          <Button variant="outline" size="sm" onClick={goBack}>
+            <ArrowLeft className="h-4 w-4" /> Back
           </Button>
           {isWon &&
             (custId ? (
