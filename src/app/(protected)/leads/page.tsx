@@ -839,7 +839,7 @@ export default function LeadsPage() {
       {viewMode === "list" && (
         <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 md:grid-cols-3 lg:grid-cols-6">
           <Input
-            placeholder="Search name, place, contact"
+            placeholder="Search name, place, contact, requirement"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
           />
