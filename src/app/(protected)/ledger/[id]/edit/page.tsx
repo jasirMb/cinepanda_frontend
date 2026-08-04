@@ -8,6 +8,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ledgerKeys, useLedgerCategories, useLedgerEntry } from "@/hooks/useLedger";
 import { useProjects } from "@/hooks/useProjects";
 import { useCustomers } from "@/hooks/useCustomers";
+import { usePaymentAccounts } from "@/hooks/usePaymentAccounts";
+import { useVendors } from "@/hooks/useVendors";
 import {
   updateLedgerEntry,
   type CreateLedgerPayload,
@@ -21,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Combobox } from "@/components/ui/combobox";
 import {
   Select,
   SelectContent,
@@ -43,6 +46,8 @@ export default function EditLedgerEntryPage({
   const projects = projectsQuery.data?.data ?? [];
   const customersQuery = useCustomers();
   const customers = customersQuery.data?.data ?? [];
+  const accounts = usePaymentAccounts().data?.data ?? [];
+  const vendors = useVendors().data?.data ?? [];
 
   const [form, setForm] = useState({
     entryType: "EXPENSE" as EntryType,
@@ -51,6 +56,9 @@ export default function EditLedgerEntryPage({
     description: "",
     entryDate: "",
     paymentMethod: "" as PaymentMethod | "",
+    paymentAccountId: "",
+    vendorId: "",
+    itemType: "" as "GOODS" | "SERVICE" | "",
     paymentStatus: "PAID" as PaymentStatus,
     projectId: "",
     customerId: "",
@@ -69,6 +77,13 @@ export default function EditLedgerEntryPage({
         description: e.description,
         entryDate: e.entryDate ? e.entryDate.slice(0, 10) : "",
         paymentMethod: e.paymentMethod ?? "",
+        paymentAccountId:
+          typeof e.paymentAccountId === "object" && e.paymentAccountId
+            ? e.paymentAccountId._id
+            : "",
+        vendorId:
+          typeof e.vendorId === "object" && e.vendorId ? e.vendorId._id : "",
+        itemType: e.itemType ?? "",
         paymentStatus: e.paymentStatus,
         projectId:
           typeof e.projectId === "object" && e.projectId
@@ -86,9 +101,13 @@ export default function EditLedgerEntryPage({
 
   const mutation = useMutation({
     mutationFn: (payload: typeof form) => {
+      const isExpense = payload.entryType === "EXPENSE";
       const cleaned: Partial<CreateLedgerPayload> = {
         ...payload,
         paymentMethod: payload.paymentMethod || undefined,
+        paymentAccountId: payload.paymentAccountId || undefined,
+        vendorId: isExpense ? payload.vendorId || undefined : undefined,
+        itemType: isExpense ? payload.itemType || undefined : undefined,
         projectId: payload.projectId || undefined,
         customerId: payload.customerId || undefined,
         invoiceRef: payload.invoiceRef || undefined,
@@ -103,6 +122,30 @@ export default function EditLedgerEntryPage({
     onError: () => toast.error("Failed to update entry"),
   });
 
+  const accountType = accountTypeForMethod(form.paymentMethod);
+  const visibleAccounts = accountType
+    ? accounts.filter((a) => a.type === accountType)
+    : accounts;
+  const selectedAccount = accounts.find((a) => a._id === form.paymentAccountId);
+
+  // Searchable-dropdown options for the long lists.
+  const projectOptions = projects.map((p: ProjectPopulated) => ({
+    value: p._id,
+    label: p.clientName,
+    hint: p.serviceType,
+  }));
+  const customerOptions = customers.map((c: Customer) => ({
+    value: c._id,
+    label: c.name,
+    hint: c.place,
+  }));
+  const vendorOptions = vendors.map((v) => ({ value: v._id, label: v.name }));
+
+  // Selecting a project forces the customer to that project's customer.
+  const selectedProject = projects.find((p) => p._id === form.projectId);
+  const projectCustomerId = selectedProject?.customerId?._id ?? "";
+  const customerLocked = Boolean(form.projectId && projectCustomerId);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.category.trim() || !form.description.trim() || !form.entryDate) {
@@ -111,6 +154,10 @@ export default function EditLedgerEntryPage({
     }
     if (form.amount <= 0) {
       toast.error("Amount must be greater than 0");
+      return;
+    }
+    if (!form.paymentAccountId) {
+      toast.error("Please choose the account it was paid through");
       return;
     }
     mutation.mutate(form);
@@ -224,12 +271,23 @@ export default function EditLedgerEntryPage({
           <Field label="Payment Method">
             <Select
               value={form.paymentMethod || "NONE"}
-              onValueChange={(v) =>
-                setForm((f) => ({
-                  ...f,
-                  paymentMethod: v === "NONE" ? "" : (v as PaymentMethod),
-                }))
-              }
+              onValueChange={(v) => {
+                // Radix fires onValueChange("") on mount when the controlled
+                // value has no matching item yet (async lists) — ignore it so
+                // the prefilled value isn't wiped.
+                if (!v) return;
+                const method = v === "NONE" ? "" : (v as PaymentMethod);
+                setForm((f) => {
+                  const t = accountTypeForMethod(method);
+                  const acc = accounts.find((a) => a._id === f.paymentAccountId);
+                  const keep = !f.paymentAccountId || !t || acc?.type === t;
+                  return {
+                    ...f,
+                    paymentMethod: method,
+                    paymentAccountId: keep ? f.paymentAccountId : "",
+                  };
+                });
+              }}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -239,6 +297,7 @@ export default function EditLedgerEntryPage({
                 <SelectItem value="CASH">Cash</SelectItem>
                 <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
                 <SelectItem value="UPI">UPI</SelectItem>
+                <SelectItem value="CARD">Card</SelectItem>
                 <SelectItem value="CHEQUE">Cheque</SelectItem>
                 <SelectItem value="OTHER">Other</SelectItem>
               </SelectContent>
@@ -248,7 +307,7 @@ export default function EditLedgerEntryPage({
             <Select
               value={form.paymentStatus}
               onValueChange={(v) =>
-                setForm((f) => ({ ...f, paymentStatus: v as PaymentStatus }))
+                v && setForm((f) => ({ ...f, paymentStatus: v as PaymentStatus }))
               }
             >
               <SelectTrigger>
@@ -263,46 +322,124 @@ export default function EditLedgerEntryPage({
           </Field>
         </div>
 
+        {/* Paid through + goods/service */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Paid through (account) *">
+            <Select
+              value={form.paymentAccountId || "NONE"}
+              onValueChange={(v) => {
+                if (!v) return;
+                if (v === "NONE") {
+                  setForm((f) => ({ ...f, paymentAccountId: "" }));
+                  return;
+                }
+                const acc = accounts.find((a) => a._id === v);
+                setForm((f) => ({
+                  ...f,
+                  paymentAccountId: v,
+                  paymentMethod: acc ? methodForType(acc.type) : f.paymentMethod,
+                }));
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select account" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NONE">Not specified</SelectItem>
+                {visibleAccounts.map((a) => (
+                  <SelectItem key={a._id} value={a._id}>
+                    {a.name} — {a.type}
+                  </SelectItem>
+                ))}
+                {visibleAccounts.length === 0 && (
+                  <div className="px-2 py-1.5 text-xs text-slate-500">
+                    No matching accounts. Add one under Payment Accounts.
+                  </div>
+                )}
+              </SelectContent>
+            </Select>
+            {selectedAccount && (
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                {accountDetail(selectedAccount)}
+              </p>
+            )}
+          </Field>
+          {form.entryType === "EXPENSE" && (
+            <Field label="Goods or Service">
+              <div className="flex gap-2">
+                {(["GOODS", "SERVICE"] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        itemType: f.itemType === opt ? "" : opt,
+                      }))
+                    }
+                    className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition ${
+                      form.itemType === opt
+                        ? "border-cine-primary bg-cine-primary/10 text-cine-primary"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    {opt === "GOODS" ? "Goods" : "Service"}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          )}
+        </div>
+
+        {form.entryType === "EXPENSE" && (
+          <Field label="Vendor (optional)">
+            <Combobox
+              options={vendorOptions}
+              value={form.vendorId}
+              onChange={(v) => setForm((f) => ({ ...f, vendorId: v }))}
+              placeholder="Select vendor (e.g. KSEB)"
+              searchPlaceholder="Search vendors…"
+              clearable
+              clearLabel="No vendor"
+            />
+          </Field>
+        )}
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Project (optional)">
-            <Select
-              value={form.projectId || "NONE"}
-              onValueChange={(v) =>
-                setForm((f) => ({ ...f, projectId: v === "NONE" ? "" : v }))
+            <Combobox
+              options={projectOptions}
+              value={form.projectId}
+              onChange={(v) =>
+                setForm((f) => {
+                  if (!v) return { ...f, projectId: "" };
+                  const proj = projects.find((p) => p._id === v);
+                  const cust = proj?.customerId?._id ?? "";
+                  return { ...f, projectId: v, customerId: cust || f.customerId };
+                })
               }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select project" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="NONE">No project</SelectItem>
-                {projects.map((p: ProjectPopulated) => (
-                  <SelectItem key={p._id} value={p._id}>
-                    {p.clientName} — {p.serviceType}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Select project"
+              searchPlaceholder="Search projects…"
+              clearable
+              clearLabel="No project"
+            />
           </Field>
           <Field label="Customer (optional)">
-            <Select
-              value={form.customerId || "NONE"}
-              onValueChange={(v) =>
-                setForm((f) => ({ ...f, customerId: v === "NONE" ? "" : v }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select customer" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="NONE">No customer</SelectItem>
-                {customers.map((c: Customer) => (
-                  <SelectItem key={c._id} value={c._id}>
-                    {c.name} — {c.place}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              options={customerOptions}
+              value={form.customerId}
+              onChange={(v) => setForm((f) => ({ ...f, customerId: v }))}
+              placeholder="Select customer"
+              searchPlaceholder="Search customers…"
+              clearable
+              clearLabel="No customer"
+              disabled={customerLocked}
+            />
+            {customerLocked && (
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                Set from the selected project. Clear the project to change it.
+              </p>
+            )}
           </Field>
         </div>
 
@@ -329,6 +466,70 @@ export default function EditLedgerEntryPage({
       </form>
     </div>
   );
+}
+
+function methodForType(type: string): PaymentMethod {
+  switch (type) {
+    case "BANK":
+      return "BANK_TRANSFER";
+    case "CASH":
+      return "CASH";
+    case "UPI":
+      return "UPI";
+    case "CARD":
+      return "CARD";
+    default:
+      return "OTHER";
+  }
+}
+
+function accountTypeForMethod(method: string): string | null {
+  switch (method) {
+    case "BANK_TRANSFER":
+    case "CHEQUE":
+      return "BANK";
+    case "CASH":
+      return "CASH";
+    case "UPI":
+      return "UPI";
+    case "CARD":
+      return "CARD";
+    default:
+      return null;
+  }
+}
+
+function accountDetail(a: {
+  type: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifsc?: string;
+  upiId?: string;
+  upiApp?: string;
+  cardNetwork?: string;
+  cardLast4?: string;
+  notes?: string;
+}): string {
+  if (a.type === "BANK")
+    return (
+      [
+        a.bankName,
+        a.accountNumber ? `A/C ${a.accountNumber}` : "",
+        a.ifsc ? `IFSC ${a.ifsc}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ") || "Bank account"
+    );
+  if (a.type === "UPI")
+    return [a.upiApp, a.upiId].filter(Boolean).join(" · ") || "UPI";
+  if (a.type === "CARD")
+    return (
+      [a.cardNetwork, a.cardLast4 ? `••${a.cardLast4}` : ""]
+        .filter(Boolean)
+        .join(" · ") || "Card"
+    );
+  if (a.type === "CASH") return "Cash";
+  return a.notes || "Other";
 }
 
 function Field({
@@ -365,31 +566,27 @@ function CategorySelect({
     !categoriesQuery.isError &&
     categories.length === 0;
 
+  const options = categories.map((c) => ({ value: c.value, label: c.label }));
+  if (value && !known) options.unshift({ value, label: value });
+
   return (
     <div className="space-y-1">
-      <Select value={value || undefined} onValueChange={onChange}>
-        <SelectTrigger>
-          <SelectValue
-            placeholder={
-              categoriesQuery.isLoading
-                ? "Loading categories..."
-                : categoriesQuery.isError
-                  ? "Failed to load categories"
-                  : isEmpty
-                    ? "No categories available"
-                    : "Select category"
-            }
-          />
-        </SelectTrigger>
-        <SelectContent>
-          {value && !known && <SelectItem value={value}>{value}</SelectItem>}
-          {categories.map((c) => (
-            <SelectItem key={c.value} value={c.value}>
-              {c.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <Combobox
+        options={options}
+        value={value}
+        onChange={(v) => onChange(v)}
+        disabled={categoriesQuery.isLoading}
+        searchPlaceholder="Search categories…"
+        placeholder={
+          categoriesQuery.isLoading
+            ? "Loading categories..."
+            : categoriesQuery.isError
+              ? "Failed to load categories"
+              : isEmpty
+                ? "No categories available"
+                : "Select category"
+        }
+      />
       {categoriesQuery.isError && (
         <p className="text-xs text-red-500">
           Could not load categories from /api/ledger/categories.

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { projectsKeys, useProjects } from "@/hooks/useProjects";
+import { useProjectsOverview } from "@/hooks/useDashboard";
 import { useLedgerSummary } from "@/hooks/useLedger";
 import {
   deleteProject,
@@ -114,6 +115,23 @@ export default function ProjectsPage() {
   const projectsQuery = useProjects(params);
   const projects = projectsQuery.data?.data ?? [];
 
+  // Global status counts (independent of the current filter) for the summary bar.
+  const overviewQuery = useProjectsOverview();
+  const ov = overviewQuery.data?.data;
+  const statusSummary: {
+    key: ProjectStatus | "ALL";
+    label: string;
+    count: number;
+    dot: string;
+  }[] = [
+    { key: "ALL", label: "All", count: ov?.totalProjects ?? projects.length, dot: "bg-slate-400" },
+    { key: "PLANNING", label: "Planning", count: ov?.planningProjects ?? 0, dot: STATUS_STRIPE.PLANNING },
+    { key: "ONGOING", label: "Ongoing", count: ov?.ongoingProjects ?? 0, dot: STATUS_STRIPE.ONGOING },
+    { key: "ON_HOLD", label: "On Hold", count: ov?.onHoldProjects ?? 0, dot: STATUS_STRIPE.ON_HOLD },
+    { key: "COMPLETED", label: "Completed", count: ov?.completedProjects ?? 0, dot: STATUS_STRIPE.COMPLETED },
+    { key: "CANCELLED", label: "Cancelled", count: ov?.cancelledProjects ?? 0, dot: STATUS_STRIPE.CANCELLED },
+  ];
+
   const ledgerSummaryQuery = useLedgerSummary();
   const financialsByProject = useMemo(() => {
     const map = new Map<string, { income: number; expense: number; net: number }>();
@@ -132,9 +150,10 @@ export default function ProjectsPage() {
     mutationFn: deleteProject,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: projectsKeys.all });
-      toast.success("Project deleted");
+      toast.success("Project moved to trash");
     },
-    onError: () => toast.error("Failed to delete project"),
+    onError: (e: any) =>
+      toast.error(e?.response?.data?.error ?? "Failed to delete project"),
   });
 
   if (projectsQuery.isLoading) {
@@ -171,7 +190,7 @@ export default function ProjectsPage() {
             Projects
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Track CinePanda installation projects and their lifecycle.
+            Track Cinepanda installation projects and their lifecycle.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -193,6 +212,36 @@ export default function ProjectsPage() {
             <Link href="/projects/new">New Project</Link>
           </Button>
         </div>
+      </div>
+
+      {/* Status summary — counts per status; click to filter */}
+      <div className="flex flex-wrap gap-2">
+        {statusSummary.map((s) => {
+          const active = (filters.status ?? "ALL") === s.key;
+          return (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() =>
+                setFilters((f) => ({
+                  ...f,
+                  status: s.key === "ALL" ? undefined : (s.key as ProjectStatus),
+                }))
+              }
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                active
+                  ? "border-cine-primary bg-cine-primary/10 text-cine-primary"
+                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800/60"
+              }`}
+            >
+              <span className={`h-2 w-2 rounded-full ${s.dot}`} />
+              <span className="font-medium">{s.label}</span>
+              <span className="rounded-full bg-slate-100 px-1.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                {s.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Filters */}
@@ -406,7 +455,27 @@ export default function ProjectsPage() {
           if (!open) setDeleteTarget(null);
         }}
         title="Delete project"
-        description="Are you sure you want to delete this project? This action cannot be undone."
+        description={(() => {
+          const t = deleteTarget
+            ? projects.find((p: ProjectPopulated) => p._id === deleteTarget)
+            : null;
+          const lc = t?.ledgerCount ?? 0;
+          const cc = t?.labours?.length ?? 0;
+          const parts = [
+            `"${t?.clientName ?? "This project"}" will be moved to the Trash.`,
+          ];
+          if (lc > 0)
+            parts.push(
+              `Its ${lc} ledger entr${lc === 1 ? "y" : "ies"} will be kept — preserved as financial records, just unlinked from the project.`
+            );
+          if (cc > 0)
+            parts.push(
+              `${cc} crew member${cc === 1 ? "" : "s"} on the roster won't be affected.`
+            );
+          parts.push("You can restore it from Trash.");
+          return parts.join(" ");
+        })()}
+        requireText="DELETE"
         confirmLabel="Delete"
         onConfirm={() => {
           if (deleteTarget) deleteMutation.mutate(deleteTarget);

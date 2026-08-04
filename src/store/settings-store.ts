@@ -59,19 +59,33 @@ export const SIDEBAR_PRESETS: SidebarPreset[] = [
 export interface ProfileSettings {
   name: string;
   email: string;
+  avatarUrl: string;
+  avatarKey: string;
 }
+
+// The id used for a user-uploaded background image.
+export const CUSTOM_PATTERN_ID = "custom";
+
+// Layout/view override — "desktop" forces the wide layout on phones
+// (like "request desktop site"); "auto" follows the actual device.
+export type ViewMode = "auto" | "desktop" | "mobile";
 
 interface SettingsState {
   theme: Theme;
   backgroundId: string;
   sidebarId: string;
   patternId: string;
+  customPatternUrl: string | null;
+  customPatternKey: string | null;
+  viewMode: ViewMode;
   profile: ProfileSettings;
   hasHydrated: boolean;
   setTheme: (t: Theme) => void;
   setBackgroundId: (id: string) => void;
   setSidebarId: (id: string) => void;
   setPatternId: (id: string) => void;
+  setCustomPattern: (url: string | null, key: string | null) => void;
+  setViewMode: (m: ViewMode) => void;
   setProfile: (p: Partial<ProfileSettings>) => void;
 }
 
@@ -87,12 +101,18 @@ export const useSettingsStore = create<SettingsState>()(
         backgroundId: "default",
         sidebarId: "slate",
         patternId: "none",
-        profile: { name: "", email: "" },
+        customPatternUrl: null,
+        customPatternKey: null,
+        viewMode: "auto",
+        profile: { name: "", email: "", avatarUrl: "", avatarKey: "" },
         hasHydrated: false,
         setTheme: (theme) => set({ theme }),
         setBackgroundId: (backgroundId) => set({ backgroundId }),
         setSidebarId: (sidebarId) => set({ sidebarId }),
         setPatternId: (patternId) => set({ patternId }),
+        setCustomPattern: (customPatternUrl, customPatternKey) =>
+          set({ customPatternUrl, customPatternKey }),
+        setViewMode: (viewMode) => set({ viewMode }),
         setProfile: (p) =>
           set((s) => ({ profile: { ...s.profile, ...p } })),
       };
@@ -104,6 +124,9 @@ export const useSettingsStore = create<SettingsState>()(
         backgroundId: state.backgroundId,
         sidebarId: state.sidebarId,
         patternId: state.patternId,
+        customPatternUrl: state.customPatternUrl,
+        customPatternKey: state.customPatternKey,
+        viewMode: state.viewMode,
         profile: state.profile,
       }),
       onRehydrateStorage: () => () => {
@@ -123,4 +146,18 @@ export function getSidebarPreset(id: string): SidebarPreset {
 
 export function getPatternPreset(id: string): PatternPreset {
   return PATTERN_PRESETS.find((p) => p.id === id) ?? PATTERN_PRESETS[0];
+}
+
+/**
+ * Resolve the background-image URL to apply for the current pattern selection.
+ * Custom uploads use the same image for both themes; presets pick per-theme.
+ */
+export function resolvePatternImage(
+  patternId: string,
+  customPatternUrl: string | null,
+  theme: Theme
+): string | null {
+  if (patternId === CUSTOM_PATTERN_ID) return customPatternUrl;
+  const preset = getPatternPreset(patternId);
+  return theme === "dark" ? preset.dark : preset.light;
 }

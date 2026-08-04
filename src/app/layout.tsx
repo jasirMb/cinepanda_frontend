@@ -1,16 +1,17 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import { ServiceWorkerUpdater } from "@/components/layout/ServiceWorkerUpdater";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
-  title: "CinePanda Admin",
-  description: "Admin panel for CinePanda",
-  applicationName: "CinePanda",
+  title: "Cinepanda Admin",
+  description: "Admin panel for Cinepanda",
+  applicationName: "Cinepanda",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "CinePanda",
+    title: "Cinepanda",
     statusBarStyle: "black-translucent"
   },
   other: {
@@ -38,6 +39,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <ServiceWorkerUpdater />
         <QueryProvider>{children}</QueryProvider>
         <Toaster richColors position="top-right" />
       </body>

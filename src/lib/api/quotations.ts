@@ -1,17 +1,36 @@
 import api from "@/lib/axios-client";
+import { API_BASE_URL } from "@/lib/api-base";
 
 /* ────────────────────────────────────────────
    Types
    ──────────────────────────────────────────── */
 
 export interface QuotationProductItem {
-  productId?: string;
+  /** Populated to {_id, name, imageUrl, specifications} on the detail endpoint; id string otherwise. */
+  productId?:
+    | string
+    | {
+        _id: string;
+        name?: string;
+        imageUrl?: string;
+        specifications?: Record<string, unknown>;
+      }
+    | null;
   productName: string;
   category: string;
   subcategory: string;
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+}
+
+/** The product image from a (possibly populated) quotation item's productId. */
+export function quotationItemImage(
+  productId: QuotationProductItem["productId"]
+): string | undefined {
+  return productId && typeof productId === "object"
+    ? productId.imageUrl
+    : undefined;
 }
 
 export interface QuotationManualItem {
@@ -43,8 +62,17 @@ export interface QuotationCustomer {
   _id: string;
   name: string;
   phone: string;
+  countryCode?: string;
   place: string;
   email?: string;
+}
+
+/** projectId comes back populated (full project) from list/detail endpoints. */
+export interface QuotationProjectRef {
+  _id: string;
+  clientName?: string;
+  serviceType?: string;
+  status?: string;
 }
 
 export interface Quotation {
@@ -56,9 +84,29 @@ export interface Quotation {
   quotationDate: string;
   validUntil?: string;
   status: "DRAFT" | "SENT" | "APPROVED" | "REJECTED";
-  projectId?: string;
+  projectId?: string | QuotationProjectRef | null;
+  speakerConfig?: {
+    name: string;
+    imageUrl?: string;
+    imageKey?: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Extract the plain project id from a (possibly populated) projectId field. */
+export function quotationProjectId(
+  projectId: string | QuotationProjectRef | null | undefined
+): string | undefined {
+  if (!projectId) return undefined;
+  return typeof projectId === "string" ? projectId : projectId._id;
+}
+
+/** Extract the populated project (label info), if present. */
+export function quotationProject(
+  projectId: string | QuotationProjectRef | null | undefined
+): QuotationProjectRef | undefined {
+  return projectId && typeof projectId === "object" ? projectId : undefined;
 }
 
 export interface QuotationsListResponse {
@@ -81,6 +129,14 @@ export interface CreateQuotationPayload {
   termsAndConditions?: string;
   quotationDate?: string;
   validUntil?: string;
+  speakerConfig?: { name: string; imageUrl?: string; imageKey?: string } | null;
+}
+
+export interface UpdateQuotationPayload {
+  notes?: string;
+  termsAndConditions?: string;
+  validUntil?: string;
+  speakerConfig?: { name: string; imageUrl?: string; imageKey?: string } | null;
 }
 
 /* ────────────────────────────────────────────
@@ -111,7 +167,7 @@ export async function createQuotation(
 
 export async function updateQuotation(
   id: string,
-  payload: Partial<Pick<Quotation, "notes" | "termsAndConditions" | "validUntil">>
+  payload: UpdateQuotationPayload
 ): Promise<QuotationResponse> {
   const { data } = await api.put<QuotationResponse>(
     `/quotations/${id}`,
@@ -139,9 +195,8 @@ export async function deleteQuotation(
 }
 
 export function getQuotationPdfUrl(id: string): string {
-  const baseURL =
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? process.env.NEXT_PUBLIC_API_URL;
-  return `${baseURL}/quotations/${id}/pdf`;
+  // API_BASE_URL is already protocol-normalized and trailing-slash-stripped.
+  return `${API_BASE_URL}/quotations/${id}/pdf`;
 }
 
 /**

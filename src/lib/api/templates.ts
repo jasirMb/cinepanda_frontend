@@ -4,14 +4,39 @@ import api from "@/lib/axios-client";
    Types
    ──────────────────────────────────────────── */
 
+/** A product item's `productId` comes back populated from the API (full product) but
+ *  is sent back as a plain id string on save. */
+export interface PopulatedProduct {
+  _id: string;
+  name?: string;
+  imageUrl?: string;
+  price?: number;
+  category?: string;
+  subcategory?: string;
+  brand?: string;
+}
+
 export interface TemplateProductItem {
-  productId: string;
+  productId: string | PopulatedProduct | null;
   productName: string;
   category: string;
   subcategory: string;
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+}
+
+/** Extract the plain id from a (possibly populated) productId field. */
+export function productItemId(productId: string | PopulatedProduct | null): string {
+  if (!productId) return "";
+  return typeof productId === "string" ? productId : productId._id;
+}
+
+/** Extract the product image (only present when productId is populated). */
+export function productItemImage(
+  productId: string | PopulatedProduct | null
+): string | undefined {
+  return productId && typeof productId === "object" ? productId.imageUrl : undefined;
 }
 
 export interface TemplateManualItem {
@@ -29,6 +54,27 @@ export interface TemplateGroup {
   subtotal: number;
 }
 
+export interface TemplateQuotationUsage {
+  total: number;
+  approved: number;
+  /** True when an approved quotation OR a project uses this template → edit/delete blocked. */
+  locked: boolean;
+  /** Why it's locked — 'project' takes priority over 'quotation' in messaging. */
+  lockReason: "project" | "quotation" | null;
+  quotations: {
+    _id: string;
+    status: string;
+    customerName: string | null;
+    quotationDate: string | null;
+  }[];
+  projects: {
+    _id: string;
+    clientName: string;
+    serviceType: string;
+    status: string;
+  }[];
+}
+
 export interface Template {
   _id: string;
   name: string;
@@ -39,12 +85,35 @@ export interface Template {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Present on the detail endpoint only. */
+  quotationUsage?: TemplateQuotationUsage;
+  /** Present on the list endpoint — edit/delete blocked when true. */
+  locked?: boolean;
+  lockReason?: "project" | "quotation" | null;
+  /** Route of the quotation/project that locks it (click-through). */
+  lockHref?: string | null;
+}
+
+export interface TemplatesListQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  /** "locked" → only locked templates; "available" → only editable/deletable ones. */
+  lock?: "locked" | "available";
 }
 
 export interface TemplatesListResponse {
   success: boolean;
   data: Template[];
   count: number;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
 }
 
 export interface TemplateResponse {
@@ -73,6 +142,7 @@ export interface SuggestResponse {
     productModel?: string;
     price: number;
     unit: string;
+    imageUrl?: string;
   }[];
 }
 
@@ -98,8 +168,10 @@ export interface CreateTemplatePayload {
    Templates API
    ──────────────────────────────────────────── */
 
-export async function fetchTemplates(): Promise<TemplatesListResponse> {
-  const { data } = await api.get<TemplatesListResponse>("/templates");
+export async function fetchTemplates(
+  params: TemplatesListQuery = {}
+): Promise<TemplatesListResponse> {
+  const { data } = await api.get<TemplatesListResponse>("/templates", { params });
   return data;
 }
 

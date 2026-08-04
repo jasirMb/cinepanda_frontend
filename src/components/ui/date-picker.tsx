@@ -25,10 +25,11 @@ export function DatePicker({
   placeholder = "Pick a date",
   className,
 }: DatePickerProps) {
+  const [open, setOpen] = React.useState(false);
   const date = value ? new Date(value + "T00:00:00") : undefined;
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -61,6 +62,8 @@ export function DatePicker({
             } else {
               onChange("");
             }
+            // Close the popover as soon as a date is picked.
+            setOpen(false);
           }}
           defaultMonth={date}
         />

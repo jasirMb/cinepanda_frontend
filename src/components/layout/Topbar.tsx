@@ -4,7 +4,40 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { useShellStore } from "@/store/shell-store";
-import { InstallButton } from "@/components/layout/InstallButton";
+import { useSettingsStore } from "@/store/settings-store";
+
+function avatarInitials(name: string, email: string): string {
+  const source = name.trim() || email.trim();
+  if (!source) return "A";
+  const parts = source.split(/[\s@.]+/).filter(Boolean);
+  const letters = (parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "");
+  return letters.toUpperCase() || source[0].toUpperCase();
+}
+
+function TopbarAvatar() {
+  const profile = useSettingsStore((s) => s.profile);
+  const openSettings = useShellStore((s) => s.openSettings);
+  return (
+    <button
+      type="button"
+      onClick={() => openSettings()}
+      title="Settings"
+      aria-label="Open settings"
+      className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-xs font-semibold text-slate-600 transition hover:ring-2 hover:ring-cine-primary/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+    >
+      {profile.avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={profile.avatarUrl}
+          alt="Profile"
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        avatarInitials(profile.name, profile.email)
+      )}
+    </button>
+  );
+}
 
 interface PageMeta {
   title: string;
@@ -63,6 +96,29 @@ const ROUTE_META: { match: (p: string) => boolean; meta: PageMeta }[] = [
   },
 
   {
+    match: (p) => p.startsWith("/labours"),
+    meta: { title: "Labours", subtitle: "Your labour / crew directory" },
+  },
+
+  {
+    match: (p) => p.startsWith("/staff/settings"),
+    meta: { title: "Staff Settings", subtitle: "Holidays & weekly offs" },
+  },
+  {
+    match: (p) => p.startsWith("/staff"),
+    meta: { title: "Staff", subtitle: "Team, attendance & salary" },
+  },
+
+  {
+    match: (p) => p.startsWith("/vendors"),
+    meta: { title: "Vendors", subtitle: "Suppliers & payees" },
+  },
+  {
+    match: (p) => p.startsWith("/payment-accounts"),
+    meta: { title: "Payment Accounts", subtitle: "Banks, cash & UPI" },
+  },
+
+  {
     match: (p) => p === "/projects/new",
     meta: { title: "New Project", subtitle: "Start a new project" },
   },
@@ -97,7 +153,7 @@ function resolveMeta(pathname: string): PageMeta {
   for (const r of ROUTE_META) {
     if (r.match(pathname)) return r.meta;
   }
-  return { title: "CinePanda", subtitle: "Admin Console" };
+  return { title: "Cinepanda", subtitle: "Admin Console" };
 }
 
 export function Topbar() {
@@ -118,7 +174,7 @@ export function Topbar() {
       <div className="flex min-w-0 items-center gap-3">
         <Image
           src="/cinepanda-logo.png"
-          alt="CinePanda logo"
+          alt="Cinepanda logo"
           width={32}
           height={32}
           priority
@@ -136,7 +192,7 @@ export function Topbar() {
         </div>
       </div>
       <div className="ml-auto flex items-center gap-2">
-        <InstallButton />
+        <TopbarAvatar />
       </div>
     </header>
   );

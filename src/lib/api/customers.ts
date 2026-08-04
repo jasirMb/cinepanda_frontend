@@ -8,9 +8,12 @@ export interface Customer {
   _id: string;
   name: string;
   phone: string;
+  countryCode?: string;
   place: string;
   email?: string;
   notes?: string;
+  imageUrl?: string;
+  imageKey?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -33,7 +36,12 @@ export async function fetchCustomers(): Promise<CustomersListResponse> {
 export interface CreateCustomerPayload {
   name: string;
   phone: string;
+  countryCode?: string;
   place: string;
+  email?: string;
+  notes?: string;
+  imageUrl?: string;
+  imageKey?: string;
 }
 
 export async function createCustomer(
@@ -46,9 +54,71 @@ export async function createCustomer(
   return data.data;
 }
 
+export async function updateCustomer(
+  id: string,
+  payload: Partial<CreateCustomerPayload>
+): Promise<Customer> {
+  const { data } = await api.put<{ success: boolean; data: Customer }>(
+    `/customers/${id}`,
+    payload
+  );
+  return data.data;
+}
+
 export async function fetchCustomer(id: string): Promise<Customer> {
   const { data } = await api.get<{ success: boolean; data: Customer }>(
     `/customers/${id}`
+  );
+  return data.data;
+}
+
+/* ────────────────────────────────────────────
+   Customer overview (everything linked to a customer)
+   ──────────────────────────────────────────── */
+
+export interface CustomerOverview {
+  customer: Customer;
+  leads: {
+    _id: string;
+    customerName: string;
+    contactNumber: string;
+    status: string;
+    requirement?: string;
+    leadSource?: string;
+    priorityType?: string;
+    createdAt: string;
+  }[];
+  quotations: {
+    _id: string;
+    status: "DRAFT" | "SENT" | "APPROVED" | "REJECTED";
+    quotationDate: string;
+    projectId?: string;
+    sectionCount: number;
+    value: number;
+  }[];
+  projects: {
+    _id: string;
+    clientName: string;
+    serviceType: string;
+    projectValue: number;
+    status: string;
+    startDate?: string;
+    expectedCompletionDate?: string;
+  }[];
+  totals: {
+    quotedValue: number;
+    projectValue: number;
+    income: number;
+    expense: number;
+    net: number;
+  };
+}
+
+export async function fetchCustomerOverview(
+  id: string
+): Promise<CustomerOverview> {
+  const { data } = await api.get<{ success: boolean; data: CustomerOverview }>(
+    `/customers/${id}/overview`
   );
   return data.data;
 }

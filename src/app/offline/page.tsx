@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 
 export const metadata: Metadata = {
-  title: "Offline | CinePanda"
+  title: "Offline | Cinepanda"
 };
 
 export default function OfflinePage() {
@@ -10,7 +10,7 @@ export default function OfflinePage() {
     <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-6 bg-white px-6 text-center dark:bg-slate-950">
       <Image
         src="/cinepanda-logo.png"
-        alt="CinePanda"
+        alt="Cinepanda"
         width={72}
         height={72}
         priority
@@ -21,7 +21,7 @@ export default function OfflinePage() {
           You&apos;re offline
         </h1>
         <p className="max-w-sm text-sm text-slate-600 dark:text-slate-300">
-          CinePanda needs an internet connection to load this page. Reconnect
+          Cinepanda needs an internet connection to load this page. Reconnect
           and try again.
         </p>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -8,19 +8,24 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   FileText,
   IndianRupee,
   MapPin,
   Pencil,
   Phone,
+  PiggyBank,
   Plus,
+  Receipt,
   TrendingDown,
   TrendingUp,
   Trash2,
   User,
   UserPlus,
   Wallet,
+  X,
 } from "lucide-react";
 
 import { projectsKeys, useProject } from "@/hooks/useProjects";
@@ -34,7 +39,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import type { LedgerEntryPopulated } from "@/lib/api/ledger";
+import { formatPhone, telHref } from "@/lib/country-codes";
+import { ProjectLabourSection } from "@/components/labour/ProjectLabourSection";
+import {
+  isFeeEntry,
+  isOperatingEntry,
+  type LedgerEntryPopulated,
+} from "@/lib/api/ledger";
 
 const STATUS_BADGE: Record<ProjectStatus, string> = {
   PLANNING: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
@@ -120,6 +131,71 @@ export default function ProjectDetailPage({
   const ledgerQuery = useLedger({ projectId: id });
   const ledgerEntries = ledgerQuery.data?.data ?? [];
 
+  // Ledger filters: type, category and date range (all combine).
+  const [ledgerType, setLedgerType] = useState<
+    "all" | "INCOME" | "EXPENSE" | "OWNER" | "TRANSFER"
+  >("all");
+  const [ledgerCategory, setLedgerCategory] = useState("");
+  const [ledgerFrom, setLedgerFrom] = useState("");
+  const [ledgerTo, setLedgerTo] = useState("");
+
+  const ledgerCategoryOptions = useMemo(
+    () =>
+      Array.from(new Set(ledgerEntries.map((e) => e.category)))
+        .filter(Boolean)
+        .sort(),
+    [ledgerEntries]
+  );
+  const ledgerFiltersActive =
+    ledgerType !== "all" || !!ledgerCategory || !!ledgerFrom || !!ledgerTo;
+
+  const filteredLedger = useMemo(() => {
+    const fromTs = ledgerFrom ? new Date(ledgerFrom).getTime() : null;
+    const toTs = ledgerTo ? new Date(`${ledgerTo}T23:59:59`).getTime() : null;
+    return ledgerEntries.filter((e) => {
+      if (ledgerType === "OWNER") {
+        if (e.accountingType !== "CAPITAL") return false;
+      } else if (ledgerType === "TRANSFER") {
+        if (e.accountingType !== "TRANSFER") return false;
+      } else if (ledgerType === "INCOME" || ledgerType === "EXPENSE") {
+        if (e.entryType !== ledgerType) return false;
+      }
+      if (ledgerCategory && e.category !== ledgerCategory) return false;
+      const ts = new Date(e.entryDate).getTime();
+      if (fromTs != null && ts < fromTs) return false;
+      if (toTs != null && ts > toTs) return false;
+      return true;
+    });
+  }, [ledgerEntries, ledgerType, ledgerCategory, ledgerFrom, ledgerTo]);
+
+  function clearLedgerFilters() {
+    setLedgerType("all");
+    setLedgerCategory("");
+    setLedgerFrom("");
+    setLedgerTo("");
+  }
+
+  const LEDGER_PER_PAGE = 10;
+  const [ledgerPage, setLedgerPage] = useState(1);
+  const ledgerPageCount = Math.max(
+    1,
+    Math.ceil(filteredLedger.length / LEDGER_PER_PAGE)
+  );
+  const pagedLedger = useMemo(
+    () =>
+      filteredLedger.slice(
+        (ledgerPage - 1) * LEDGER_PER_PAGE,
+        ledgerPage * LEDGER_PER_PAGE
+      ),
+    [filteredLedger, ledgerPage]
+  );
+  useEffect(() => {
+    setLedgerPage(1);
+  }, [ledgerType, ledgerCategory, ledgerFrom, ledgerTo]);
+  useEffect(() => {
+    if (ledgerPage > ledgerPageCount) setLedgerPage(ledgerPageCount);
+  }, [ledgerPage, ledgerPageCount]);
+
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const statusMutation = useMutation({
@@ -141,16 +217,19 @@ export default function ProjectDetailPage({
   const deleteMutation = useMutation({
     mutationFn: () => deleteProject(id),
     onSuccess: () => {
-      toast.success("Project deleted");
+      toast.success("Project moved to trash");
       router.push("/projects");
     },
     onError: () => toast.error("Failed to delete project"),
   });
 
-  const totalIncome = ledgerEntries
+  // Operating entries only — owner contributions/withdrawals and account
+  // transfers move money around but aren't this project's income/expense.
+  const operatingEntries = ledgerEntries.filter(isOperatingEntry);
+  const totalIncome = operatingEntries
     .filter((e) => e.entryType === "INCOME")
     .reduce((s, e) => s + e.amount, 0);
-  const totalExpense = ledgerEntries
+  const totalExpense = operatingEntries
     .filter((e) => e.entryType === "EXPENSE")
     .reduce((s, e) => s + e.amount, 0);
   const pendingAmount = project ? project.projectValue - totalIncome : 0;
@@ -159,6 +238,21 @@ export default function ProjectDetailPage({
       ? Math.min(100, (totalIncome / project.projectValue) * 100)
       : 0;
   const netProfit = totalIncome - totalExpense;
+
+  // Owner's own money in/out for THIS project (kept out of profit above).
+  const ownerPutIn = ledgerEntries
+    .filter((e) => e.accountingType === "CAPITAL" && e.entryType === "INCOME")
+    .reduce((s, e) => s + e.amount, 0);
+  const ownerTakenOut = ledgerEntries
+    .filter((e) => e.accountingType === "CAPITAL" && e.entryType === "EXPENSE")
+    .reduce((s, e) => s + e.amount, 0);
+  const hasOwnerMoney = ownerPutIn > 0 || ownerTakenOut > 0;
+
+  // Money lost to fees / charges / taxes on this project (part of expenses above).
+  const lostToFees = ledgerEntries
+    .filter(isFeeEntry)
+    .reduce((s, e) => s + e.amount, 0);
+
   const hasActivity = totalIncome > 0 || totalExpense > 0;
   const isProfit = netProfit >= 0;
   const marginPct =
@@ -401,6 +495,61 @@ export default function ProjectDetailPage({
         />
       </div>
 
+      {/* Owner money on this project — tracked separately, not part of profit */}
+      {hasOwnerMoney && (
+        <div className="space-y-2">
+          <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <PiggyBank className="h-3.5 w-3.5 text-indigo-500" />
+            Owner money
+            <span className="font-normal normal-case text-slate-400">
+              (not in profit)
+            </span>
+          </h3>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            <StatCard
+              icon={PiggyBank}
+              label="Owner Put In"
+              value={`+${formatINR(ownerPutIn)}`}
+              tone="emerald"
+            />
+            <StatCard
+              icon={Wallet}
+              label="Owner Taken Out"
+              value={`−${formatINR(ownerTakenOut)}`}
+              tone="red"
+            />
+            <StatCard
+              icon={IndianRupee}
+              label="Net Owner"
+              value={`${
+                ownerPutIn - ownerTakenOut >= 0 ? "+" : "−"
+              }${formatINR(Math.abs(ownerPutIn - ownerTakenOut))}`}
+              tone="slate"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Money lost to fees & taxes on this project (part of expenses) */}
+      {lostToFees > 0 && (
+        <Link
+          href={`/ledger/fees?projectId=${id}`}
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-2.5 text-sm transition hover:border-amber-300 hover:bg-amber-100/60 dark:border-amber-900/50 dark:bg-amber-950/20 dark:hover:bg-amber-900/30"
+        >
+          <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
+            <Receipt className="h-4 w-4 text-amber-500" />
+            Lost to fees &amp; taxes
+          </span>
+          <span className="font-semibold text-red-600 dark:text-red-400">
+            −{formatINR(lostToFees)}
+          </span>
+          <span className="ml-auto flex items-center gap-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+            View all
+            <ChevronRight className="h-3.5 w-3.5" />
+          </span>
+        </Link>
+      )}
+
       {/* Project + Customer details */}
       <div className="grid gap-4 lg:grid-cols-2">
         <DetailsCard title="Project Details" icon={CalendarDays}>
@@ -436,8 +585,14 @@ export default function ProjectDetailPage({
             <DetailRow
               icon={Phone}
               label="Phone"
-              value={project.customerId.phone}
-              link={`tel:${project.customerId.phone}`}
+              value={formatPhone(
+                project.customerId.countryCode,
+                project.customerId.phone
+              )}
+              link={telHref(
+                project.customerId.countryCode,
+                project.customerId.phone
+              )}
             />
             <DetailRow
               icon={MapPin}
@@ -470,6 +625,13 @@ export default function ProjectDetailPage({
         )}
       </div>
 
+      {/* Labour */}
+      <ProjectLabourSection
+        projectId={id}
+        labours={project.labours ?? []}
+        groups={project.groups ?? []}
+      />
+
       {/* Ledger entries */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -495,11 +657,85 @@ export default function ProjectDetailPage({
           </Button>
         </div>
 
+        {ledgerEntries.length > 0 && (
+          <div className="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+            <FilterField label="Type">
+              <select
+                value={ledgerType}
+                onChange={(e) =>
+                  setLedgerType(
+                    e.target.value as
+                      | "all"
+                      | "INCOME"
+                      | "EXPENSE"
+                      | "OWNER"
+                      | "TRANSFER"
+                  )
+                }
+                className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+              >
+                <option value="all">All</option>
+                <option value="INCOME">Income</option>
+                <option value="EXPENSE">Expense</option>
+                <option value="OWNER">Owner money</option>
+                <option value="TRANSFER">Transfers</option>
+              </select>
+            </FilterField>
+            <FilterField label="Category">
+              <select
+                value={ledgerCategory}
+                onChange={(e) => setLedgerCategory(e.target.value)}
+                className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+              >
+                <option value="">All categories</option>
+                {ledgerCategoryOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c.replace(/_/g, " ")}
+                  </option>
+                ))}
+              </select>
+            </FilterField>
+            <FilterField label="From">
+              <input
+                type="date"
+                value={ledgerFrom}
+                onChange={(e) => setLedgerFrom(e.target.value)}
+                className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+              />
+            </FilterField>
+            <FilterField label="To">
+              <input
+                type="date"
+                value={ledgerTo}
+                onChange={(e) => setLedgerTo(e.target.value)}
+                className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+              />
+            </FilterField>
+            {ledgerFiltersActive && (
+              <button
+                type="button"
+                onClick={clearLedgerFilters}
+                className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium text-slate-500 hover:text-cine-primary dark:text-slate-400"
+              >
+                <X className="h-3.5 w-3.5" /> Clear
+              </button>
+            )}
+            <span className="ml-auto self-center text-xs text-slate-500 dark:text-slate-400">
+              {filteredLedger.length} of {ledgerEntries.length}
+            </span>
+          </div>
+        )}
+
         {ledgerEntries.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
             No ledger entries linked to this project yet.
           </div>
+        ) : filteredLedger.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
+            No entries match the selected filters.
+          </div>
         ) : (
+          <>
           <div className="w-full overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
             <table className="w-full min-w-[760px] table-fixed text-sm">
               <colgroup>
@@ -521,7 +757,7 @@ export default function ProjectDetailPage({
                 </tr>
               </thead>
               <tbody>
-                {ledgerEntries.map((entry: LedgerEntryPopulated) => (
+                {pagedLedger.map((entry: LedgerEntryPopulated) => (
                   <tr
                     key={entry._id}
                     className="border-b border-slate-100 last:border-0 dark:border-slate-800/50"
@@ -585,6 +821,37 @@ export default function ProjectDetailPage({
               </tbody>
             </table>
           </div>
+          {filteredLedger.length > LEDGER_PER_PAGE && (
+            <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+              <span>
+                Page {ledgerPage} of {ledgerPageCount} · {filteredLedger.length}{" "}
+                entries
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setLedgerPage((p) => Math.max(1, p - 1))}
+                  disabled={ledgerPage <= 1}
+                  aria-label="Previous page"
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:border-slate-400 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setLedgerPage((p) => Math.min(ledgerPageCount, p + 1))
+                  }
+                  disabled={ledgerPage >= ledgerPageCount}
+                  aria-label="Next page"
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:border-slate-400 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+          </>
         )}
       </div>
 
@@ -592,7 +859,7 @@ export default function ProjectDetailPage({
         open={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
         title="Delete project"
-        description="Are you sure you want to delete this project? This action cannot be undone."
+        description="Are you sure you want to delete this project? It will be moved to the Trash and can be restored later."
         confirmLabel="Delete"
         onConfirm={() => deleteMutation.mutate()}
       />
@@ -601,6 +868,23 @@ export default function ProjectDetailPage({
 }
 
 /* ── Sub-components ── */
+
+function FilterField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
 
 type StatTone = "slate" | "emerald" | "red" | "amber";
 

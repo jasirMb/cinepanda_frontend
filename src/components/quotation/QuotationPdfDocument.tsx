@@ -70,12 +70,33 @@ type ExtendedProductItem = QuotationProductItem & {
   unit?: string;
 };
 
+/** The populated product (from the detail endpoint), if productId was populated. */
+function populatedProduct(item: ExtendedProductItem) {
+  return item.productId && typeof item.productId === "object"
+    ? item.productId
+    : undefined;
+}
+
 function getImage(item: ExtendedProductItem): string {
-  return item.image || item.imageUrl || PRODUCT_IMAGE_PLACEHOLDER;
+  return (
+    item.image ||
+    item.imageUrl ||
+    populatedProduct(item)?.imageUrl ||
+    PRODUCT_IMAGE_PLACEHOLDER
+  );
 }
 
 function getSpecifications(item: ExtendedProductItem): string {
-  return item.specifications || item.description || "";
+  if (item.specifications) return item.specifications;
+  const specs = populatedProduct(item)?.specifications;
+  if (specs && typeof specs === "object") {
+    const text = Object.entries(specs)
+      .filter(([, v]) => v != null && v !== "")
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(", ");
+    if (text) return text;
+  }
+  return item.description || "";
 }
 
 function getUnit(item: ExtendedProductItem, bucket: LayoutBucket): string {
@@ -131,6 +152,42 @@ function sectionOffer(section: QuotationSection): number {
   return section.grandTotal;
 }
 
+/** Full price breakdown for a section: products subtotal, each adjustment
+ *  (discount −, tax/service/other +), and the grand total. */
+function sectionBreakdown(section: QuotationSection) {
+  let subtotal = 0;
+  const adjustments: { label: string; amount: number; isDiscount: boolean }[] = [];
+  const add = (m: QuotationManualItem) =>
+    adjustments.push({
+      label: `${m.name}${m.isPercentage ? ` (${m.amount}%)` : ""}`,
+      amount: Math.abs(m.resolvedAmount),
+      isDiscount: m.type === "discount",
+    });
+  for (const g of section.groups ?? []) {
+    for (const p of g.productItems ?? []) subtotal += p.lineTotal;
+    for (const m of g.manualItems ?? []) add(m);
+  }
+  for (const m of section.manualItems ?? []) add(m);
+
+  // Reconcile: if the listed lines don't add up to the grand total (e.g. older
+  // quotations whose snapshot didn't store adjustments), show the difference
+  // as a single "GST & taxes" line so the breakdown always balances.
+  const adjSum = adjustments.reduce(
+    (s, a) => s + (a.isDiscount ? -a.amount : a.amount),
+    0
+  );
+  const diff = Math.round(section.grandTotal) - Math.round(subtotal + adjSum);
+  if (Math.abs(diff) >= 1) {
+    adjustments.push({
+      label: "GST & taxes",
+      amount: Math.abs(diff),
+      isDiscount: diff < 0,
+    });
+  }
+
+  return { subtotal, adjustments, grandTotal: section.grandTotal };
+}
+
 /* ────────────────────────────────────────────
    Inline styles (Puppeteer-friendly — no external CSS)
    ──────────────────────────────────────────── */
@@ -177,36 +234,65 @@ const watermarkDataUri = `url("data:image/svg+xml,${encodeURIComponent(
   watermarkSvg.replace(/\n/g, "")
 )}")`;
 
-const watermarkStyle: React.CSSProperties = {
-  position: "absolute",
-  bottom: "40px",
-  right: "-40px",
-  width: "450px",
-  height: "550px",
-  backgroundImage: watermarkDataUri,
-  backgroundRepeat: "no-repeat",
-  backgroundSize: "contain",
-  pointerEvents: "none",
-  zIndex: 0,
-};
+// Watermark removed for a cleaner, more professional look.
+const watermarkStyle: React.CSSProperties = { display: "none" };
+void watermarkDataUri;
 
 const contentStyle: React.CSSProperties = { position: "relative", zIndex: 1 };
 
+// ── Premium navy + gold palette ──
+const BRAND = "#1f3a5f"; // navy
+const BRAND_DARK = "#13243c"; // deep navy
+const GOLD = "#b0883c"; // gold accent
+const BRAND_TINT = "#f2f5f9";
+const ROW_ALT = "#f8fafc";
+const BORDER = "#dde3ec";
+
+// Table/list column header: a light tint with dark text + a navy underline,
+// so it reads as a column header and is clearly distinct from the navy
+// option banner above it (they no longer look like two identical bars).
 const tableHeaderStyle: React.CSSProperties = {
-  background: "#dce6f1",
+  background: BRAND_TINT,
+  color: BRAND_DARK,
   fontWeight: "bold",
-  padding: "8px 10px",
-  border: "1px solid #000",
+  padding: "9px 10px",
+  border: `1px solid ${BORDER}`,
+  borderBottom: `2px solid ${BRAND}`,
   textAlign: "center",
-  fontSize: "14px",
+  fontSize: "11.5px",
+  letterSpacing: "0.04em",
+  textTransform: "uppercase",
 };
 
 const tdStyle: React.CSSProperties = {
   padding: "8px 10px",
-  border: "1px solid #000",
+  border: `1px solid ${BORDER}`,
   textAlign: "center",
   verticalAlign: "middle",
   fontSize: "13px",
+};
+
+/** Zebra-stripe background for item rows. */
+function rowStyle(i: number): React.CSSProperties {
+  return { background: i % 2 === 1 ? ROW_ALT : "#fff" };
+}
+
+/** A branded total row (light-brand label cell + dark-brand amount cell). */
+const totalLabelStyle: React.CSSProperties = {
+  ...tdStyle,
+  background: BRAND_TINT,
+  fontWeight: "bold",
+  textAlign: "right",
+  textTransform: "uppercase",
+  letterSpacing: "0.03em",
+  color: BRAND_DARK,
+};
+const totalAmountStyle: React.CSSProperties = {
+  ...tdStyle,
+  background: BRAND,
+  color: "#fff",
+  fontWeight: "bold",
+  textAlign: "right",
 };
 
 /* ────────────────────────────────────────────
@@ -274,96 +360,56 @@ function Footer() {
   );
 }
 
-function LogoHeader() {
+/** Shared page header — identical logo treatment on every page (top-right
+ *  logo + gold underline), matching the cover page. */
+function PageHeader() {
   return (
-    <div style={{ textAlign: "right", marginBottom: "10px" }}>
-      <img
-        src={CINEPANDA_LOGO_DATA_URI}
-        alt="CinePanda Entertainments"
-        style={{
-          height: "80px",
-          objectFit: "contain",
-          display: "inline-block",
-        }}
-      />
-    </div>
-  );
-}
-
-function LogoSmall() {
-  return (
-    <div style={{ textAlign: "center" }}>
-      <img
-        src={CINEPANDA_LOGO_DATA_URI}
-        alt="CinePanda Entertainments"
-        style={{
-          height: "55px",
-          objectFit: "contain",
-          display: "inline-block",
-        }}
-      />
-    </div>
-  );
-}
-
-function PlaceholderImage({
-  width,
-  height,
-  label,
-}: {
-  width: number;
-  height: number;
-  label: string;
-}) {
-  return (
-    <div
-      style={{
-        width,
-        height,
-        background: "#f1f5f9",
-        border: "1px dashed #94a3b8",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "#64748b",
-        fontSize: "10px",
-        fontStyle: "italic",
-        textAlign: "center",
-        padding: "4px",
-        boxSizing: "border-box",
-      }}
-    >
-      {label}
+    <div>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <img
+          src={CINEPANDA_LOGO_DATA_URI}
+          alt="Cinepanda Entertainments"
+          style={{ height: "74px", objectFit: "contain", display: "block" }}
+        />
+      </div>
+      <div style={{ height: "2px", background: GOLD, marginTop: "12px" }} />
     </div>
   );
 }
 
 function ProductImageCell({ src }: { src: string }) {
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt=""
-        style={{
-          width: "130px",
-          height: "100px",
-          objectFit: "cover",
-          display: "block",
-          margin: "0 auto",
-        }}
-      />
-    );
-  }
-  return <PlaceholderImage width={130} height={100} label="Product image" />;
+  if (!src) return null;
+  return (
+    <img
+      src={src}
+      alt=""
+      style={{
+        width: "130px",
+        height: "100px",
+        objectFit: "cover",
+        display: "block",
+        margin: "0 auto",
+      }}
+    />
+  );
 }
 
 /* ────────────────────────────────────────────
    Bucketed item tables
    ──────────────────────────────────────────── */
 
-function EquipmentTable({ items }: { items: ExtendedProductItem[] }) {
+function EquipmentTable({
+  items,
+  totalLabel = "TOTAL",
+}: {
+  items: ExtendedProductItem[];
+  totalLabel?: string;
+}) {
   if (items.length === 0) return null;
   const subtotal = items.reduce((s, i) => s + i.lineTotal, 0);
+  // Only show the IMAGE column when at least one product actually has an image —
+  // otherwise the column is just empty space (no placeholders).
+  const hasImages = items.some((i) => !!getImage(i));
   return (
     <table
       style={{
@@ -380,14 +426,15 @@ function EquipmentTable({ items }: { items: ExtendedProductItem[] }) {
           <th style={tableHeaderStyle}>SPECIFICATIONS</th>
           <th style={tableHeaderStyle}>QTY</th>
           <th style={tableHeaderStyle}>PRICE</th>
-          <th style={tableHeaderStyle}>IMAGE</th>
+          {hasImages && <th style={tableHeaderStyle}>IMAGE</th>}
         </tr>
       </thead>
       <tbody>
         {items.map((item, i) => {
           const specs = getSpecifications(item);
+          const img = getImage(item);
           return (
-            <tr key={i}>
+            <tr key={i} style={rowStyle(i)}>
               <td style={tdStyle}>{i + 1}</td>
               <td
                 style={{
@@ -415,27 +462,21 @@ function EquipmentTable({ items }: { items: ExtendedProductItem[] }) {
               <td style={{ ...tdStyle, fontWeight: "bold" }}>
                 {fmtAmount(item.lineTotal)}
               </td>
-              <td style={{ ...tdStyle, width: "150px" }}>
-                <ProductImageCell src={getImage(item)} />
-              </td>
+              {hasImages && (
+                <td style={{ ...tdStyle, width: "150px" }}>
+                  {img ? <ProductImageCell src={img} /> : null}
+                </td>
+              )}
             </tr>
           );
         })}
         <tr>
-          <td
-            colSpan={4}
-            style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}
-          >
-            TOTAL
+          <td colSpan={4} style={totalLabelStyle}>
+            {totalLabel}
           </td>
           <td
-            colSpan={2}
-            style={{
-              ...tdStyle,
-              fontWeight: "bold",
-              textAlign: "right",
-              fontSize: "16px",
-            }}
+            colSpan={hasImages ? 2 : 1}
+            style={{ ...totalAmountStyle, fontSize: "16px" }}
           >
             {fmtAmount(subtotal)}
           </td>
@@ -445,7 +486,13 @@ function EquipmentTable({ items }: { items: ExtendedProductItem[] }) {
   );
 }
 
-function SqftTable({ items }: { items: ExtendedProductItem[] }) {
+function SqftTable({
+  items,
+  totalLabel = "Total",
+}: {
+  items: ExtendedProductItem[];
+  totalLabel?: string;
+}) {
   if (items.length === 0) return null;
   const total = items.reduce((s, i) => s + i.lineTotal, 0);
   return (
@@ -470,7 +517,7 @@ function SqftTable({ items }: { items: ExtendedProductItem[] }) {
         {items.map((item, i) => {
           const desc = getSpecifications(item);
           return (
-            <tr key={i}>
+            <tr key={i} style={rowStyle(i)}>
               <td style={tdStyle}>{i + 1}</td>
               <td style={{ ...tdStyle, textAlign: "left" }}>
                 <span style={{ fontWeight: "bold" }}>{item.productName}</span>
@@ -496,32 +543,30 @@ function SqftTable({ items }: { items: ExtendedProductItem[] }) {
         <tr>
           <td
             colSpan={4}
-            style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}
+            style={totalLabelStyle}
           >
-            Total
+            {totalLabel}
           </td>
-          <td
-            style={{
-              ...tdStyle,
-              fontWeight: "bold",
-              textAlign: "right",
-            }}
-          >
-            {fmtAmount(total)}
-          </td>
+          <td style={totalAmountStyle}>{fmtAmount(total)}</td>
         </tr>
       </tbody>
     </table>
   );
 }
 
-function InstallationTable({ items }: { items: ExtendedProductItem[] }) {
+function InstallationTable({
+  items,
+  totalLabel = "TOTAL",
+}: {
+  items: ExtendedProductItem[];
+  totalLabel?: string;
+}) {
   if (items.length === 0) return null;
   const total = items.reduce((s, i) => s + i.lineTotal, 0);
   return (
     <table
       style={{
-        width: "80%",
+        width: "100%",
         borderCollapse: "collapse",
         marginTop: "20px",
         fontSize: "13px",
@@ -551,53 +596,103 @@ function InstallationTable({ items }: { items: ExtendedProductItem[] }) {
         <tr>
           <td
             colSpan={3}
-            style={{ ...tdStyle, fontWeight: "bold", textAlign: "center" }}
+            style={totalLabelStyle}
           >
-            TOTAL
+            {totalLabel}
           </td>
-          <td
-            style={{
-              ...tdStyle,
-              fontWeight: "bold",
-              textAlign: "right",
-            }}
-          >
-            {fmtAmount(total)}
-          </td>
+          <td style={totalAmountStyle}>{fmtAmount(total)}</td>
         </tr>
       </tbody>
     </table>
   );
 }
 
-function ManualItemsTable({ items }: { items: QuotationManualItem[] }) {
-  if (!items || items.length === 0) return null;
+/** One line in the right-aligned section totals stack. */
+function TotalsLine({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color?: string;
+}) {
   return (
-    <table
+    <div
       style={{
-        width: "60%",
-        borderCollapse: "collapse",
-        marginTop: "20px",
+        display: "flex",
+        justifyContent: "space-between",
+        gap: "16px",
+        padding: "6px 0",
+        borderBottom: `1px solid ${BORDER}`,
         fontSize: "13px",
-        marginLeft: "auto",
       }}
     >
-      <tbody>
-        {items.map((m, i) => (
-          <tr key={i}>
-            <td style={{ ...tdStyle, textAlign: "left" }}>
-              {m.type === "discount" ? "(-) " : "(+) "}
-              {m.name}
-              {m.isPercentage ? ` (${m.amount}%)` : ""}
-            </td>
-            <td style={{ ...tdStyle, textAlign: "right", fontWeight: "bold" }}>
-              {m.type === "discount" ? "-" : ""}
-              {fmtAmount(Math.abs(m.resolvedAmount))}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+      <span style={{ color: color ?? "#444" }}>{label}</span>
+      <span
+        style={{ color: color ?? "#222", fontWeight: 600, whiteSpace: "nowrap" }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/** Right-aligned invoice-style totals: adjustment lines + a Grand Total bar.
+ *  Replaces the old free-floating bordered GST box for a cohesive, professional
+ *  finish to each option page. */
+function SectionTotals({ section }: { section: QuotationSection }) {
+  const { adjustments, grandTotal } = sectionBreakdown(section);
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "flex-end",
+        marginTop: "18px",
+      }}
+    >
+      <div style={{ width: "340px", maxWidth: "100%" }}>
+        {adjustments.length > 0 && (
+          <div style={{ padding: "0 2px" }}>
+            {adjustments.map((a, k) => (
+              <TotalsLine
+                key={k}
+                label={a.label}
+                value={`${a.isDiscount ? "−" : "+"} ${fmtAmount(a.amount)}`}
+                color={a.isDiscount ? "#b3261e" : "#333"}
+              />
+            ))}
+          </div>
+        )}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            background: `linear-gradient(120deg, ${BRAND} 0%, ${BRAND_DARK} 100%)`,
+            color: "#fff",
+            padding: "11px 16px",
+            marginTop: "8px",
+            borderLeft: `4px solid ${GOLD}`,
+            borderRadius: "3px",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "13px",
+              fontWeight: "bold",
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+            }}
+          >
+            Grand Total
+          </span>
+          <span style={{ fontSize: "18px", fontWeight: "bold", color: "#f0e2c4" }}>
+            {fmtAmount(grandTotal)}/-
+          </span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -630,53 +725,80 @@ function SectionPage({
     (i) => bucketForCategory(i.category) === "installation"
   );
 
-  // Section-level + group-level manual items
-  const allManualItems: QuotationManualItem[] = [
-    ...groups.flatMap((g) => g.manualItems ?? []),
-    ...(section.manualItems ?? []),
-  ];
+  // Does this section have any adjustments (GST, discount, …) or multiple
+  // item tables? If so, each table shows a "SUB TOTAL" and we render a unified
+  // Grand-Total panel below; otherwise the single table's "TOTAL" is the total.
+  const { adjustments } = sectionBreakdown(section);
+  const bucketCount = [equipment.length, sqft.length, installation.length].filter(
+    (n) => n > 0
+  ).length;
+  const showTotalsPanel = adjustments.length > 0 || bucketCount > 1;
+  const subLabel = showTotalsPanel ? "Sub Total" : "Total";
 
   return (
     <div style={pageStyle}>
       <div style={watermarkStyle} />
-      <div style={contentStyle}>
+      <div
+        style={{
+          ...contentStyle,
+          display: "flex",
+          flexDirection: "column",
+          minHeight: "240mm",
+        }}
+      >
+        <div style={{ marginBottom: "8px" }}>
+          <PageHeader />
+        </div>
+        {/* Centre the option content vertically so short options don't leave a
+            big blank gap at the bottom of the page. */}
         <div
           style={{
+            flex: 1,
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
+            flexDirection: "column",
+            justifyContent: "center",
           }}
         >
-          <h2 style={{ fontSize: "18px", fontWeight: "bold", margin: 0 }}>
-            ➤{" "}
-            <span style={{ fontWeight: "bold" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              background: `linear-gradient(120deg, ${BRAND} 0%, ${BRAND_DARK} 100%)`,
+              color: "#fff",
+              padding: "12px 18px",
+              borderLeft: `4px solid ${GOLD}`,
+              borderRadius: "3px",
+            }}
+          >
+            <span style={{ fontSize: "15px", fontWeight: "bold", letterSpacing: "0.02em" }}>
               {total > 1
-                ? `AV Package ${index + 1}, ${section.sectionName}.`
+                ? `OPTION ${index + 1}  ·  ${section.sectionName}`
                 : section.sectionName}
             </span>
-          </h2>
-          <div style={{ marginLeft: "20px", flexShrink: 0 }}>
-            <LogoSmall />
+            <span style={{ fontSize: "16px", fontWeight: "bold", color: "#f0e2c4" }}>
+              {fmtAmount(section.grandTotal)}
+            </span>
           </div>
-        </div>
 
-        {section.description && (
-          <p style={{ marginTop: "12px", fontSize: "13px", color: "#333" }}>
-            {section.description}
-          </p>
-        )}
+          {section.description && (
+            <p style={{ marginTop: "12px", fontSize: "13px", color: "#333" }}>
+              {section.description}
+            </p>
+          )}
 
-        {/* Equipment block */}
-        <EquipmentTable items={equipment} />
+          {/* Equipment block */}
+          <EquipmentTable items={equipment} totalLabel={subLabel} />
 
         {/* Room Acoustics block */}
         {sqft.length > 0 && (
           <>
             <h3
               style={{
-                fontSize: "16px",
+                fontSize: "15px",
                 fontWeight: "bold",
-                margin: "30px 0 0",
+                margin: "24px 0 0",
+                color: BRAND_DARK,
               }}
             >
               ➤{" "}
@@ -684,7 +806,7 @@ function SectionPage({
                 Room Acoustics, Ceiling &amp; Carpet Work
               </span>
             </h3>
-            <SqftTable items={sqft} />
+            <SqftTable items={sqft} totalLabel={subLabel} />
           </>
         )}
 
@@ -693,9 +815,10 @@ function SectionPage({
           <>
             <h3
               style={{
-                fontSize: "16px",
+                fontSize: "15px",
                 fontWeight: "bold",
-                margin: "30px 0 0",
+                margin: "24px 0 0",
+                color: BRAND_DARK,
               }}
             >
               ➤ &nbsp;
@@ -703,12 +826,13 @@ function SectionPage({
                 Installation and Accessories
               </span>
             </h3>
-            <InstallationTable items={installation} />
+            <InstallationTable items={installation} totalLabel={subLabel} />
           </>
         )}
 
-        {/* Section-level adjustments (GST, discount, etc.) */}
-        <ManualItemsTable items={allManualItems} />
+          {/* Section adjustments (GST, discount, …) + Grand Total */}
+          {showTotalsPanel && <SectionTotals section={section} />}
+        </div>
       </div>
       <Footer />
     </div>
@@ -719,74 +843,176 @@ function SectionPage({
    Page 1: Cover
    ──────────────────────────────────────────── */
 
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        fontSize: "13px",
+        fontWeight: "bold",
+        color: BRAND_DARK,
+        borderLeft: `4px solid ${GOLD}`,
+        paddingLeft: "10px",
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function BreakdownRow({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color?: string;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        gap: "16px",
+        padding: "3px 0",
+      }}
+    >
+      <span style={{ color: color ?? "#444" }}>{label}</span>
+      <span
+        style={{ color: color ?? "#222", fontWeight: 600, whiteSpace: "nowrap" }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
 function CoverPage({ quotation }: { quotation: Quotation }) {
   const customer = quotation.customerId;
   return (
     <div style={pageStyle}>
       <div style={watermarkStyle} />
       <div style={contentStyle}>
-        <LogoHeader />
+        {/* Header — logo on the top-right (shared across all pages) */}
+        <PageHeader />
 
+        {/* Meta line */}
         <div
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            margin: "50px 0 30px",
+            textAlign: "left",
+            marginTop: "18px",
+            fontSize: "12px",
+            color: "#666",
           }}
         >
-          <span style={{ fontWeight: "bold", fontSize: "14px" }}>
-            {quotationNumber(quotation)}
+          Quotation No.{" "}
+          <span style={{ fontWeight: "bold", color: BRAND_DARK }}>
+            {quotation._id.slice(-8).toUpperCase()}
           </span>
-          <span style={{ fontWeight: "bold", fontSize: "14px" }}>
+          {"  ·  "}Date{" "}
+          <span style={{ fontWeight: "bold", color: BRAND_DARK }}>
             {fmtDate(quotation.quotationDate)}
           </span>
+          {quotation.validUntil && (
+            <>
+              {"  ·  "}Valid Until{" "}
+              <span style={{ fontWeight: "bold", color: BRAND_DARK }}>
+                {fmtDate(quotation.validUntil)}
+              </span>
+            </>
+          )}
         </div>
 
-        <div style={{ margin: "20px 0 10px", fontSize: "14px" }}>
-          <div style={{ fontWeight: "bold" }}>To,</div>
-          <div style={{ fontWeight: "bold" }}>{customer.name}</div>
-          {customer.place && <div>{customer.place}</div>}
-          {customer.phone && <div>Mob: {customer.phone}</div>}
+        {/* Hero — the client is the focus */}
+        <div style={{ marginTop: "40px" }}>
+          <div
+            style={{
+              fontSize: "11px",
+              fontWeight: "bold",
+              color: "#8a93a3",
+              letterSpacing: "0.26em",
+            }}
+          >
+            PROPOSAL PREPARED FOR
+          </div>
+          <div
+            style={{
+              fontSize: "30px",
+              fontWeight: "bold",
+              color: BRAND_DARK,
+              marginTop: "8px",
+              lineHeight: 1.1,
+            }}
+          >
+            {customer.name}
+          </div>
+          <div
+            style={{
+              width: "54px",
+              height: "3px",
+              background: GOLD,
+              marginTop: "13px",
+              borderRadius: "2px",
+            }}
+          />
+          {(customer.place || customer.phone) && (
+            <div style={{ fontSize: "13px", color: "#555", marginTop: "12px" }}>
+              {customer.place}
+              {customer.place && customer.phone ? "  ·  " : ""}
+              {customer.phone ? `Mob: ${customer.phone}` : ""}
+            </div>
+          )}
         </div>
 
+        {/* Intro */}
         <p
           style={{
-            margin: "30px 0 30px",
-            fontSize: "14px",
-            textIndent: "40px",
+            margin: "26px 0 28px",
+            fontSize: "13.5px",
+            lineHeight: 1.75,
+            color: "#222",
+            textAlign: "justify",
           }}
         >
-          <span style={{ fontSize: "22px", fontWeight: "bold" }}>W</span>
+          <span style={{ fontWeight: "bold" }}>W</span>
           {INTRO_PARAGRAPH}
         </p>
 
-        <h2
-          style={{
-            textAlign: "center",
-            textDecoration: "underline",
-            margin: "40px 0 30px",
-            fontSize: "20px",
-            fontWeight: "bold",
-          }}
-        >
-          Speaker Configuration
-        </h2>
-
-        <div style={{ margin: "20px 0", textAlign: "center" }}>
-          {CONFIG_DIAGRAM_PLACEHOLDER_URL ? (
-            <img
-              src={CONFIG_DIAGRAM_PLACEHOLDER_URL}
-              alt="Speaker Configuration"
-              style={{ width: "100%", height: "auto", display: "block" }}
-            />
-          ) : (
-            <PlaceholderImage
-              width={500}
-              height={300}
-              label="Speaker configuration diagram (to be added)"
-            />
-          )}
-        </div>
+        {/* Speaker config — only when a diagram image is actually set */}
+        {quotation.speakerConfig?.imageUrl && (
+          <>
+            <SectionHeading>
+              Speaker Configuration
+              {quotation.speakerConfig.name
+                ? `  —  ${quotation.speakerConfig.name}`
+                : ""}
+            </SectionHeading>
+            <div
+              style={{
+                marginTop: "14px",
+                textAlign: "center",
+                border: `1px solid ${BORDER}`,
+                borderRadius: "8px",
+                padding: "14px",
+                background: ROW_ALT,
+              }}
+            >
+              <img
+                src={quotation.speakerConfig.imageUrl}
+                alt={quotation.speakerConfig.name}
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "300px",
+                  height: "auto",
+                  display: "inline-block",
+                  borderRadius: "4px",
+                }}
+              />
+            </div>
+          </>
+        )}
       </div>
       <Footer />
     </div>
@@ -810,106 +1036,130 @@ function SummaryPage({ quotation }: { quotation: Quotation }) {
     <div style={lastPageStyle}>
       <div style={watermarkStyle} />
       <div style={contentStyle}>
-        <LogoHeader />
+        <div style={{ marginBottom: "18px" }}>
+          <PageHeader />
+        </div>
 
-        <hr
-          style={{
-            border: "none",
-            borderTop: "2px solid #1a3c6e",
-            margin: "20px 0 30px",
-          }}
-        />
+        <SectionHeading>Investment Summary</SectionHeading>
 
-        {sections.map((section, i) => {
-          const estimated = sectionEstimated(section);
-          const offer = sectionOffer(section);
-          const hasDiscount = Math.round(estimated) !== Math.round(offer);
-          const optionLabel =
-            sections.length > 1 ? `AV Option ${i + 1}` : section.sectionName;
+        <div style={{ marginTop: "16px" }}>
+          {sections.map((section, i) => {
+            const { subtotal, adjustments, grandTotal } =
+              sectionBreakdown(section);
+            const optionLabel =
+              sections.length > 1 ? `AV Option ${i + 1}` : section.sectionName;
 
-          return (
-            <div key={i} style={{ marginBottom: "30px" }}>
-              <h2
+            return (
+              <div
+                key={i}
                 style={{
-                  fontSize: i === 0 ? "20px" : "18px",
-                  fontWeight: "bold",
-                  color: "#1a3c6e",
-                  margin: "10px 0 10px",
+                  border: `1px solid ${BORDER}`,
+                  borderLeft: `4px solid ${BRAND}`,
+                  borderRadius: "8px",
+                  padding: "14px 18px",
+                  marginBottom: "12px",
+                  background: "#fff",
                 }}
               >
-                Total estimated project cost for {optionLabel} with Accessories
-                and Installation is Rupees ₹{" "}
-                {hasDiscount ? (
-                  <span style={{ textDecoration: "line-through" }}>
-                    {fmtAmount(estimated)}/-
-                  </span>
-                ) : (
-                  <span>{fmtAmount(estimated)}/-</span>
-                )}
-              </h2>
-
-              {hasDiscount && (
-                <h2
+                <div
                   style={{
-                    fontSize: "20px",
-                    fontWeight: "bold",
-                    color: "#d4183d",
-                    margin: "5px 0 20px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "baseline",
+                    marginBottom: "8px",
                   }}
                 >
-                  Offer Price for the Package is {fmtAmount(offer)}/-
-                </h2>
-              )}
-            </div>
-          );
-        })}
+                  <span
+                    style={{
+                      fontSize: "15px",
+                      fontWeight: "bold",
+                      color: BRAND_DARK,
+                    }}
+                  >
+                    {optionLabel}
+                  </span>
+                  {sections.length > 1 && (
+                    <span style={{ fontSize: "11px", color: "#8a93a3" }}>
+                      {section.sectionName}
+                    </span>
+                  )}
+                </div>
 
-        <hr
-          style={{
-            border: "none",
-            borderTop: "2px solid #1a3c6e",
-            margin: "10px 0",
-          }}
-        />
-        <hr
-          style={{
-            border: "none",
-            borderTop: "2px solid #1a3c6e",
-            margin: "5px 0 30px",
-          }}
-        />
+                {/* Price breakdown */}
+                <div style={{ fontSize: "12.5px", color: "#333" }}>
+                  <BreakdownRow
+                    label="Equipment, accessories & installation"
+                    value={`₹${fmtAmount(subtotal)}`}
+                  />
+                  {adjustments.map((a, k) => (
+                    <BreakdownRow
+                      key={k}
+                      label={a.label}
+                      value={`${a.isDiscount ? "−" : "+"} ₹${fmtAmount(a.amount)}`}
+                      color={a.isDiscount ? "#b3261e" : "#444"}
+                    />
+                  ))}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      borderTop: `2px solid ${BRAND}`,
+                      marginTop: "8px",
+                      paddingTop: "8px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontWeight: "bold",
+                        fontSize: "14px",
+                        color: BRAND_DARK,
+                      }}
+                    >
+                      Grand Total
+                    </span>
+                    <span
+                      style={{
+                        fontWeight: "bold",
+                        fontSize: "19px",
+                        color: BRAND_DARK,
+                      }}
+                    >
+                      ₹{fmtAmount(grandTotal)}/-
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
-        <h3
-          style={{
-            fontWeight: "bold",
-            textDecoration: "underline",
-            margin: "20px 0 10px",
-            fontSize: "16px",
-          }}
-        >
-          Terms &amp; Conditions
-        </h3>
-        <ol
-          style={{
-            paddingLeft: "30px",
-            margin: "0 0 25px",
-            fontSize: "14px",
-          }}
-        >
-          {termsLines.map((t, i) => (
-            <li key={i} style={{ marginBottom: "5px" }}>
-              {t}
-            </li>
-          ))}
-        </ol>
+        <div style={{ marginTop: "26px" }}>
+          <SectionHeading>Terms &amp; Conditions</SectionHeading>
+          <ol
+            style={{
+              paddingLeft: "22px",
+              margin: "12px 0 0",
+              fontSize: "12.5px",
+              color: "#333",
+              lineHeight: 1.7,
+            }}
+          >
+            {termsLines.map((t, i) => (
+              <li key={i} style={{ marginBottom: "4px" }}>
+                {t}
+              </li>
+            ))}
+          </ol>
+        </div>
 
         {quotation.notes && (
           <p
             style={{
-              fontSize: "13px",
+              fontSize: "12.5px",
               fontStyle: "italic",
-              color: "#333",
-              margin: "10px 0 20px",
+              color: "#555",
+              margin: "16px 0 0",
               whiteSpace: "pre-line",
             }}
           >
@@ -920,33 +1170,53 @@ function SummaryPage({ quotation }: { quotation: Quotation }) {
         <p
           style={{
             fontStyle: "italic",
-            fontWeight: "bold",
             textAlign: "center",
-            margin: "20px 0",
-            fontSize: "14px",
+            margin: "26px 0 0",
+            fontSize: "13px",
+            color: "#444",
           }}
         >
-          Please feel free to call us for any further clarification and we look
+          Please feel free to call us for any further clarification. We look
           forward to your valued order and an opportunity to serve.
         </p>
 
-        <div style={{ margin: "30px 0 0" }}>
-          <p style={{ marginBottom: "5px" }}>With Warm Regards.</p>
-          <p
-            style={{
-              fontWeight: "bold",
-              fontSize: "18px",
-              margin: "5px 0 2px",
-            }}
-          >
-            {SIGNATURE.name}
-          </p>
-          <p style={{ margin: "2px 0", fontSize: "13px" }}>
-            {SIGNATURE.title}
-          </p>
-          <p style={{ margin: "2px 0", fontSize: "13px" }}>
-            Mobile: {SIGNATURE.mobile}
-          </p>
+        {/* Signature */}
+        <div
+          style={{
+            marginTop: "36px",
+            display: "flex",
+            justifyContent: "flex-end",
+          }}
+        >
+          <div style={{ minWidth: "230px" }}>
+            <p
+              style={{
+                fontSize: "13px",
+                color: "#444",
+                marginBottom: "34px",
+              }}
+            >
+              With Warm Regards,
+            </p>
+            <div style={{ borderTop: `1.5px solid ${BRAND}`, paddingTop: "7px" }}>
+              <p
+                style={{
+                  fontWeight: "bold",
+                  fontSize: "16px",
+                  color: BRAND_DARK,
+                  margin: 0,
+                }}
+              >
+                {SIGNATURE.name}
+              </p>
+              <p style={{ margin: "2px 0", fontSize: "12px", color: "#666" }}>
+                {SIGNATURE.title}
+              </p>
+              <p style={{ margin: 0, fontSize: "12px", color: "#666" }}>
+                Mobile: {SIGNATURE.mobile}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
       <Footer />

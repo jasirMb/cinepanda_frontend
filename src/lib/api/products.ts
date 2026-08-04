@@ -14,6 +14,8 @@ export interface Product {
   productModel?: string;
   price: number;
   unit: string;
+  imageUrl?: string;
+  imageKey?: string;
   specifications: Record<string, any>;
   isActive: boolean;
   createdAt: string;
@@ -92,6 +94,8 @@ export interface CreateProductPayload {
   productModel?: string;
   price: number;
   unit: string;
+  imageUrl?: string;
+  imageKey?: string;
   specifications?: Record<string, any>;
 }
 
@@ -145,6 +149,14 @@ export async function deleteProduct(id: string): Promise<ProductResponse> {
 export async function fetchCategories(): Promise<CategoriesResponse> {
   const { data } = await api.get<CategoriesResponse>("/product-categories/list");
   return data;
+}
+
+/** Distinct brand values across products (for the brand filter autocomplete). */
+export async function fetchProductBrands(): Promise<string[]> {
+  const { data } = await api.get<{ success: boolean; data: string[] }>(
+    "/products/brands"
+  );
+  return data.data;
 }
 
 export async function fetchSubcategories(categoryName: string): Promise<string[]> {

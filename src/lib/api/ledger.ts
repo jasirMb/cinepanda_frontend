@@ -6,7 +6,49 @@ import type { ProjectStatus } from "./projects";
    ──────────────────────────────────────────── */
 
 export type EntryType = "INCOME" | "EXPENSE";
-export type PaymentMethod = "CASH" | "BANK_TRANSFER" | "UPI" | "CHEQUE" | "OTHER";
+/** OPERATING = real business P&L; CAPITAL = owner money in/out; TRANSFER = between own accounts. */
+export type AccountingType = "OPERATING" | "CAPITAL" | "TRANSFER";
+
+// Categories that classify an entry as non-operating (excluded from profit).
+export const OWNER_CONTRIBUTION_CATEGORY = "OWNER_CONTRIBUTION";
+export const OWNER_WITHDRAWAL_CATEGORY = "OWNER_WITHDRAWAL";
+export const TRANSFER_IN_CATEGORY = "TRANSFER_IN";
+export const TRANSFER_OUT_CATEGORY = "TRANSFER_OUT";
+
+/**
+ * Whether an entry counts toward operating profit/loss. Owner capital
+ * (contributions/withdrawals) and account transfers do NOT — they only move
+ * money around. Treats a missing accountingType (legacy rows) as operating.
+ * Use this anywhere you sum income/expense from the raw entry list.
+ */
+export function isOperatingEntry(e: {
+  accountingType?: AccountingType | null;
+}): boolean {
+  return e.accountingType !== "CAPITAL" && e.accountingType !== "TRANSFER";
+}
+
+/** Expense categories that are money lost to fees / charges / taxes (not goods or services). */
+export const FEE_CATEGORIES = ["BANK_CHARGES", "TAXES"] as const;
+
+/** True for an operating EXPENSE in a fee/charge/tax category (i.e. money lost to fees). */
+export function isFeeEntry(e: {
+  entryType: EntryType;
+  category: string;
+  accountingType?: AccountingType | null;
+}): boolean {
+  return (
+    e.entryType === "EXPENSE" &&
+    isOperatingEntry(e) &&
+    (FEE_CATEGORIES as readonly string[]).includes(e.category)
+  );
+}
+export type PaymentMethod =
+  | "CASH"
+  | "BANK_TRANSFER"
+  | "UPI"
+  | "CARD"
+  | "CHEQUE"
+  | "OTHER";
 export type PaymentStatus = "PAID" | "PENDING" | "PARTIAL";
 export type ApprovalStatus =
   | "NOT_REQUIRED"
@@ -40,6 +82,8 @@ export interface LedgerEntryPopulated {
     clientName: string;
     serviceType: string;
     status: ProjectStatus;
+    /** Set when the project has been deleted (trashed) — the entry still shows its name. */
+    deletedAt?: string | null;
   } | null;
   customerId?: {
     _id: string;
@@ -48,10 +92,29 @@ export interface LedgerEntryPopulated {
   } | null;
   entryType: EntryType;
   category: string;
+  /** OPERATING (counts toward profit), CAPITAL (owner money) or TRANSFER. */
+  accountingType?: AccountingType;
+  /** Present on transfer legs; links the OUT and IN entries. */
+  transferGroupId?: string | null;
   amount: number;
   description: string;
   entryDate: string;
   paymentMethod?: PaymentMethod;
+  paymentAccountId?: {
+    _id: string;
+    name: string;
+    type: string;
+    bankName?: string;
+    accountNumber?: string;
+    accountHolderName?: string;
+    ifsc?: string;
+    upiId?: string;
+    upiApp?: string;
+    cardNetwork?: string;
+    cardLast4?: string;
+  } | null;
+  vendorId?: { _id: string; name: string } | null;
+  itemType?: "GOODS" | "SERVICE";
   paymentStatus: PaymentStatus;
   invoiceRef?: string;
   approvalStatus: ApprovalStatus;
@@ -70,6 +133,14 @@ export interface LedgerListResponse {
   success: boolean;
   data: LedgerEntryPopulated[];
   count: number;
+  /** Total matching entries (across all pages). Present on every response. */
+  total?: number;
+  /** Current page (1-based) when pagination is active. */
+  page?: number;
+  /** Page size requested; 0 means "all entries returned". */
+  limit?: number;
+  /** Total number of pages when pagination is active. */
+  totalPages?: number;
 }
 
 export interface LedgerDetailResponse {
@@ -86,6 +157,14 @@ export interface LedgerListQuery {
   category?: string;
   paymentStatus?: PaymentStatus;
   approvalStatus?: ApprovalStatus;
+  vendorId?: string;
+  paymentAccountId?: string;
+  /** Filter by accounting type — e.g. "CAPITAL" for owner money, "TRANSFER" for transfers. */
+  accountingType?: AccountingType;
+  /** 1-based page number. Omit (with limit) to fetch all entries. */
+  page?: number;
+  /** Page size. Omit to fetch all matching entries (statements, dashboards). */
+  limit?: number;
 }
 
 export interface CreateLedgerPayload {
@@ -95,6 +174,9 @@ export interface CreateLedgerPayload {
   description: string;
   entryDate: string;
   paymentMethod?: PaymentMethod;
+  paymentAccountId?: string;
+  vendorId?: string;
+  itemType?: "GOODS" | "SERVICE";
   paymentStatus?: PaymentStatus;
   projectId?: string;
   customerId?: string;
@@ -148,6 +230,19 @@ export interface ProfitLossSummary {
   totalIncome: number;
   totalExpense: number;
   netProfitLoss: number;
+  /** Owner's own money put in (not counted as income/profit). */
+  ownerContribution?: number;
+  /** Owner's own money taken out for personal use (not counted as expense/loss). */
+  ownerWithdrawal?: number;
+}
+
+export interface TransferPayload {
+  fromAccountId: string;
+  toAccountId: string;
+  amount: number;
+  entryDate: string;
+  description?: string;
+  projectId?: string;
 }
 
 export interface LedgerSummaryResponse {
@@ -192,6 +287,14 @@ export async function updateLedgerEntry(
 
 export async function deleteLedgerEntry(id: string): Promise<MutationResponse> {
   const { data } = await api.delete<MutationResponse>(`/ledger/${id}`);
+  return data;
+}
+
+/** Record a money transfer between two of your own accounts (no profit impact). */
+export async function createLedgerTransfer(
+  payload: TransferPayload
+): Promise<MutationResponse> {
+  const { data } = await api.post<MutationResponse>("/ledger/transfer", payload);
   return data;
 }
 

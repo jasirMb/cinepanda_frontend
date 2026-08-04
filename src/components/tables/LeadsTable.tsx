@@ -1,154 +1,309 @@
 "use client";
 
 import Link from "next/link";
-import clsx from "clsx";
-import { Pencil } from "lucide-react";
+import { Eye, Lock, Pencil, Phone, Trash2, UserCheck } from "lucide-react";
 import { type Lead } from "@/lib/api/leads";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell
-} from "@/components/ui/table";
 
 interface LeadsTableProps {
   leads: Lead[];
+  onDelete?: (id: string) => void;
+}
+
+const SOURCE_LABELS: Record<string, string> = {
+  META: "Meta",
+  YOUTUBE: "YouTube",
+  REFERENCE: "Reference",
+  WALKIN: "Walk-in",
+  WALK_IN: "Walk-in",
+  REFERRAL: "Reference",
+  OTHER: "Other",
+};
+function sourceLabel(s: string) {
+  return SOURCE_LABELS[s] ?? s.replace(/_/g, " ");
 }
 
 function statusTone(status: string) {
   switch (status) {
-    case "OPEN":
-      return "text-emerald-700 bg-emerald-50 dark:text-emerald-200 dark:bg-emerald-900/40";
+    case "NEW_LEAD":
+      return "text-blue-700 bg-blue-100 dark:text-blue-200 dark:bg-blue-950/50";
     case "CLOSED_WON":
-      return "text-emerald-800 bg-emerald-100 dark:text-emerald-100 dark:bg-emerald-900/50";
+      return "text-emerald-700 bg-emerald-100 dark:text-emerald-200 dark:bg-emerald-950/50";
     case "CLOSED_LOST":
-      return "text-red-700 bg-red-50 dark:text-red-200 dark:bg-red-900/50";
+      return "text-red-700 bg-red-100 dark:text-red-200 dark:bg-red-950/50";
     case "ON_HOLD":
-      return "text-amber-800 bg-amber-100 dark:text-amber-100 dark:bg-amber-900/50";
+      return "text-amber-800 bg-amber-100 dark:text-amber-200 dark:bg-amber-950/50";
     case "FOLLOW_UP":
-      return "text-blue-800 bg-blue-100 dark:text-blue-100 dark:bg-blue-900/50";
+      return "text-violet-700 bg-violet-100 dark:text-violet-200 dark:bg-violet-950/50";
     default:
-      return "text-slate-800 bg-slate-100 dark:text-slate-100 dark:bg-slate-800/50";
+      return "text-slate-700 bg-slate-100 dark:text-slate-200 dark:bg-slate-800";
   }
 }
-
 function priorityTone(priority?: string) {
   switch (priority) {
     case "URGENT_BUILD":
-      return "text-red-800 bg-red-100 dark:text-red-100 dark:bg-red-900/50";
+      return "text-red-700 bg-red-100 dark:text-red-200 dark:bg-red-950/50";
     case "TAKES_TIME":
-      return "text-amber-800 bg-amber-100 dark:text-amber-100 dark:bg-amber-900/50";
+      return "text-amber-800 bg-amber-100 dark:text-amber-200 dark:bg-amber-950/50";
     case "ENQUIRED":
-      return "text-blue-800 bg-blue-100 dark:text-blue-100 dark:bg-blue-900/50";
+      return "text-blue-700 bg-blue-100 dark:text-blue-200 dark:bg-blue-950/50";
     default:
-      return "text-slate-800 bg-slate-100 dark:text-slate-100 dark:bg-slate-800/50";
+      return "text-slate-700 bg-slate-100 dark:text-slate-200 dark:bg-slate-800";
   }
 }
 
-export function LeadsTable({ leads }: LeadsTableProps) {
+const AVATAR_PALETTE = [
+  "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200",
+  "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200",
+  "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200",
+  "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200",
+  "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-200",
+];
+function initials(name: string) {
   return (
-    <div className="w-full overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-      <Table className="w-full min-w-[1100px] table-fixed">
-        <colgroup>
-          <col className="w-[16%]" />
-          <col className="w-[11%]" />
-          <col className="w-[11%]" />
-          <col className="w-[8%]" />
-          <col className="w-[10%]" />
-          <col className="w-[10%]" />
-          <col className="w-[9%]" />
-          <col className="w-[9%]" />
-          <col className="w-[12%]" />
-          <col className="w-[4%]" />
-        </colgroup>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="px-4 py-3">Customer</TableHead>
-            <TableHead className="px-4 py-3">Place</TableHead>
-            <TableHead className="px-4 py-3">Contact</TableHead>
-            <TableHead className="px-4 py-3">Source</TableHead>
-            <TableHead className="px-4 py-3">Status</TableHead>
-            <TableHead className="px-4 py-3">Priority</TableHead>
-            <TableHead className="px-4 py-3">Lead Date</TableHead>
-            <TableHead className="px-4 py-3">Last Update</TableHead>
-            <TableHead className="px-4 py-3">Next Call</TableHead>
-            <TableHead className="px-4 py-3 text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {leads.map((lead) => (
-            <TableRow key={lead._id}>
-              <TableCell className="truncate px-4 py-3 font-medium" title={lead.customerName}>
-                {lead.customerName}
-              </TableCell>
-              <TableCell className="truncate px-4 py-3" title={lead.place}>
-                {lead.place}
-              </TableCell>
-              <TableCell className="truncate px-4 py-3">{lead.contactNumber}</TableCell>
-              <TableCell className="truncate px-4 py-3">{lead.leadSource}</TableCell>
-              <TableCell className="px-4 py-3">
-                <span
-                  className={clsx(
-                    "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold",
-                    statusTone(lead.status)
-                  )}
+    name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("") || "?"
+  );
+}
+function avatarColor(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length];
+}
+
+function leadAge(leadDate?: string | null, createdAt?: string): string {
+  const from = leadDate ? new Date(leadDate) : createdAt ? new Date(createdAt) : new Date();
+  const days = Math.floor((Date.now() - from.getTime()) / (1000 * 60 * 60 * 24));
+  if (days === 0) return "Today";
+  if (days === 1) return "1d";
+  if (days < 7) return `${days}d`;
+  const weeks = Math.floor(days / 7);
+  if (days < 30) return `${weeks}w`;
+  const months = Math.floor(days / 30);
+  if (days < 365) return `${months}mo`;
+  return `${Math.floor(days / 365)}y`;
+}
+
+const IST = "Asia/Kolkata";
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+function getISTDayBounds() {
+  const istNow = new Date(Date.now() + IST_OFFSET_MS);
+  const midnight = Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate());
+  return {
+    startOfToday: new Date(midnight - IST_OFFSET_MS),
+    endOfToday: new Date(midnight - IST_OFFSET_MS + 24 * 60 * 60 * 1000 - 1),
+  };
+}
+
+function nextCallInfo(iso?: string) {
+  if (!iso) return { text: "No follow-up", tone: "text-slate-400" };
+  const d = new Date(iso);
+  const text = d.toLocaleString("en-IN", {
+    timeZone: IST,
+    day: "2-digit",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+  const { startOfToday, endOfToday } = getISTDayBounds();
+  if (d < startOfToday) return { text, tone: "text-red-600 dark:text-red-400 font-medium" };
+  if (d <= endOfToday) return { text, tone: "text-amber-600 dark:text-amber-400 font-medium" };
+  return { text, tone: "text-slate-600 dark:text-slate-300" };
+}
+
+export function LeadsTable({ leads, onDelete }: LeadsTableProps) {
+  return (
+    <div className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+      <div className="w-full overflow-x-auto">
+        <table className="w-full min-w-[860px] text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+              <th className="px-4 py-3 text-right font-medium w-12">#</th>
+              <th className="px-4 py-3 text-left font-medium">Lead</th>
+              <th className="px-4 py-3 text-left font-medium">Contact</th>
+              <th className="px-4 py-3 text-left font-medium">Source</th>
+              <th className="px-4 py-3 text-left font-medium">Status</th>
+              <th className="px-4 py-3 text-left font-medium">Priority</th>
+              <th className="px-4 py-3 text-left font-medium">Next Call</th>
+              <th className="px-4 py-3 text-right font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            {leads.map((lead, index) => {
+              const nc = nextCallInfo(lead.nextCallTime);
+              const customerId =
+                lead.customerId && typeof lead.customerId === "object"
+                  ? lead.customerId._id
+                  : (lead.customerId as string | null | undefined);
+              return (
+                <tr
+                  key={lead._id}
+                  className="group transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40"
                 >
-                  {lead.status.replace("_", " ")}
-                </span>
-              </TableCell>
-              <TableCell className="px-4 py-3">
-                <span
-                  className={clsx(
-                    "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold",
-                    priorityTone(lead.priorityType)
-                  )}
+                  {/* Row number */}
+                  <td className="px-4 py-2.5 text-right text-xs tabular-nums text-slate-400">
+                    {index + 1}
+                  </td>
+
+                  {/* Lead */}
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${avatarColor(
+                          lead.customerName
+                        )}`}
+                      >
+                        {initials(lead.customerName)}
+                      </span>
+                      <div className="min-w-0">
+                        <Link
+                          href={`/leads/${lead._id}`}
+                          className="block truncate font-medium text-slate-900 hover:text-cine-primary hover:underline dark:text-slate-50"
+                          title={lead.customerName}
+                        >
+                          {lead.customerName}
+                        </Link>
+                        <div className="flex items-center gap-2">
+                          {lead.place && (
+                            <p className="truncate text-xs text-slate-400">{lead.place}</p>
+                          )}
+                          {lead.leadId && (
+                            <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                              {lead.leadId}
+                            </span>
+                          )}
+                          <span className="shrink-0 text-[10px] font-medium text-slate-400 dark:text-slate-500">
+                            {leadAge(lead.leadDate, lead.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* Contact */}
+                  <td className="px-4 py-2.5">
+                    {lead.contactNumber ? (
+                      <a
+                        href={`tel:${lead.contactNumber}`}
+                        className="inline-flex items-center gap-1.5 text-slate-600 hover:text-cine-primary dark:text-slate-300"
+                      >
+                        <Phone className="h-3.5 w-3.5 text-slate-400" />
+                        {lead.contactNumber}
+                      </a>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </td>
+
+                  {/* Source */}
+                  <td className="px-4 py-2.5">
+                    <span className="inline-block rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      {sourceLabel(lead.leadSource)}
+                    </span>
+                  </td>
+
+                  {/* Status */}
+                  <td className="px-4 py-2.5">
+                    <span
+                      className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${statusTone(lead.status)}`}
+                    >
+                      {lead.status.replace(/_/g, " ")}
+                    </span>
+                  </td>
+
+                  {/* Priority */}
+                  <td className="px-4 py-2.5">
+                    {lead.priorityType ? (
+                      <span
+                        className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${priorityTone(lead.priorityType)}`}
+                      >
+                        {lead.priorityType.replace(/_/g, " ")}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </td>
+
+                  {/* Next Call */}
+                  <td className={`whitespace-nowrap px-4 py-2.5 text-xs tabular-nums ${nc.tone}`}>
+                    {nc.text}
+                  </td>
+
+                  {/* Actions */}
+                  <td className="px-4 py-2.5 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {lead.status === "CLOSED_WON" && customerId && (
+                        <Link
+                          href={`/customers/${customerId}`}
+                          aria-label="View customer"
+                          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-cine-primary dark:hover:bg-slate-800"
+                        >
+                          <UserCheck className="h-3.5 w-3.5" />
+                        </Link>
+                      )}
+                      <Link
+                        href={`/leads/${lead._id}`}
+                        aria-label={`View ${lead.customerName}`}
+                        className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-cine-primary dark:hover:bg-slate-800"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                      </Link>
+                      <Link
+                        href={`/leads/new?edit=${lead._id}`}
+                        aria-label={`Edit ${lead.customerName}`}
+                        className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-cine-primary dark:hover:bg-slate-800"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Link>
+                      {lead.locked ? (
+                        lead.lockHref ? (
+                          <Link
+                            href={lead.lockHref}
+                            title={`${lead.lockReason ?? "Locked"} — open it`}
+                            aria-label={`${lead.lockReason ?? "Locked"} — open the linked record`}
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-amber-500 transition hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950/40"
+                          >
+                            <Lock className="h-3.5 w-3.5" />
+                          </Link>
+                        ) : (
+                          <span
+                            title={lead.lockReason ?? "Linked — can't be deleted"}
+                            aria-label={lead.lockReason ?? "Locked"}
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-amber-500"
+                          >
+                            <Lock className="h-3.5 w-3.5" />
+                          </span>
+                        )
+                      ) : (
+                        onDelete && (
+                          <button
+                            type="button"
+                            onClick={() => onDelete(lead._id)}
+                            aria-label={`Delete ${lead.customerName}`}
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {leads.length === 0 && (
+              <tr>
+                <td
+                  colSpan={8}
+                  className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
                 >
-                  {lead.priorityType.replace("_", " ")}
-                </span>
-              </TableCell>
-              <TableCell className="truncate px-4 py-3 tabular-nums">
-                {lead.leadDate ? new Date(lead.leadDate).toLocaleDateString() : "—"}
-              </TableCell>
-              <TableCell className="truncate px-4 py-3 tabular-nums">
-                {lead.lastUpdate ? new Date(lead.lastUpdate).toLocaleDateString() : "—"}
-              </TableCell>
-              <TableCell className="truncate px-4 py-3 tabular-nums">
-                {lead.nextCallTime
-                  ? new Date(lead.nextCallTime).toLocaleString([], {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit"
-                    })
-                  : "No follow-up"}
-              </TableCell>
-              <TableCell className="px-4 py-3 text-right">
-                <Link
-                  href={`/leads/new?edit=${lead._id}`}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-cine-primary dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-cine-primary"
-                  aria-label={`Edit ${lead.customerName}`}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Link>
-              </TableCell>
-            </TableRow>
-          ))}
-          {leads.length === 0 && (
-            <TableRow>
-              <TableCell
-                colSpan={10}
-                className="px-4 py-8 text-center text-slate-500 dark:text-slate-400"
-              >
-                No leads found.
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+                  No leads found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
-

@@ -1,11 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { Check, Sparkles } from "lucide-react";
+import {
+  Check,
+  Sparkles,
+  Package,
+  ArrowLeftRight,
+  Lock,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Trash2,
+  Plus,
+} from "lucide-react";
 
 import { templatesKeys, useTemplates } from "@/hooks/useTemplates";
 import { useCategories } from "@/hooks/useProducts";
@@ -17,11 +29,13 @@ import {
   type SuggestResponse,
   type Template,
 } from "@/lib/api/templates";
+import { type Product } from "@/lib/api/products";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CategoryProductPicker } from "@/components/products/category-product-picker";
 
 /* ────────────────────────────────────────────
    Types
@@ -35,7 +49,8 @@ interface ProductOption {
   category: string;
   subcategory: string;
   price: number;
-  rank: number; // 1-based priority (1 = most recommended)
+  rank: number; // 1-based priority (1 = most recommended); 0 = manually picked
+  imageUrl?: string;
 }
 
 // Top-5 products per category key
@@ -76,10 +91,39 @@ const PRIORITY_COLORS: Record<number, string> = {
 
 export default function TemplatesPage() {
   const queryClient = useQueryClient();
-  const templatesQuery = useTemplates();
+
+  // ── list controls: search / lock filter / pagination ──
+  const [listPage, setListPage] = useState(1);
+  const [lockFilter, setLockFilter] = useState<"all" | "available" | "locked">(
+    "all"
+  );
+  const [searchInput, setSearchInput] = useState("");
+  const [listSearch, setListSearch] = useState("");
+  // Debounce the search box so typing doesn't refetch on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setListSearch(searchInput), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+  // Reset to page 1 whenever the search or filter changes.
+  useEffect(() => {
+    setListPage(1);
+  }, [listSearch, lockFilter]);
+
+  const templatesParams = useMemo(
+    () => ({
+      page: listPage,
+      limit: 12,
+      search: listSearch || undefined,
+      lock: lockFilter === "all" ? undefined : lockFilter,
+    }),
+    [listPage, listSearch, lockFilter]
+  );
+
+  const templatesQuery = useTemplates(templatesParams);
   const categoriesQuery = useCategories();
 
   const templates = templatesQuery.data?.data ?? [];
+  const pagination = templatesQuery.data?.pagination;
   const categories = categoriesQuery.data?.data ?? [];
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -97,6 +141,8 @@ export default function TemplatesPage() {
   // One selected product per category
   const [categorySelection, setCategorySelection] =
     useState<CategorySelection>({});
+  // Category currently being added (loading state) via the "Add category" control.
+  const [isAddingCat, setIsAddingCat] = useState(false);
 
   // Discount & GST
   const [discountType, setDiscountType] = useState<"flat" | "percent">("percent");
@@ -120,10 +166,13 @@ export default function TemplatesPage() {
     return products;
   }, [categorySelection, allCategoryProducts]);
 
+  // All products that go into the template (one per selected/added category).
+  const templateProducts = selectedProducts;
+
   // Totals
   const subtotal = useMemo(
-    () => selectedProducts.reduce((s, p) => s + p.price * p.quantity, 0),
-    [selectedProducts]
+    () => templateProducts.reduce((s, p) => s + p.price * p.quantity, 0),
+    [templateProducts]
   );
 
   const discountAmount = useMemo(() => {
@@ -148,6 +197,17 @@ export default function TemplatesPage() {
     [allCategoryProducts]
   );
 
+  // Categories not yet shown in the review — available to add.
+  const availableCategories = useMemo(
+    () =>
+      categories.filter(
+        (c) =>
+          !productCategories.includes(c.name) &&
+          !selectedCategories.includes(c.name)
+      ),
+    [categories, productCategories, selectedCategories]
+  );
+
   // ── mutations ─────────────────────────────
   const createMutation = useMutation({
     mutationFn: createTemplate,
@@ -166,10 +226,11 @@ export default function TemplatesPage() {
     mutationFn: deleteTemplate,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: templatesKeys.all });
-      toast.success("Template deleted");
+      toast.success("Template moved to trash");
     },
-    onError: () => {
-      toast.error("Failed to delete template");
+    onError: (err) => {
+      const e = err as { response?: { data?: { error?: string } } };
+      toast.error(e?.response?.data?.error ?? "Failed to delete template");
     },
   });
 
@@ -214,6 +275,7 @@ export default function TemplatesPage() {
             subcategory: p.subcategory,
             price: p.price,
             rank: index + 1,
+            imageUrl: p.imageUrl,
           };
 
           if (!catMap[p.category]) catMap[p.category] = [];
@@ -242,6 +304,80 @@ export default function TemplatesPage() {
     setCategorySelection((prev) => ({ ...prev, [category]: productId }));
   }
 
+  // Category whose product is being swapped via the "browse all" picker.
+  const [replaceTarget, setReplaceTarget] = useState<string | null>(null);
+
+  /** Swap in any product from the full catalog (injecting it into the option list if new). */
+  function handlePickProduct(category: string, product: Product) {
+    setAllCategoryProducts((prev) => {
+      const existing = prev[category] ?? [];
+      if (existing.some((o) => o._id === product._id)) return prev;
+      const injected: ProductOption = {
+        _id: product._id,
+        name: product.name,
+        category,
+        subcategory: product.subcategory,
+        price: product.price,
+        rank: 0, // manual pick
+        imageUrl: product.imageUrl,
+      };
+      return { ...prev, [category]: [injected, ...existing] };
+    });
+    setCategorySelection((prev) => ({ ...prev, [category]: product._id }));
+    setReplaceTarget(null);
+  }
+
+  /** Add another category's products to the review (fetches its recommendations,
+   *  shows it as a new category card with the top product preselected). */
+  async function addCategory(catName: string) {
+    if (!catName || isAddingCat) return;
+    setIsAddingCat(true);
+    try {
+      const res = await suggestProducts({
+        category: catName,
+        limit: MAX_PER_CATEGORY,
+      });
+      if (!res.data.length) {
+        toast.info(`No products found in "${catName}".`);
+        return;
+      }
+      const newByCat: Record<string, ProductOption[]> = {};
+      const newSel: Record<string, string> = {};
+      res.data.forEach((p, index) => {
+        const option: ProductOption = {
+          _id: p._id,
+          name: p.name,
+          category: p.category,
+          subcategory: p.subcategory,
+          price: p.price,
+          rank: index + 1,
+          imageUrl: p.imageUrl,
+        };
+        (newByCat[p.category] ||= []).push(option);
+        if (!newSel[p.category]) newSel[p.category] = p._id;
+      });
+      setAllCategoryProducts((prev) => {
+        const next = { ...prev };
+        for (const [c, opts] of Object.entries(newByCat)) {
+          if (!next[c]) next[c] = opts.slice(0, MAX_PER_CATEGORY);
+        }
+        return next;
+      });
+      setCategorySelection((prev) => {
+        const sel = { ...prev };
+        for (const [c, id] of Object.entries(newSel)) if (!sel[c]) sel[c] = id;
+        return sel;
+      });
+      setSelectedCategories((prev) =>
+        prev.includes(catName) ? prev : [...prev, catName]
+      );
+    } catch {
+      toast.error("Failed to add category");
+    } finally {
+      setIsAddingCat(false);
+    }
+  }
+
   function handleConfirmCreate() {
     const manualItems: CreateTemplatePayload["manualItems"] = [];
 
@@ -265,21 +401,31 @@ export default function TemplatesPage() {
       });
     }
 
-    const groups: CreateTemplatePayload["groups"] = selectedProducts.map(
-      (product) => ({
-        name: product.category,
-        productItems: [
-          {
-            productId: product._id,
-            productName: product.name,
-            category: product.category,
-            subcategory: product.subcategory,
-            quantity: product.quantity,
-            unitPrice: product.price,
-          },
-        ],
-        manualItems: [],
-      })
+    // Group all products (recommendations + extras) by category — one group per
+    // category, so extra products in the same category merge in (no duplicates).
+    const groupsByCategory = new Map<string, CreateTemplatePayload["groups"][number]>();
+    templateProducts.forEach((product) => {
+      const item = {
+        productId: product._id,
+        productName: product.name,
+        category: product.category,
+        subcategory: product.subcategory,
+        quantity: product.quantity,
+        unitPrice: product.price,
+      };
+      const existing = groupsByCategory.get(product.category);
+      if (existing) {
+        existing.productItems.push(item);
+      } else {
+        groupsByCategory.set(product.category, {
+          name: product.category,
+          productItems: [item],
+          manualItems: [],
+        });
+      }
+    });
+    const groups: CreateTemplatePayload["groups"] = Array.from(
+      groupsByCategory.values()
     );
 
     const payload: CreateTemplatePayload = {
@@ -457,7 +603,7 @@ export default function TemplatesPage() {
     const budgetUsed = budgetNum > 0 ? Math.min(100, (grandTotal / budgetNum) * 100) : 0;
 
     return (
-      <div className="space-y-4">
+      <div className="max-w-4xl space-y-4">
         {/* Header */}
         <div>
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
@@ -493,8 +639,8 @@ export default function TemplatesPage() {
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 Budget: {INR(budgetNum)} ·{" "}
-                {selectedProducts.length} product
-                {selectedProducts.length !== 1 ? "s" : ""} selected
+                {templateProducts.length} product
+                {templateProducts.length !== 1 ? "s" : ""} selected
               </p>
             </div>
             <div className="text-right">
@@ -561,11 +707,23 @@ export default function TemplatesPage() {
                         )}
                       </p>
                     </div>
-                    {selected && (
-                      <span className="shrink-0 rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-                        {INR(selected.price)}
-                      </span>
-                    )}
+                    <div className="flex shrink-0 items-center gap-2">
+                      {selected && (
+                        <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                          {INR(selected.price)}
+                        </span>
+                      )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1.5 px-2.5 text-xs"
+                        onClick={() => setReplaceTarget(cat)}
+                      >
+                        <ArrowLeftRight className="h-3.5 w-3.5" />
+                        Browse all
+                      </Button>
+                    </div>
                   </div>
 
                   {/* Top recommendations */}
@@ -609,6 +767,47 @@ export default function TemplatesPage() {
             })}
           </div>
         )}
+
+        {/* Add another category */}
+        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Plus className="h-4 w-4 text-cine-primary" />
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  Add another category
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Pull in products from another category (e.g. speakers, screens).
+                </p>
+              </div>
+            </div>
+            <Select
+              value=""
+              onValueChange={(v) => v && addCategory(v)}
+              disabled={isAddingCat || availableCategories.length === 0}
+            >
+              <SelectTrigger className="w-60">
+                <SelectValue
+                  placeholder={
+                    isAddingCat
+                      ? "Adding…"
+                      : availableCategories.length === 0
+                        ? "All categories added"
+                        : "Choose a category to add…"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {availableCategories.map((c) => (
+                  <SelectItem key={c._id} value={c.name}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
         {/* Adjustments */}
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
@@ -675,8 +874,8 @@ export default function TemplatesPage() {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between text-slate-600 dark:text-slate-400">
               <span>
-                Subtotal ({selectedProducts.length} product
-                {selectedProducts.length !== 1 ? "s" : ""})
+                Subtotal ({templateProducts.length} product
+                {templateProducts.length !== 1 ? "s" : ""})
               </span>
               <span className="font-medium text-slate-900 dark:text-slate-50">
                 {INR(subtotal)}
@@ -729,13 +928,25 @@ export default function TemplatesPage() {
             Back
           </Button>
           <Button
-            disabled={selectedProducts.length === 0}
+            disabled={templateProducts.length === 0}
             onClick={handleConfirmCreate}
           >
             <Check className="h-4 w-4" />
             Confirm & Create Template
           </Button>
         </div>
+
+        {/* Browse-all product picker (replace the selected product within a category) */}
+        <CategoryProductPicker
+          open={!!replaceTarget}
+          category={replaceTarget ?? undefined}
+          selectedId={replaceTarget ? categorySelection[replaceTarget] : undefined}
+          title="Replace product"
+          onClose={() => setReplaceTarget(null)}
+          onPick={(product) =>
+            replaceTarget && handlePickProduct(replaceTarget, product)
+          }
+        />
       </div>
     );
   }
@@ -767,15 +978,52 @@ export default function TemplatesPage() {
         <Button onClick={() => setStep("budget")}>Create New Template</Button>
       </div>
 
+      {/* Search + lock filter toolbar */}
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="relative min-w-[200px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            placeholder="Search templates…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="inline-flex overflow-hidden rounded-md border border-slate-200 dark:border-slate-700">
+          {(
+            [
+              { key: "all", label: "All" },
+              { key: "available", label: "Available" },
+              { key: "locked", label: "Locked" },
+            ] as const
+          ).map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => setLockFilter(opt.key)}
+              className={`px-3 py-1.5 text-xs font-medium transition ${
+                lockFilter === opt.key
+                  ? "bg-cine-primary text-white"
+                  : "bg-white text-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Templates grid */}
       {templates.length === 0 ? (
         <div className="rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            No templates yet. Create your first template to get started.
+            {listSearch || lockFilter !== "all"
+              ? "No templates match your search or filter."
+              : "No templates yet. Create your first template to get started."}
           </p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {templates.map((template) => (
             <TemplateCard
               key={template._id}
@@ -786,11 +1034,43 @@ export default function TemplatesPage() {
         </div>
       )}
 
+      {/* Pagination footer */}
+      {pagination && pagination.total > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Showing {templates.length} of {pagination.total} template
+            {pagination.total !== 1 ? "s" : ""}
+            {pagination.totalPages > 1 &&
+              ` · page ${pagination.page} of ${pagination.totalPages}`}
+          </p>
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!pagination.hasPrev}
+                onClick={() => setListPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="h-4 w-4" /> Prev
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!pagination.hasNext}
+                onClick={() => setListPage((p) => p + 1)}
+              >
+                Next <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
         title="Delete template"
-        description="Are you sure you want to delete this template? This action cannot be undone."
+        description="Are you sure you want to delete this template? It will be moved to the Trash and can be restored later."
         confirmLabel="Delete"
         onConfirm={() => {
           if (deleteTarget) deleteMutation.mutate(deleteTarget);
@@ -853,7 +1133,11 @@ function ProductRadioRow({
         {isSelected && <Check className="h-3 w-3" />}
       </span>
 
-      {showBadge ? (
+      {product.rank === 0 ? (
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+          Your pick
+        </span>
+      ) : showBadge ? (
         <span
           className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${priorityColor}`}
         >
@@ -865,6 +1149,20 @@ function ProductRadioRow({
           #{product.rank}
         </span>
       )}
+
+      {/* Thumbnail */}
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
+        {product.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={product.imageUrl}
+            alt={product.name}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <Package className="h-4 w-4 text-slate-400" />
+        )}
+      </div>
 
       <div className="min-w-0 flex-1">
         <p
@@ -915,6 +1213,19 @@ function WizardField({
   );
 }
 
+const CARD_GRADIENTS = [
+  "from-violet-500 to-fuchsia-500",
+  "from-sky-500 to-indigo-500",
+  "from-emerald-500 to-teal-500",
+  "from-amber-500 to-orange-500",
+  "from-rose-500 to-pink-500",
+];
+function gradientFor(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return CARD_GRADIENTS[Math.abs(h) % CARD_GRADIENTS.length];
+}
+
 function TemplateCard({
   template,
   onDelete,
@@ -926,74 +1237,117 @@ function TemplateCard({
     (sum, g) => sum + g.productItems.length,
     0
   );
+  const locked = !!template.locked;
+  const initial = template.name.trim().charAt(0).toUpperCase() || "T";
+
   return (
-    <div className="group flex h-full flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
-      <Link href={`/templates/${template._id}`} className="space-y-3">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300">
-            <span className="text-base font-bold">T</span>
+    <div className="group flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-cine-primary/40 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        {/* Header */}
+        <Link
+          href={`/templates/${template._id}`}
+          className="flex items-start gap-3"
+        >
+          <div
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-base font-bold text-white shadow-sm ${gradientFor(
+              template._id
+            )}`}
+          >
+            {initial}
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-base font-semibold text-slate-900 dark:text-slate-50">
+            <h3 className="truncate text-sm font-semibold text-slate-900 group-hover:text-cine-primary dark:text-slate-50">
               {template.name}
             </h3>
-            {template.description && (
-              <p className="line-clamp-1 text-xs text-slate-500 dark:text-slate-400">
-                {template.description}
-              </p>
+            <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+              {template.description || "Quotation template"}
+            </p>
+          </div>
+        </Link>
+
+        {/* Price */}
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+              Grand total
+            </p>
+            <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
+              {INR(template.grandTotal)}
+            </p>
+          </div>
+          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            {totalProducts} item{totalProducts !== 1 ? "s" : ""} ·{" "}
+            {template.groups.length} grp
+          </span>
+        </div>
+
+        {/* Group chips */}
+        {template.groups.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {template.groups.slice(0, 3).map((group) => (
+              <span
+                key={group.name}
+                className="truncate rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300"
+              >
+                {group.name}
+                <span className="ml-1 text-slate-400">
+                  {group.productItems.length}
+                </span>
+              </span>
+            ))}
+            {template.groups.length > 3 && (
+              <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-400 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-500">
+                +{template.groups.length - 3}
+              </span>
             )}
           </div>
-        </div>
+        )}
+      </div>
 
-        <div className="flex items-baseline justify-between">
-          <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
-            {INR(template.grandTotal)}
-          </p>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">
-            {totalProducts} product{totalProducts !== 1 ? "s" : ""} ·{" "}
-            {template.groups.length} group
-            {template.groups.length !== 1 ? "s" : ""}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-1">
-          {template.groups.slice(0, 5).map((group) => (
-            <span
-              key={group.name}
-              className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-            >
-              {group.name} ({group.productItems.length})
-            </span>
-          ))}
-          {template.groups.length > 5 && (
-            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-              +{template.groups.length - 5} more
-            </span>
-          )}
-        </div>
-      </Link>
-
-      <div className="mt-auto flex items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
-        <span className="text-[10px] text-slate-500 dark:text-slate-400">
-          Created {new Date(template.createdAt).toLocaleDateString()}
+      {/* Footer bar */}
+      <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/70 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-800/30">
+        <span className="text-[10px] text-slate-400 dark:text-slate-500">
+          {new Date(template.createdAt).toLocaleDateString()}
         </span>
         <div className="flex gap-1.5">
           <Link
             href={`/templates/${template._id}`}
-            className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
           >
+            <Eye className="h-3 w-3" />
             View
           </Link>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              onDelete(template._id);
-            }}
-            className="inline-flex h-8 items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
-          >
-            Delete
-          </button>
+          {locked ? (
+            template.lockHref ? (
+              <Link
+                href={template.lockHref}
+                title={
+                  template.lockReason === "project"
+                    ? "Part of a project — open it"
+                    : "Used by an approved quotation — open it"
+                }
+                className="inline-flex h-7 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 text-xs font-medium text-amber-700 transition hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50"
+              >
+                <Lock className="h-3 w-3" /> Locked
+              </Link>
+            ) : (
+              <span className="inline-flex h-7 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 text-xs font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+                <Lock className="h-3 w-3" /> Locked
+              </span>
+            )
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                onDelete(template._id);
+              }}
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-red-200 bg-white px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-400 dark:hover:bg-red-950/30"
+            >
+              <Trash2 className="h-3 w-3" />
+              Delete
+            </button>
+          )}
         </div>
       </div>
     </div>

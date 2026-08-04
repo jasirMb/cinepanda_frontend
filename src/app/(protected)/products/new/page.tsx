@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { ImagePlus, Loader2, Package, Trash2 } from "lucide-react";
 
+import { uploadFile, deleteFile } from "@/lib/api/files";
+import { compressImageToLimit } from "@/lib/compress-image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -42,6 +45,8 @@ const unitOptions: Option[] = [
   { label: "Per unit", value: "per unit" },
 ];
 
+const MAX_IMG_BYTES = 5 * 1024 * 1024;
+
 interface FormValues {
   name: string;
   description: string;
@@ -51,6 +56,8 @@ interface FormValues {
   productModel: string;
   price: string;
   unit: string;
+  imageUrl: string;
+  imageKey: string;
   specifications: Record<string, any>;
 }
 
@@ -63,6 +70,8 @@ const initialFormValues: FormValues = {
   productModel: "",
   price: "",
   unit: "",
+  imageUrl: "",
+  imageKey: "",
   specifications: {},
 };
 
@@ -95,7 +104,7 @@ export default function NewProductPage() {
   const specTemplate = specTemplateQuery.data ?? {};
 
   const productQuery = useQuery({
-    queryKey: ["product", editId],
+    queryKey: productsKeys.detail(editId as string),
     queryFn: () => fetchProduct(editId as string),
     enabled: isEditMode,
   });
@@ -112,23 +121,68 @@ export default function NewProductPage() {
         productModel: p.productModel ?? "",
         price: String(p.price ?? ""),
         unit: p.unit ?? "",
+        imageUrl: p.imageUrl ?? "",
+        imageKey: p.imageKey ?? "",
         specifications: p.specifications ?? {},
       });
     }
   }, [productQuery.data]);
 
-  const [initialLoaded, setInitialLoaded] = useState(false);
-  useEffect(() => {
-    if (productQuery.data && !initialLoaded) {
-      setInitialLoaded(true);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const imageFileRef = useRef<HTMLInputElement>(null);
+
+  async function handleImageFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file.");
       return;
     }
-    if (initialLoaded || !isEditMode) {
+    let toUpload = file;
+    if (file.size > MAX_IMG_BYTES) {
+      try {
+        toUpload = await compressImageToLimit(file, MAX_IMG_BYTES);
+        toast.info("Image was over 5 MB — compressed it before uploading.");
+      } catch {
+        toast.error("Image is too large. Please pick one under 5 MB.");
+        return;
+      }
+    }
+    const previousKey = formValues.imageKey;
+    setUploadingImage(true);
+    try {
+      const uploaded = await uploadFile(toUpload, "products");
       setFormValues((prev) => ({
         ...prev,
-        subcategory: "",
-        specifications: {},
+        imageUrl: uploaded.fileUrl,
+        imageKey: uploaded.key,
       }));
+      if (previousKey && previousKey !== uploaded.key) {
+        deleteFile(previousKey).catch(() => {});
+      }
+    } catch {
+      toast.error("Failed to upload image");
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
+  function handleRemoveImage() {
+    const key = formValues.imageKey;
+    setFormValues((prev) => ({ ...prev, imageUrl: "", imageKey: "" }));
+    if (key) deleteFile(key).catch(() => {});
+  }
+
+  // Clear subcategory/specs only when the user actually SWITCHES category from
+  // an existing one — never on the initial prefill (prev is empty then), so an
+  // edited product keeps its subcategory + specs.
+  const prevCategoryRef = useRef("");
+  useEffect(() => {
+    const prev = prevCategoryRef.current;
+    prevCategoryRef.current = formValues.category;
+    if (prev && prev !== formValues.category) {
+      setFormValues((p) => ({ ...p, subcategory: "", specifications: {} }));
     }
   }, [formValues.category]);
 
@@ -216,6 +270,8 @@ export default function NewProductPage() {
       productModel: formValues.productModel.trim() || undefined,
       price: Number(formValues.price),
       unit: formValues.unit.trim(),
+      imageUrl: formValues.imageUrl || undefined,
+      imageKey: formValues.imageKey || undefined,
       specifications: formValues.specifications,
     };
 
@@ -232,7 +288,7 @@ export default function NewProductPage() {
       return (
         <Select
           value={String(value) || undefined}
-          onValueChange={(v) => handleSpecChange(key, v)}
+          onValueChange={(v) => v && handleSpecChange(key, v)}
         >
           <SelectTrigger>
             <SelectValue placeholder={`Select ${field.label}`} />
@@ -319,6 +375,64 @@ export default function NewProductPage() {
           noValidate
           className="max-w-4xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
         >
+          {/* Product image */}
+          <div className="flex items-center gap-4">
+            <div className="relative h-20 w-20 shrink-0">
+              <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
+                {formValues.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={formValues.imageUrl}
+                    alt="Product"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <Package className="h-7 w-7 text-slate-300 dark:text-slate-600" />
+                )}
+              </div>
+              {uploadingImage && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40">
+                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                Product image
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => imageFileRef.current?.click()}
+                  disabled={uploadingImage}
+                  className="h-7 px-3 text-xs"
+                >
+                  <ImagePlus className="mr-1.5 h-3 w-3" />
+                  {formValues.imageUrl ? "Change image" : "Upload image"}
+                </Button>
+                {formValues.imageUrl && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    disabled={uploadingImage}
+                    className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-red-600 disabled:opacity-50 dark:text-slate-400"
+                  >
+                    <Trash2 className="h-3 w-3" /> Remove
+                  </button>
+                )}
+              </div>
+            </div>
+            <input
+              ref={imageFileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="hidden"
+              onChange={handleImageFile}
+            />
+          </div>
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Product Name *" error={formErrors.name}>
               <Input
@@ -342,7 +456,7 @@ export default function NewProductPage() {
             <Field label="Category *" error={formErrors.category}>
               <Select
                 value={formValues.category || undefined}
-                onValueChange={(v) => handleChange("category", v)}
+                onValueChange={(v) => v && handleChange("category", v)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select category" />
@@ -359,7 +473,7 @@ export default function NewProductPage() {
             <Field label="Subcategory *" error={formErrors.subcategory}>
               <Select
                 value={formValues.subcategory || undefined}
-                onValueChange={(v) => handleChange("subcategory", v)}
+                onValueChange={(v) => v && handleChange("subcategory", v)}
               >
                 <SelectTrigger disabled={!formValues.category}>
                   <SelectValue placeholder="Select subcategory" />
@@ -395,7 +509,7 @@ export default function NewProductPage() {
           <Field label="Unit *" error={formErrors.unit}>
             <Select
               value={formValues.unit || undefined}
-              onValueChange={(v) => handleChange("unit", v)}
+              onValueChange={(v) => v && handleChange("unit", v)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select unit" />

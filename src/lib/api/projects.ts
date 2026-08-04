@@ -38,6 +38,7 @@ export interface ProjectPopulated {
     _id: string;
     name: string;
     phone: string;
+    countryCode?: string;
     place: string;
     email?: string;
   } | null;
@@ -50,8 +51,43 @@ export interface ProjectPopulated {
   expectedCompletionDate: string;
   actualCompletionDate?: string;
   status: ProjectStatus;
+  labours?: ProjectLabour[];
+  groups?: ProjectGroupInfo[];
+  /** Present on the list endpoint — number of ledger entries pointing at this project. */
+  ledgerCount?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProjectGroupInfo {
+  _id: string;
+  name: string;
+  color?: string;
+  avatarUrl?: string;
+}
+
+export interface ProjectLabourInfo {
+  _id: string;
+  name: string;
+  role?: string;
+  dailyWage?: number;
+  avatarUrl?: string;
+  region?: string;
+  state?: string;
+}
+
+export interface ProjectLabour {
+  labourId: ProjectLabourInfo;
+  charge: number;
+  /** Planned number of days assigned on this project (optional). */
+  plannedDays?: number;
+  /** Total agreed amount; per-day rate = totalAmount ÷ plannedDays. */
+  totalAmount?: number;
+  /** Legacy single work timeline. */
+  startDate?: string;
+  endDate?: string;
+  /** Multiple work periods (sections), each with its own per-day rate. */
+  workPeriods?: { startDate: string; endDate: string; rate?: number }[];
 }
 
 export interface ProjectsListResponse {
@@ -71,6 +107,7 @@ export interface ProjectsListQuery {
   leadId?: string;
   startDate?: string;
   endDate?: string;
+  labourId?: string;
 }
 
 export interface CreateProjectPayload {
@@ -145,4 +182,61 @@ export async function updateProject(
 export async function deleteProject(id: string): Promise<MutationResponse> {
   const { data } = await api.delete<MutationResponse>(`/projects/${id}`);
   return data;
+}
+
+/**
+ * Add a labour to a project, or update only the provided fields (charge /
+ * plannedDays) if already on the roster.
+ */
+export async function addProjectLabour(
+  projectId: string,
+  labourId: string,
+  fields: {
+    charge?: number;
+    plannedDays?: number | null;
+    totalAmount?: number | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    workPeriods?: { startDate: string; endDate: string; rate?: number }[];
+  }
+): Promise<ProjectPopulated> {
+  const { data } = await api.post<ProjectDetailResponse>(
+    `/projects/${projectId}/labours`,
+    { labourId, ...fields }
+  );
+  return data.data;
+}
+
+/** Remove a labour from a project's involved-labours roster. */
+export async function removeProjectLabour(
+  projectId: string,
+  labourId: string
+): Promise<ProjectPopulated> {
+  const { data } = await api.delete<ProjectDetailResponse>(
+    `/projects/${projectId}/labours/${labourId}`
+  );
+  return data.data;
+}
+
+/** Add all labours from a group to the project (deduped server-side). */
+export async function addProjectGroup(
+  projectId: string,
+  groupId: string
+): Promise<ProjectPopulated> {
+  const { data } = await api.post<ProjectDetailResponse>(
+    `/projects/${projectId}/groups`,
+    { groupId }
+  );
+  return data.data;
+}
+
+/** Unlink a group from the project (its labours stay on the roster). */
+export async function removeProjectGroup(
+  projectId: string,
+  groupId: string
+): Promise<ProjectPopulated> {
+  const { data } = await api.delete<ProjectDetailResponse>(
+    `/projects/${projectId}/groups/${groupId}`
+  );
+  return data.data;
 }

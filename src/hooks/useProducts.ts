@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import {
   fetchProducts,
   fetchCategories,
@@ -15,6 +15,7 @@ import {
 export const productsKeys = {
   all: ["products"] as const,
   list: (params?: ProductsListQuery) => [...productsKeys.all, params] as const,
+  detail: (id: string) => [...productsKeys.all, "detail", id] as const,
   categories: ["product-categories"] as const,
   subcategories: (category: string) => [...productsKeys.categories, "subs", category] as const,
   specTemplate: (subcategory: string) => [...productsKeys.categories, "specs", subcategory] as const
@@ -24,7 +25,8 @@ export function useProducts(params?: ProductsListQuery) {
   return useQuery<ProductsListResponse>({
     queryKey: productsKeys.list(params),
     queryFn: () => fetchProducts(params),
-    staleTime: 60_000
+    staleTime: 60_000,
+    placeholderData: keepPreviousData
   });
 }
 

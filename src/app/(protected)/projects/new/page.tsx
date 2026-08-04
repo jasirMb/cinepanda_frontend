@@ -6,19 +6,15 @@ import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { projectsKeys } from "@/hooks/useProjects";
-import { useCustomers } from "@/hooks/useCustomers";
+import { useCustomers, customersKeys } from "@/hooks/useCustomers";
 import { createProject, type CreateProjectPayload } from "@/lib/api/projects";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneField } from "@/components/ui/phone-field";
 import { DatePicker } from "@/components/ui/date-picker";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import type { Customer } from "@/lib/api/customers";
+import { Combobox } from "@/components/ui/combobox";
+import { createCustomer, type Customer } from "@/lib/api/customers";
+import { DEFAULT_COUNTRY_CODE } from "@/lib/country-codes";
 
 const EMPTY_FORM: CreateProjectPayload = {
   clientName: "",
@@ -39,6 +35,16 @@ export default function NewProjectPage() {
 
   const [form, setForm] = useState<CreateProjectPayload>({ ...EMPTY_FORM });
 
+  // Inline "create customer" mini-form, so you don't have to leave the page.
+  const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({
+    name: "",
+    phone: "",
+    countryCode: DEFAULT_COUNTRY_CODE,
+    place: "",
+    email: "",
+  });
+
   const createMutation = useMutation({
     mutationFn: createProject,
     onSuccess: () => {
@@ -49,14 +55,56 @@ export default function NewProjectPage() {
     onError: () => toast.error("Failed to create project"),
   });
 
+  const createCustomerMutation = useMutation({
+    mutationFn: createCustomer,
+    onSuccess: (created: Customer) => {
+      // Add to the cached list immediately so the picker shows it, then refetch.
+      queryClient.setQueryData(
+        customersKeys.list(),
+        (old: { data?: Customer[] } | undefined) =>
+          old ? { ...old, data: [created, ...(old.data ?? [])] } : old
+      );
+      queryClient.invalidateQueries({ queryKey: customersKeys.all });
+      // Select the new customer + prefill the client name.
+      setForm((f) => ({ ...f, customerId: created._id, clientName: created.name }));
+      setShowNewCustomer(false);
+      setNewCustomer({
+        name: "",
+        phone: "",
+        countryCode: DEFAULT_COUNTRY_CODE,
+        place: "",
+        email: "",
+      });
+      toast.success("Customer created");
+    },
+    onError: () => toast.error("Failed to create customer"),
+  });
+
   function handleCustomerChange(customerId: string) {
     const customer = customers.find((c: Customer) => c._id === customerId);
     setForm((f) => ({
       ...f,
-      customerId: customerId === "NONE" ? "" : customerId,
-      clientName:
-        customerId !== "NONE" && customer ? customer.name : f.clientName,
+      customerId,
+      clientName: customer ? customer.name : f.clientName,
     }));
+  }
+
+  function handleCreateCustomer() {
+    if (
+      !newCustomer.name.trim() ||
+      !newCustomer.place.trim() ||
+      !/^\d{5,15}$/.test(newCustomer.phone.trim())
+    ) {
+      toast.error("Name, place and a valid phone are required");
+      return;
+    }
+    createCustomerMutation.mutate({
+      name: newCustomer.name.trim(),
+      phone: newCustomer.phone.trim(),
+      countryCode: newCustomer.countryCode,
+      place: newCustomer.place.trim(),
+      ...(newCustomer.email.trim() ? { email: newCustomer.email.trim() } : {}),
+    });
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -92,24 +140,94 @@ export default function NewProjectPage() {
         onSubmit={handleSubmit}
         className="max-w-4xl space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
       >
-        {/* Customer selector */}
+        {/* Customer selector + inline create */}
         <Field label="Customer (optional)">
-          <Select
-            value={form.customerId || "NONE"}
-            onValueChange={handleCustomerChange}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select customer" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="NONE">No customer</SelectItem>
-              {customers.map((c: Customer) => (
-                <SelectItem key={c._id} value={c._id}>
-                  {c.name} — {c.place}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <Combobox
+                options={customers.map((c: Customer) => ({
+                  value: c._id,
+                  label: c.name,
+                  hint: c.place,
+                }))}
+                value={form.customerId}
+                onChange={handleCustomerChange}
+                placeholder="Select customer"
+                searchPlaceholder="Search customers…"
+                clearable
+                clearLabel="No customer"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowNewCustomer((s) => !s)}
+            >
+              {showNewCustomer ? "Close" : "+ New"}
+            </Button>
+          </div>
+
+          {showNewCustomer && (
+            <div className="mt-3 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
+              <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                New customer
+              </p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Input
+                  value={newCustomer.name}
+                  onChange={(e) =>
+                    setNewCustomer((c) => ({ ...c, name: e.target.value }))
+                  }
+                  placeholder="Name *"
+                />
+                <PhoneField
+                  countryCode={newCustomer.countryCode}
+                  number={newCustomer.phone}
+                  onCountryCodeChange={(code) =>
+                    setNewCustomer((c) => ({ ...c, countryCode: code }))
+                  }
+                  onNumberChange={(n) =>
+                    setNewCustomer((c) => ({ ...c, phone: n }))
+                  }
+                  placeholder="Phone *"
+                />
+                <Input
+                  value={newCustomer.place}
+                  onChange={(e) =>
+                    setNewCustomer((c) => ({ ...c, place: e.target.value }))
+                  }
+                  placeholder="Place *"
+                />
+                <Input
+                  value={newCustomer.email}
+                  onChange={(e) =>
+                    setNewCustomer((c) => ({ ...c, email: e.target.value }))
+                  }
+                  placeholder="Email (optional)"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleCreateCustomer}
+                  disabled={createCustomerMutation.isPending}
+                >
+                  {createCustomerMutation.isPending
+                    ? "Saving…"
+                    : "Save customer"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowNewCustomer(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
         </Field>
 
         <Field label="Client Name *">

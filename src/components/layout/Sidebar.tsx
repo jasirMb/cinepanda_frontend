@@ -6,29 +6,29 @@ import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import clsx from "clsx";
 import {
+  Building2,
   ChevronsLeft,
+  CreditCard,
   FileText,
   FolderKanban,
+  HardHat,
+  IdCard,
   LayoutDashboard,
   LogOut,
   Package,
   Receipt,
   Settings,
+  Trash2,
   UserPlus,
   Users,
   Wallet,
   X,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/auth-store";
 import { getSidebarPreset, useSettingsStore } from "@/store/settings-store";
 import { useShellStore } from "@/store/shell-store";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { SettingsPanel } from "@/components/layout/SettingsPanel";
 
 const navItems: {
   href: string;
@@ -41,7 +41,11 @@ const navItems: {
   { href: "/templates", label: "Templates", icon: FileText },
   { href: "/quotations", label: "Quotations", icon: Receipt },
   { href: "/customers", label: "Customers", icon: Users },
+  { href: "/labours", label: "Labours", icon: HardHat },
+  { href: "/staff", label: "Staff", icon: IdCard },
   { href: "/projects", label: "Projects", icon: FolderKanban },
+  { href: "/vendors", label: "Vendors", icon: Building2 },
+  { href: "/payment-accounts", label: "Payment Accounts", icon: CreditCard },
   { href: "/ledger", label: "Ledger", icon: Wallet },
 ];
 
@@ -51,12 +55,14 @@ export function Sidebar() {
   const pathname = usePathname();
   const logout = useAuthStore((s) => s.logout);
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const sidebarId = useSettingsStore((s) => s.sidebarId);
   const sidebarPreset = getSidebarPreset(sidebarId);
   const mobileOpen = useShellStore((s) => s.mobileSidebarOpen);
   const closeMobile = useShellStore((s) => s.closeMobileSidebar);
+  const openSettings = useShellStore((s) => s.openSettings);
 
   useEffect(() => {
     const saved =
@@ -95,6 +101,9 @@ export function Sidebar() {
 
   function handleLogout() {
     logout();
+    // Drop all cached server data so the next user can't see the previous user's
+    // leads/customers/quotations on a shared device.
+    queryClient.clear();
     router.replace("/login");
   }
 
@@ -138,32 +147,42 @@ export function Sidebar() {
           showExpanded ? "px-5" : "justify-center px-0"
         )}
       >
-        <div className="relative shrink-0">
-          <div
-            aria-hidden
-            className="absolute inset-0 rounded-xl bg-cine-primary/30 blur-md"
-          />
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-white/10 to-white/0 p-1.5 ring-1 ring-white/10">
-            <Image
-              src="/cinepanda-logo.png"
-              alt="CinePanda logo"
-              width={32}
-              height={32}
-              priority
-              className="drop-shadow-[0_2px_8px_rgba(48,118,161,0.55)]"
+        <Link
+          href="/dashboard"
+          onClick={closeMobile}
+          title="Go to dashboard"
+          className={clsx(
+            "flex min-w-0 items-center gap-3 rounded-lg transition hover:opacity-90",
+            showExpanded && "flex-1"
+          )}
+        >
+          <div className="relative shrink-0">
+            <div
+              aria-hidden
+              className="absolute inset-0 rounded-xl bg-cine-primary/30 blur-md"
             />
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-white/10 to-white/0 p-1.5 ring-1 ring-white/10">
+              <Image
+                src="/cinepanda-logo.png"
+                alt="Cinepanda logo"
+                width={32}
+                height={32}
+                priority
+                className="drop-shadow-[0_2px_8px_rgba(48,118,161,0.55)]"
+              />
+            </div>
           </div>
-        </div>
-        {showExpanded && (
-          <div className="min-w-0 flex-1 leading-tight">
-            <p className="truncate text-base font-semibold tracking-tight text-white">
-              CinePanda
-            </p>
-            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-cine-primary">
-              Entertainment
-            </p>
-          </div>
-        )}
+          {showExpanded && (
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="truncate text-base font-semibold tracking-tight text-white">
+                Cinepanda
+              </p>
+              <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-cine-primary">
+                Entertainment
+              </p>
+            </div>
+          )}
+        </Link>
         <button
           type="button"
           onClick={closeMobile}
@@ -206,31 +225,39 @@ export function Sidebar() {
 
       {/* Footer actions */}
       <div className="space-y-1 border-t border-white/10 p-2">
-        <Popover>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              title="Settings"
-              aria-label="Settings"
-              className={clsx(
-                "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white",
-                !showExpanded && "justify-center px-2"
-              )}
-            >
-              <Settings className="h-4 w-4 shrink-0" />
-              {showExpanded && <span>Settings</span>}
-            </button>
-          </PopoverTrigger>
-          <PopoverContent
-            side="top"
-            align="start"
-            sideOffset={12}
-            collisionPadding={12}
-            className="w-80 max-w-[calc(100vw-1.5rem)] max-h-[80vh] overflow-y-auto"
-          >
-            <SettingsPanel />
-          </PopoverContent>
-        </Popover>
+        <button
+          type="button"
+          title="Settings"
+          aria-label="Settings"
+          onClick={() => openSettings()}
+          className={clsx(
+            "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white",
+            !showExpanded && "justify-center px-2"
+          )}
+        >
+          <Settings className="h-4 w-4 shrink-0" />
+          {showExpanded && <span>Settings</span>}
+        </button>
+
+        <Link
+          href="/trash"
+          title={!showExpanded ? "Trash" : undefined}
+          className={clsx(
+            "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+            !showExpanded && "justify-center px-2",
+            pathname.startsWith("/trash")
+              ? "bg-cine-primary/20 text-white ring-1 ring-cine-primary/40"
+              : "text-slate-300 hover:bg-white/5 hover:text-white"
+          )}
+        >
+          <Trash2
+            className={clsx(
+              "h-4 w-4 shrink-0",
+              pathname.startsWith("/trash") ? "text-cine-primary" : "text-slate-400"
+            )}
+          />
+          {showExpanded && <span>Trash</span>}
+        </Link>
 
         <button
           type="button"

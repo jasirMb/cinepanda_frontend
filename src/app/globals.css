@@ -2,11 +2,83 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The app shell owns the full viewport; the inner <main> is the only scroller.
+   Locking html/body prevents a second (window) scrollbar on tall pages. */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   @apply bg-slate-50 text-slate-900;
 }
 
 .dark body {
   @apply bg-slate-950 text-slate-50;
+}
+
+
+
+/* ── Slim, modern scrollbars app-wide ──────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 0.45) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: rgb(148 163 184 / 0.4);
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(100 116 139 / 0.6);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background-color: rgb(71 85 105 / 0.55);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(100 116 139 / 0.75);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ── Glass / wallpaper mode ──────────────────────────────────────────────
+   When a custom background image is active, <AppBackdrop> renders it (softly
+   blurred) full screen and sets data-wallpaper on <html>. Surfaces become
+   *frosted glass* — mostly opaque + blur — so text stays fully readable while
+   the wallpaper still reads through the gutters and edges. */
+[data-wallpaper="true"] body {
+  background-color: transparent !important;
+}
+
+/* Only frost *translucent panel* surfaces so the wallpaper doesn't bleed through
+   content. Solid surfaces (opaque `bg-white` cards, `bg-slate-900` buttons) are
+   left alone — the trailing slash in the dark selectors, and the 6–9 opacity
+   buckets for white, exclude both buttons and tiny decorative overlays
+   (bg-white/5, bg-white/10). */
+[data-wallpaper="true"] [class*="bg-white/6"],
+[data-wallpaper="true"] [class*="bg-white/7"],
+[data-wallpaper="true"] [class*="bg-white/8"],
+[data-wallpaper="true"] [class*="bg-white/9"] {
+  background-color: rgb(255 255 255 / 0.92) !important;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+.dark[data-wallpaper="true"] [class*="bg-slate-900/"],
+.dark[data-wallpaper="true"] [class*="bg-slate-950/"],
+.dark[data-wallpaper="true"] [class*="bg-slate-800/"] {
+  background-color: rgb(2 6 23 / 0.9) !important;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
 }
 

@@ -9,20 +9,37 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   CalendarClock,
+  Check,
   CheckCircle2,
   Clock,
+  Eye,
+  LayoutGrid,
+  LayoutList,
+  Loader2,
   MapPin,
+  Lock,
   Pencil,
   Phone,
+  Trash2,
   TrendingUp,
+  UserCheck,
+  UserPlus,
   Users,
   XCircle,
 } from "lucide-react";
 
-import { leadsKeys, useFollowupLeads, useLeads } from "@/hooks/useLeads";
+import { leadsKeys, useLeads, useLeadStatuses, useLeadSources, usePriorityTypes } from "@/hooks/useLeads";
 import { LeadsTable } from "@/components/tables/LeadsTable";
 import { Button } from "@/components/ui/button";
-import { type Lead, updateLeadStatus } from "@/lib/api/leads";
+import { Combobox } from "@/components/ui/combobox";
+import {
+  type Lead,
+  updateLeadStatus,
+  convertLeadToCustomer,
+  deleteLead,
+} from "@/lib/api/leads";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -30,7 +47,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 
 type LeadCategory = "overdue" | "today" | "upcoming" | "unscheduled";
 
-function humanize(value?: string) {
+function humanize(value?: string | null) {
   if (!value) return "Not set";
   return value
     .replace(/_/g, " ")
@@ -38,23 +55,38 @@ function humanize(value?: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+const IST = "Asia/Kolkata";
+
 function formatDateLabel(value?: string | null) {
   if (!value) return "No follow-up set";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "Invalid date";
-  return `${parsed.toLocaleDateString()} at ${parsed.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit"
-  })}`;
+  return parsed.toLocaleString("en-IN", {
+    timeZone: IST,
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function getISTDayBounds() {
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  const nowUTC = Date.now();
+  const istNow = new Date(nowUTC + IST_OFFSET_MS);
+  const midnight = Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate());
+  return {
+    startOfToday: new Date(midnight - IST_OFFSET_MS),
+    endOfToday: new Date(midnight - IST_OFFSET_MS + 24 * 60 * 60 * 1000 - 1),
+  };
 }
 
 function getCategory(lead: Lead): LeadCategory {
   if (lead.nextCallTime) {
     const next = new Date(lead.nextCallTime);
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-
+    const { startOfToday, endOfToday } = getISTDayBounds();
     if (next < startOfToday) return "overdue";
     if (next >= startOfToday && next <= endOfToday) return "today";
     return "upcoming";
@@ -62,7 +94,7 @@ function getCategory(lead: Lead): LeadCategory {
   return "unscheduled";
 }
 
-function priorityWeight(priority?: string) {
+function priorityWeight(priority?: string | null) {
   switch (priority) {
     case "URGENT_BUILD":
       return 0;
@@ -116,7 +148,7 @@ function categoryBadgeClass(category: LeadCategory) {
 
 function statusBadgeClass(status?: string) {
   switch (status) {
-    case "OPEN":
+    case "NEW_LEAD":
       return "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300";
     case "CLOSED_WON":
       return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300";
@@ -131,7 +163,7 @@ function statusBadgeClass(status?: string) {
   }
 }
 
-function priorityBadgeClass(priority?: string) {
+function priorityBadgeClass(priority?: string | null) {
   switch (priority) {
     case "URGENT_BUILD":
       return "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300";
@@ -142,6 +174,19 @@ function priorityBadgeClass(priority?: string) {
     default:
       return "bg-slate-100 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200";
   }
+}
+
+function leadAge(leadDate?: string | null, createdAt?: string): string {
+  const from = leadDate ? new Date(leadDate) : createdAt ? new Date(createdAt) : new Date();
+  const days = Math.floor((Date.now() - from.getTime()) / (1000 * 60 * 60 * 24));
+  if (days === 0) return "Today";
+  if (days === 1) return "1d";
+  if (days < 7) return `${days}d`;
+  const weeks = Math.floor(days / 7);
+  if (days < 30) return `${weeks}w`;
+  const months = Math.floor(days / 30);
+  if (days < 365) return `${months}mo`;
+  return `${Math.floor(days / 365)}y`;
 }
 
 function getInitials(name: string) {
@@ -155,12 +200,12 @@ function getInitials(name: string) {
 
 function avatarColor(seed: string) {
   const palette = [
-    "bg-cine-primary/15 text-cine-primary",
-    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-    "bg-violet-500/15 text-violet-700 dark:text-violet-300",
-    "bg-amber-500/15 text-amber-800 dark:text-amber-300",
-    "bg-rose-500/15 text-rose-700 dark:text-rose-300",
-    "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+    "from-violet-500 to-fuchsia-500",
+    "from-sky-500 to-indigo-500",
+    "from-emerald-500 to-teal-500",
+    "from-amber-500 to-orange-500",
+    "from-rose-500 to-pink-500",
+    "from-cyan-500 to-blue-500",
   ];
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
@@ -171,7 +216,45 @@ export default function LeadsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
+  // View mode lives in the URL (?view=list&list=table) rather than in component
+  // state, so opening a lead and coming back returns to the view you left —
+  // local state would remount as "cards" every time.
+  const viewMode: "cards" | "list" =
+    searchParams.get("view") === "list" ? "list" : "cards";
+  const listMode: "grid" | "table" =
+    searchParams.get("list") === "table" ? "table" : "grid";
+
+  function setViewParam(key: string, value: string, fallback: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === fallback) params.delete(key);
+    else params.set(key, value);
+    const qs = params.toString();
+    router.replace(qs ? `/leads?${qs}` : "/leads", { scroll: false });
+  }
+  const setViewMode = (v: "cards" | "list") => setViewParam("view", v, "cards");
+  const setListMode = (v: "grid" | "table") => setViewParam("list", v, "grid");
+
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const CARDS_SECTION_LIMIT = 8;
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+  function toggleSection(key: string) {
+    setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteLead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: leadsKeys.all });
+      toast.success("Lead moved to trash");
+    },
+    onError: (e: any) => {
+      toast.error(e?.response?.data?.error ?? "Failed to delete lead");
+    },
+  });
+
+  function handleDelete(id: string) {
+    setDeleteTarget(id);
+  }
   const [filters, setFilters] = useState({
     search: "",
     status: "",
@@ -190,73 +273,99 @@ export default function LeadsPage() {
       | "nextCallTime_asc"
   });
 
-  const todayDate = useMemo(() => {
-    const now = new Date();
-    return now.toISOString().slice(0, 10);
-  }, []);
+  // Debounced search — type freely, the query only updates after a short pause.
+  const [searchInput, setSearchInput] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setFilters((prev) => (prev.search === searchInput ? prev : { ...prev, search: searchInput }));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
-  const statusOptions = [
-    { label: "All statuses", value: "" },
-    { label: "Open", value: "OPEN" },
-    { label: "Closed Won", value: "CLOSED_WON" },
-    { label: "Closed Lost", value: "CLOSED_LOST" },
-    { label: "On Hold", value: "ON_HOLD" },
-    { label: "Follow up", value: "FOLLOW_UP" }
-  ];
+  const statusEnum = useLeadStatuses().data ?? [];
+  const statusOptions = [{ label: "All statuses", value: "" }, ...statusEnum];
 
-  const priorityTypeOptions = [
-    { label: "All priorities", value: "" },
-    { label: "Enquired", value: "ENQUIRED" },
-    { label: "Takes time", value: "TAKES_TIME" },
-    { label: "Urgent building", value: "URGENT_BUILD" }
-  ];
+  const priorityEnum = usePriorityTypes().data ?? [];
+  const priorityTypeOptions = [{ label: "All priorities", value: "" }, ...priorityEnum];
 
-  const leadSourceOptions = [
-    { label: "All sources", value: "" },
-    { label: "Meta", value: "META" },
-    { label: "Youtube", value: "YOUTUBE" },
-    { label: "Walk-in", value: "WALK_IN" },
-    { label: "Referral", value: "REFERRAL" },
-    { label: "Other", value: "OTHER" }
-  ];
+  const sourceEnum = useLeadSources().data ?? [];
+  const leadSourceOptions = [{ label: "All sources", value: "" }, ...sourceEnum];
 
-  const followupQuery = useFollowupLeads({ date: todayDate });
+  const LIST_LIMIT = 20;
+  const [listPage, setListPage] = useState(1);
 
-  const leadsParams = useMemo(
+  // Reset to page 1 whenever filters change
+  useEffect(() => { setListPage(1); }, [filters]);
+
+  // Cards view: fetch page 1 + page 2 in parallel (100 each) → up to 200 leads
+  const cardsBase = useMemo(
     () => ({
-      page: 1,
-      limit: 50,
+      limit: 100,
       search: filters.search || undefined,
       status: filters.status || undefined,
       priorityType: filters.priorityType || undefined,
       leadSource: filters.leadSource || undefined,
       startDate: filters.startDate || undefined,
-      endDate: filters.endDate || undefined
+      endDate: filters.endDate || undefined,
     }),
     [filters]
   );
+  const cardsPage1Params = useMemo(() => ({ ...cardsBase, page: 1 }), [cardsBase]);
+  const cardsPage2Params = useMemo(() => ({ ...cardsBase, page: 2 }), [cardsBase]);
 
-  const leadsQuery = useLeads(leadsParams);
+  const leadsQuery  = useLeads(cardsPage1Params);
+  const leadsQuery2 = useLeads(cardsPage2Params);
+
+  // List view: real backend pagination
+  const listParams = useMemo(
+    () => ({
+      page: listPage,
+      limit: LIST_LIMIT,
+      search: filters.search || undefined,
+      status: filters.status || undefined,
+      priorityType: filters.priorityType || undefined,
+      leadSource: filters.leadSource || undefined,
+      startDate: filters.startDate || undefined,
+      endDate: filters.endDate || undefined,
+    }),
+    [filters, listPage]
+  );
+
+  const listQuery = useLeads(listParams);
 
   useEffect(() => {
     const created = searchParams.get("created");
     const error = searchParams.get("error");
     const updated = searchParams.get("updated");
 
+    // Strip only the one-shot toast flags — keep view/list so clearing the
+    // notice doesn't bounce the user back to the default cards view.
+    const clearFlags = () => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("created");
+      params.delete("updated");
+      params.delete("error");
+      const qs = params.toString();
+      router.replace(qs ? `/leads?${qs}` : "/leads", { scroll: false });
+    };
+
     if (created === "1") {
       toast.success("Lead created successfully");
-      router.replace("/leads");
+      clearFlags();
     } else if (updated === "1") {
       toast.success("Lead updated successfully");
-      router.replace("/leads");
+      clearFlags();
     } else if (typeof error === "string" && error.trim().length > 0) {
       toast.error(decodeURIComponent(error));
-      router.replace("/leads");
+      clearFlags();
     }
   }, [router, searchParams]);
 
-  const attentionLeads = followupQuery.data?.data ?? [];
-  const allLeadsRaw = leadsQuery.data?.data ?? [];
+  const cardsTotal = leadsQuery.data?.pagination?.total ?? 0;
+  const allLeadsRaw = useMemo(
+    () => [...(leadsQuery.data?.data ?? []), ...(leadsQuery2.data?.data ?? [])],
+    [leadsQuery.data, leadsQuery2.data]
+  );
   const sortedAllLeads = useMemo(() => {
     const [field, dir] = filters.sort.split("_") as [keyof Lead | string, "asc" | "desc"];
     const factor = dir === "asc" ? 1 : -1;
@@ -283,10 +392,10 @@ export default function LeadsPage() {
     let overdue = 0;
     let dueToday = 0;
     for (const lead of allLeadsRaw) {
-      if (lead.status === "OPEN") open++;
-      else if (lead.status === "CLOSED_WON") won++;
+      if (lead.status === "CLOSED_WON") won++;
       else if (lead.status === "CLOSED_LOST") lost++;
       else if (lead.status === "ON_HOLD") onHold++;
+      else open++; // any active pipeline status (New Lead, Contacted, …)
       if (lead.priorityType === "URGENT_BUILD") urgent++;
       const cat = getCategory(lead);
       if (cat === "overdue") overdue++;
@@ -297,14 +406,8 @@ export default function LeadsPage() {
     return { total, open, won, lost, onHold, urgent, overdue, dueToday, conversion };
   }, [allLeadsRaw]);
 
-  const attentionIds = useMemo(
-    () => new Set(attentionLeads.map((lead) => lead._id)),
-    [attentionLeads]
-  );
-  const leads = useMemo(
-    () => allLeads.filter((lead) => !attentionIds.has(lead._id)),
-    [allLeads, attentionIds]
-  );
+  // Categorise EVERY lead purely by its schedule (not priority), so leads of
+  // any priority type (Takes Time included) appear in the right section.
   const grouped = useMemo(() => {
     const buckets: Record<LeadCategory, Lead[]> = {
       overdue: [],
@@ -313,10 +416,17 @@ export default function LeadsPage() {
       unscheduled: []
     };
 
-    leads.forEach((lead) => {
-      const category = getCategory(lead);
-      buckets[category].push(lead);
-    });
+    // Only leads that still need action — a Closed Won/Lost lead is resolved and
+    // shouldn't sit in Needs attention / Upcoming / Unscheduled.
+    allLeads
+      .filter(
+        (lead) =>
+          lead.status !== "CLOSED_WON" && lead.status !== "CLOSED_LOST"
+      )
+      .forEach((lead) => {
+        const category = getCategory(lead);
+        buckets[category].push(lead);
+      });
 
     const byNextCall = (a: Lead, b: Lead) => {
       const aDate = a.nextCallTime ? new Date(a.nextCallTime).getTime() : Infinity;
@@ -332,9 +442,21 @@ export default function LeadsPage() {
     );
 
     return buckets;
-  }, [leads]);
+  }, [allLeads]);
 
-  function LeadCard({ lead }: { lead: Lead }) {
+  // "Needs attention" = overdue + due-today (any priority), most overdue first.
+  const attentionLeads = useMemo(
+    () => [...grouped.overdue, ...grouped.today],
+    [grouped]
+  );
+
+  // Won leads that still need a customer (not yet linked/converted).
+  const toConvertLeads = useMemo(
+    () => allLeads.filter((l) => l.status === "CLOSED_WON" && !l.customerId),
+    [allLeads]
+  );
+
+  function LeadCard({ lead, compact = false }: { lead: Lead; compact?: boolean }) {
     const category = getCategory(lead);
     const [statusValue, setStatusValue] = useState(lead.status);
     const statusMutation = useMutation({
@@ -350,32 +472,63 @@ export default function LeadsPage() {
       }
     });
 
+    const [convertOpen, setConvertOpen] = useState(false);
+    const [cPlace, setCPlace] = useState(lead.place ?? "");
+    const [cEmail, setCEmail] = useState("");
+    const [cNotes, setCNotes] = useState("");
+    const convertMutation = useMutation({
+      mutationFn: () =>
+        convertLeadToCustomer(lead._id, {
+          place: cPlace.trim() || undefined,
+          email: cEmail.trim() || undefined,
+          notes: cNotes.trim() || undefined,
+        }),
+      onSuccess: (res) => {
+        queryClient.invalidateQueries({ queryKey: leadsKeys.all });
+        setConvertOpen(false);
+        toast.success(
+          res.merged
+            ? `Linked to existing customer "${res.customer.name}"`
+            : `Customer "${res.customer.name}" created`
+        );
+      },
+      onError: (e: any) =>
+        toast.error(e?.response?.data?.error ?? "Failed to convert"),
+    });
+
     return (
       <div className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700">
-        <div
-          className={`absolute left-0 top-0 h-full w-1 ${categoryStripe(category)}`}
-          aria-hidden
-        />
+        {!compact && (
+          <div
+            className={`absolute left-0 top-0 h-full w-1 ${categoryStripe(category)}`}
+            aria-hidden
+          />
+        )}
 
-        <div className="flex flex-1 flex-col gap-3 p-4 pl-5">
+        <div className={`flex flex-1 flex-col gap-2 ${compact ? "p-3" : "gap-3 p-4 pl-5"}`}>
           {/* Header */}
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-2.5">
             <div
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${avatarColor(
-                lead.customerName
-              )}`}
+              className={`flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-bold text-white shadow-sm ${compact ? "h-8 w-8 text-[11px]" : "h-11 w-11 text-sm"} ${avatarColor(lead.customerName)}`}
             >
               {getInitials(lead.customerName)}
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="truncate text-base font-semibold text-slate-900 dark:text-slate-50">
+              <Link
+                href={`/leads/${lead._id}`}
+                className={`block truncate font-semibold text-slate-900 hover:text-cine-primary dark:text-slate-50 ${compact ? "text-sm" : "text-base"}`}
+              >
                 {lead.customerName}
-              </h3>
+              </Link>
               <p className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                 <MapPin className="h-3 w-3 shrink-0" />
                 <span className="truncate">{lead.place}</span>
                 <span className="text-slate-300 dark:text-slate-600">•</span>
                 <span className="truncate">{humanize(lead.leadSource)}</span>
+                <span className="text-slate-300 dark:text-slate-600">•</span>
+                <span className="shrink-0 font-medium text-slate-400 dark:text-slate-500">
+                  {leadAge(lead.leadDate, lead.createdAt)}
+                </span>
               </p>
             </div>
             <span
@@ -406,16 +559,17 @@ export default function LeadsPage() {
           </div>
 
           {/* Info rows */}
-          <div className="space-y-1.5 text-sm text-slate-700 dark:text-slate-300">
+          <div className="space-y-1 text-xs text-slate-700 dark:text-slate-300">
             <p className="flex items-center gap-2">
-              <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+              <Phone className="h-3 w-3 shrink-0 text-slate-400" />
               <span>{lead.contactNumber}</span>
             </p>
             <p className="flex items-center gap-2">
-              <CalendarClock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+              <CalendarClock className="h-3 w-3 shrink-0 text-slate-400" />
+              <span className="text-slate-400">Next call:</span>
               <span>{formatDateLabel(lead.nextCallTime)}</span>
             </p>
-            {lead.requirement && (
+            {!compact && lead.requirement && (
               <p className="line-clamp-2 text-xs text-slate-600 dark:text-slate-400">
                 {lead.requirement}
               </p>
@@ -423,54 +577,181 @@ export default function LeadsPage() {
           </div>
 
           {/* Footer */}
-          <div className="mt-auto flex items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+          <div className={`mt-auto flex items-center gap-1 border-t border-slate-100 dark:border-slate-800 ${compact ? "pt-2" : "pt-3"}`}>
             <Select
               value={statusValue || "__all__"}
-              onValueChange={(v) =>
-                setStatusValue(v === "__all__" ? "" : v)
-              }
+              onValueChange={(v) => setStatusValue(v === "__all__" ? "" : v)}
               disabled={statusMutation.isPending}
             >
-              <SelectTrigger className="h-8 flex-1 text-xs">
+              <SelectTrigger className="h-7 flex-1 min-w-0 px-2 text-[11px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {statusOptions.map((opt) => (
-                  <SelectItem
-                    key={opt.value || "__all__"}
-                    value={opt.value || "__all__"}
-                  >
+                  <SelectItem key={opt.value || "__all__"} value={opt.value || "__all__"}>
                     {opt.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 px-3 text-xs"
-              disabled={
-                statusMutation.isPending || statusValue === lead.status
-              }
+            <button
+              type="button"
+              title="Save status"
+              aria-label="Save status"
+              disabled={statusMutation.isPending || statusValue === lead.status}
               onClick={() => statusMutation.mutate(statusValue)}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-emerald-400 hover:text-emerald-600 disabled:opacity-30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
             >
-              {statusMutation.isPending ? "..." : "Save"}
-            </Button>
+              <Check className="h-3.5 w-3.5" />
+            </button>
+            <Link
+              href={`/leads/${lead._id}`}
+              title="View lead"
+              aria-label="View lead"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+            >
+              <Eye className="h-3.5 w-3.5" />
+            </Link>
             <Link
               href={`/leads/new?edit=${lead._id}`}
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              title="Edit lead"
+              aria-label="Edit lead"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
             >
-              <Pencil className="h-3 w-3" />
-              Edit
+              <Pencil className="h-3.5 w-3.5" />
             </Link>
+            {lead.locked ? (
+              lead.lockHref ? (
+                <Link
+                  href={lead.lockHref}
+                  title={`${lead.lockReason ?? "Locked"} — open it`}
+                  aria-label={`${lead.lockReason ?? "Locked"} — open it`}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-amber-200 bg-amber-50 text-amber-600 transition hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
+                >
+                  <Lock className="h-3.5 w-3.5" />
+                </Link>
+              ) : (
+                <span
+                  title={lead.lockReason ?? "Linked — can't be deleted"}
+                  aria-label={lead.lockReason ?? "Locked"}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
+                >
+                  <Lock className="h-3.5 w-3.5" />
+                </span>
+              )
+            ) : (
+              <button
+                type="button"
+                title="Delete lead"
+                onClick={() => handleDelete(lead._id)}
+                aria-label="Delete lead"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-red-950/30"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
+
+          {/* Won lead → customer */}
+          {lead.status === "CLOSED_WON" &&
+            (() => {
+              const customerId =
+                lead.customerId && typeof lead.customerId === "object"
+                  ? lead.customerId._id
+                  : (lead.customerId as string | null | undefined);
+              return customerId ? (
+                <Link
+                  href={`/customers/${customerId}`}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-cine-primary hover:underline"
+                >
+                  <UserCheck className="h-3.5 w-3.5" /> View customer
+                </Link>
+              ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1.5 self-start text-xs"
+                onClick={() => setConvertOpen(true)}
+              >
+                <UserPlus className="h-3.5 w-3.5" /> Convert to customer
+              </Button>
+              );
+            })()}
         </div>
+
+        {/* Convert dialog */}
+        <Dialog
+          open={convertOpen}
+          onClose={() => setConvertOpen(false)}
+          className="w-full max-w-md"
+        >
+          <div className="space-y-3 p-5">
+            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">
+              Convert to customer
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Creates or links a customer for{" "}
+              <span className="font-medium text-slate-700 dark:text-slate-200">
+                {lead.customerName}
+              </span>{" "}
+              · {lead.contactNumber}. An existing customer with the same name &amp;
+              phone is reused (no duplicate).
+            </p>
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+              Place *
+              <Input
+                value={cPlace}
+                onChange={(e) => setCPlace(e.target.value)}
+                placeholder="Customer place"
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+              Email
+              <Input
+                value={cEmail}
+                onChange={(e) => setCEmail(e.target.value)}
+                className="mt-1"
+              />
+            </label>
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+              Notes
+              <Input
+                value={cNotes}
+                onChange={(e) => setCNotes(e.target.value)}
+                className="mt-1"
+              />
+            </label>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConvertOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                disabled={convertMutation.isPending}
+                onClick={() => {
+                  if (!cPlace.trim()) {
+                    toast.error("Place is required");
+                    return;
+                  }
+                  convertMutation.mutate();
+                }}
+              >
+                {convertMutation.isPending ? "Converting…" : "Convert"}
+              </Button>
+            </div>
+          </div>
+        </Dialog>
       </div>
     );
   }
 
-  const isLoading = followupQuery.isLoading || leadsQuery.isLoading;
-  const isError = followupQuery.isError || leadsQuery.isError;
+  const isLoading = leadsQuery.isLoading || leadsQuery2.isLoading;
+  const isError = leadsQuery.isError;
 
   if (isLoading) {
     return (
@@ -507,24 +788,34 @@ export default function LeadsPage() {
             Leads
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Manage incoming leads from all CinePanda channels.
+            Manage incoming leads from all Cinepanda channels.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant={viewMode === "cards" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewMode("cards")}
-          >
-            Priority cards
-          </Button>
-          <Button
-            variant={viewMode === "table" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setViewMode("table")}
-          >
-            Table view
-          </Button>
+          <div className="flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <button
+              type="button"
+              onClick={() => setViewMode("cards")}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                viewMode === "cards"
+                  ? "bg-cine-primary text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              }`}
+            >
+              Priority cards
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("list")}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                viewMode === "list"
+                  ? "bg-cine-primary text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              }`}
+            >
+              Leads list
+            </button>
+          </div>
           <Button asChild>
             <Link href="/leads/new">Add lead</Link>
           </Button>
@@ -572,43 +863,37 @@ export default function LeadsPage() {
         />
       </div>
 
-      {viewMode === "table" && (
+      {viewMode === "list" && (
         <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60 md:grid-cols-3 lg:grid-cols-6">
           <Input
-            placeholder="Search name, place, contact"
-            value={filters.search}
-            onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+            placeholder="Search name, place, contact, requirement"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
-          <Select value={filters.status || "__all__"} onValueChange={(v) => setFilters((prev) => ({ ...prev, status: v === "__all__" ? "" : v }))}>
-            <SelectTrigger>
-              <SelectValue placeholder="All statuses" />
-            </SelectTrigger>
-            <SelectContent>
-              {statusOptions.map((opt) => (
-                <SelectItem key={opt.value || "__all__"} value={opt.value || "__all__"}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filters.priorityType || "__all__"} onValueChange={(v) => setFilters((prev) => ({ ...prev, priorityType: v === "__all__" ? "" : v }))}>
-            <SelectTrigger>
-              <SelectValue placeholder="All priorities" />
-            </SelectTrigger>
-            <SelectContent>
-              {priorityTypeOptions.map((opt) => (
-                <SelectItem key={opt.value || "__all__"} value={opt.value || "__all__"}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filters.leadSource || "__all__"} onValueChange={(v) => setFilters((prev) => ({ ...prev, leadSource: v === "__all__" ? "" : v }))}>
-            <SelectTrigger>
-              <SelectValue placeholder="All sources" />
-            </SelectTrigger>
-            <SelectContent>
-              {leadSourceOptions.map((opt) => (
-                <SelectItem key={opt.value || "__all__"} value={opt.value || "__all__"}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Combobox
+            options={[...statusOptions].sort((a, b) => a.label.localeCompare(b.label))}
+            value={filters.status}
+            onChange={(v) => setFilters((prev) => ({ ...prev, status: v }))}
+            placeholder="All statuses"
+            clearable
+            clearLabel="All statuses"
+          />
+          <Combobox
+            options={[...priorityTypeOptions].sort((a, b) => a.label.localeCompare(b.label))}
+            value={filters.priorityType}
+            onChange={(v) => setFilters((prev) => ({ ...prev, priorityType: v }))}
+            placeholder="All priorities"
+            clearable
+            clearLabel="All priorities"
+          />
+          <Combobox
+            options={[...leadSourceOptions].sort((a, b) => a.label.localeCompare(b.label))}
+            value={filters.leadSource}
+            onChange={(v) => setFilters((prev) => ({ ...prev, leadSource: v }))}
+            placeholder="All sources"
+            clearable
+            clearLabel="All sources"
+          />
           <DatePicker
             value={filters.startDate}
             onChange={(v) => setFilters((prev) => ({ ...prev, startDate: v }))}
@@ -655,94 +940,310 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {viewMode === "table" ? (
-        <LeadsTable leads={allLeads} />
-      ) : (
+      {viewMode === "list" ? (() => {
+        const listLeads = listQuery.data?.data ?? [];
+        const listTotal = listQuery.data?.pagination?.total ?? 0;
+        const totalPages = Math.ceil(listTotal / LIST_LIMIT);
+
+        return (
+        <div className="space-y-3">
+          {/* Grid / Table sub-toggle */}
+          <div className="flex items-center justify-between">
+            <p className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+              {listQuery.isFetching
+                ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…</>
+                : `${listTotal} lead${listTotal === 1 ? "" : "s"}`}
+            </p>
+            <div className="flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <button
+                type="button"
+                onClick={() => setListMode("grid")}
+                title="Grid view"
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  listMode === "grid"
+                    ? "bg-cine-primary text-white shadow-sm"
+                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                }`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Grid
+              </button>
+              <button
+                type="button"
+                onClick={() => setListMode("table")}
+                title="Table view"
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  listMode === "table"
+                    ? "bg-cine-primary text-white shadow-sm"
+                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                }`}
+              >
+                <LayoutList className="h-3.5 w-3.5" />
+                Table
+              </button>
+            </div>
+          </div>
+
+          {listQuery.isLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : listLeads.length === 0 && !listQuery.isFetching ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
+              No leads found. Try adjusting your filters.
+            </div>
+          ) : (
+            <div className={`relative transition-opacity duration-200 ${listQuery.isFetching ? "pointer-events-none opacity-50" : "opacity-100"}`}>
+              {listQuery.isFetching && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center">
+                  <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 shadow-md dark:border-slate-700 dark:bg-slate-900">
+                    <Loader2 className="h-4 w-4 animate-spin text-cine-primary" />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Updating…</span>
+                  </div>
+                </div>
+              )}
+              {listMode === "table" ? (
+                <LeadsTable leads={listLeads} onDelete={handleDelete} />
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  {listLeads.map((lead) => (
+                    <LeadCard key={lead._id} lead={lead} compact />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-slate-200 pt-3 dark:border-slate-800">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Page {listPage} of {totalPages} · {listTotal} total
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={listPage <= 1}
+                  onClick={() => setListPage(1)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-xs text-slate-600 transition hover:bg-slate-50 disabled:opacity-30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                >
+                  «
+                </button>
+                <button
+                  type="button"
+                  disabled={listPage <= 1}
+                  onClick={() => setListPage((p) => p - 1)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-xs text-slate-600 transition hover:bg-slate-50 disabled:opacity-30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                >
+                  ‹
+                </button>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let page: number;
+                  if (totalPages <= 5) {
+                    page = i + 1;
+                  } else if (listPage <= 3) {
+                    page = i + 1;
+                  } else if (listPage >= totalPages - 2) {
+                    page = totalPages - 4 + i;
+                  } else {
+                    page = listPage - 2 + i;
+                  }
+                  return (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => setListPage(page)}
+                      className={`flex h-7 w-7 items-center justify-center rounded-md border text-xs font-medium transition ${
+                        page === listPage
+                          ? "border-cine-primary bg-cine-primary text-white"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  disabled={listPage >= totalPages}
+                  onClick={() => setListPage((p) => p + 1)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-xs text-slate-600 transition hover:bg-slate-50 disabled:opacity-30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                >
+                  ›
+                </button>
+                <button
+                  type="button"
+                  disabled={listPage >= totalPages}
+                  onClick={() => setListPage(totalPages)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-xs text-slate-600 transition hover:bg-slate-50 disabled:opacity-30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                >
+                  »
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        );
+      })() : (
         <div className="space-y-10">
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
-                  Needs attention
-                </h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Overdue and due-today follow-ups are shown first.
-                </p>
-              </div>
-              <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-200">
-                {attentionLeads.length} lead{attentionLeads.length === 1 ? "" : "s"}
-              </span>
-            </div>
-            {attentionLeads.length === 0 ? (
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Nothing urgent right now. Keep nurturing your leads!
-              </p>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {attentionLeads.map((lead) => (
-                  <LeadCard key={lead._id} lead={lead} />
-                ))}
-              </div>
-            )}
-          </section>
+          {attentionLeads.length > 0 && (
+            <SectionCards
+              sectionKey="attention"
+              leads={attentionLeads}
+              title="Needs attention"
+              subtitle="Overdue and due-today follow-ups are shown first."
+              badge={`${attentionLeads.length} lead${attentionLeads.length === 1 ? "" : "s"}`}
+              badgeClass="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200"
+              expanded={!!expandedSections["attention"]}
+              onToggle={() => toggleSection("attention")}
+              limit={CARDS_SECTION_LIMIT}
+              LeadCard={LeadCard}
+            />
+          )}
 
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
-                  Upcoming follow-ups
-                </h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Ordered by the next call time so you can glide through the day.
-                </p>
-              </div>
-              <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100">
-                {grouped.upcoming.length} scheduled
-              </span>
-            </div>
-            {grouped.upcoming.length === 0 ? (
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                No upcoming follow-ups scheduled.
-              </p>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {grouped.upcoming.map((lead) => (
-                  <LeadCard key={lead._id} lead={lead} />
-                ))}
-              </div>
-            )}
-          </section>
+          {grouped.upcoming.length > 0 && (
+            <SectionCards
+              sectionKey="upcoming"
+              leads={grouped.upcoming}
+              title="Upcoming follow-ups"
+              subtitle="Ordered by the next call time so you can glide through the day."
+              badge={`${grouped.upcoming.length} scheduled`}
+              badgeClass="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100"
+              expanded={!!expandedSections["upcoming"]}
+              onToggle={() => toggleSection("upcoming")}
+              limit={CARDS_SECTION_LIMIT}
+              LeadCard={LeadCard}
+            />
+          )}
 
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
-                  Unscheduled
-                </h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Leads without a next call time, sorted by priority.
-                </p>
-              </div>
-              <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-800 dark:bg-slate-800/70 dark:text-slate-100">
-                {grouped.unscheduled.length} waiting
-              </span>
-            </div>
-            {grouped.unscheduled.length === 0 ? (
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                All leads have a follow-up plan. Nicely done.
-              </p>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {grouped.unscheduled.map((lead) => (
-                  <LeadCard key={lead._id} lead={lead} />
-                ))}
+          {grouped.unscheduled.length > 0 && (
+            <SectionCards
+              sectionKey="unscheduled"
+              leads={grouped.unscheduled}
+              title="Unscheduled"
+              subtitle="Leads without a next call time, sorted by priority."
+              badge={`${grouped.unscheduled.length} waiting`}
+              badgeClass="bg-slate-200 text-slate-800 dark:bg-slate-800/70 dark:text-slate-100"
+              expanded={!!expandedSections["unscheduled"]}
+              onToggle={() => toggleSection("unscheduled")}
+              limit={CARDS_SECTION_LIMIT}
+              LeadCard={LeadCard}
+            />
+          )}
+
+          {toConvertLeads.length > 0 && (
+            <SectionCards
+              sectionKey="toconvert"
+              leads={toConvertLeads}
+              title="To convert"
+              subtitle="Won leads not yet linked to a customer."
+              badge={`${toConvertLeads.length} to convert`}
+              badgeClass="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-100"
+              expanded={!!expandedSections["toconvert"]}
+              onToggle={() => toggleSection("toconvert")}
+              limit={CARDS_SECTION_LIMIT}
+              LeadCard={LeadCard}
+            />
+          )}
+
+          {attentionLeads.length === 0 &&
+            grouped.upcoming.length === 0 &&
+            grouped.unscheduled.length === 0 &&
+            toConvertLeads.length === 0 && (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
+                No leads to show. Add a lead or adjust your filters.
               </div>
             )}
-          </section>
+
+          {cardsTotal > 200 && (
+            <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+              <span className="text-base">⚠️</span>
+              <span>
+                Showing 200 of <strong>{cardsTotal}</strong> leads. Switch to{" "}
+                <button
+                  type="button"
+                  className="font-semibold underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-200"
+                  onClick={() => setViewMode("list")}
+                >
+                  Leads list
+                </button>{" "}
+                to browse all leads with full pagination.
+              </span>
+            </div>
+          )}
         </div>
       )}
 
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Delete lead"
+        description="This lead will be moved to the Trash. You can restore it later from the Trash page."
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate(deleteTarget);
+          setDeleteTarget(null);
+        }}
+      />
     </div>
+  );
+}
+
+function SectionCards({
+  leads,
+  title,
+  subtitle,
+  badge,
+  badgeClass,
+  expanded,
+  onToggle,
+  limit,
+  LeadCard,
+}: {
+  sectionKey: string;
+  leads: Lead[];
+  title: string;
+  subtitle: string;
+  badge: string;
+  badgeClass: string;
+  expanded: boolean;
+  onToggle: () => void;
+  limit: number;
+  LeadCard: React.ComponentType<{ lead: Lead }>;
+}) {
+  const visible = expanded ? leads : leads.slice(0, limit);
+  const hidden = leads.length - limit;
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">{title}</h3>
+          <p className="text-sm text-slate-600 dark:text-slate-400">{subtitle}</p>
+        </div>
+        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${badgeClass}`}>
+          {badge}
+        </span>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        {visible.map((lead) => (
+          <LeadCard key={lead._id} lead={lead} />
+        ))}
+      </div>
+      {leads.length > limit && (
+        <button
+          type="button"
+          onClick={onToggle}
+          className="w-full rounded-lg border border-dashed border-slate-300 py-2 text-xs font-medium text-slate-500 transition hover:border-slate-400 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:text-slate-200"
+        >
+          {expanded ? "Show less" : `Show ${hidden} more`}
+        </button>
+      )}
+    </section>
   );
 }
 

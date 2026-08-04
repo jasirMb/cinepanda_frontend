@@ -3,18 +3,38 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
+import {
+  Lock,
+  FolderKanban,
+  CheckCircle2,
+  Check,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  X,
+  Phone,
+  MapPin,
+  Package,
+} from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { quotationsKeys, useQuotations } from "@/hooks/useQuotations";
 import { useTemplates } from "@/hooks/useTemplates";
+import { productItemImage, type Template } from "@/lib/api/templates";
+import { type SpeakerConfigSnapshot } from "@/lib/api/speaker-configs";
+import { SpeakerConfigPicker } from "@/components/quotation/SpeakerConfigPicker";
 import { useCustomers } from "@/hooks/useCustomers";
 import {
   createQuotation,
   deleteQuotation,
   updateQuotationStatus,
+  quotationProject,
+  quotationProjectId,
   type CreateQuotationPayload,
   type Quotation,
 } from "@/lib/api/quotations";
+import { formatPhone } from "@/lib/country-codes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -53,6 +73,37 @@ const STATUS_COLORS: Record<string, string> = {
   REJECTED: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
 };
 
+// Status-tinted header background — quick visual scan of approved / rejected / etc.
+const HEADER_TINT: Record<string, string> = {
+  DRAFT: "bg-slate-50 dark:bg-slate-800/40",
+  SENT: "bg-blue-50/70 dark:bg-blue-950/20",
+  APPROVED: "bg-emerald-50/70 dark:bg-emerald-950/20",
+  REJECTED: "bg-red-50/70 dark:bg-red-950/20",
+};
+
+const CARD_GRADIENTS = [
+  "from-violet-500 to-fuchsia-500",
+  "from-sky-500 to-indigo-500",
+  "from-emerald-500 to-teal-500",
+  "from-amber-500 to-orange-500",
+  "from-rose-500 to-pink-500",
+];
+function gradientFor(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return CARD_GRADIENTS[Math.abs(h) % CARD_GRADIENTS.length];
+}
+function getInitials(name: string) {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  );
+}
+
 /* ────────────────────────────────────────────
    Page
    ──────────────────────────────────────────── */
@@ -61,16 +112,32 @@ export default function QuotationsPage() {
   const queryClient = useQueryClient();
 
   const quotationsQuery = useQuotations();
-  const templatesQuery = useTemplates();
+  // Template picker: 10 per page, latest-first, searchable by name (debounced).
+  const [templateSearch, setTemplateSearch] = useState("");
+  const [debouncedTemplateSearch, setDebouncedTemplateSearch] = useState("");
+  const [templatePage, setTemplatePage] = useState(1);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedTemplateSearch(templateSearch), 300);
+    return () => clearTimeout(t);
+  }, [templateSearch]);
+  useEffect(() => {
+    setTemplatePage(1);
+  }, [debouncedTemplateSearch]);
+  const templatesQuery = useTemplates({
+    search: debouncedTemplateSearch || undefined,
+    page: templatePage,
+    limit: 10,
+  });
   const customersQuery = useCustomers();
 
   const quotations = quotationsQuery.data?.data ?? [];
   const templates = templatesQuery.data?.data ?? [];
+  const templatePagination = templatesQuery.data?.pagination;
   const customers = customersQuery.data?.data ?? [];
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [whatsappTarget, setWhatsappTarget] = useState<
-    { phone: string; name: string } | null
+    { phone: string; name: string; countryCode?: string } | null
   > (null);
 
   // ── list filters / pagination ─────────────
@@ -157,6 +224,10 @@ export default function QuotationsPage() {
   // ── wizard state ──────────────────────────
   const [step, setStep] = useState<Step>("list");
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
+  // Full objects of selected templates, so a pick survives search/pagination.
+  const [selectedTemplatesById, setSelectedTemplatesById] = useState<
+    Record<string, Template>
+  >({});
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [notes, setNotes] = useState("");
@@ -167,11 +238,16 @@ export default function QuotationsPage() {
     new Date().toISOString().split("T")[0]
   );
   const [validUntil, setValidUntil] = useState("");
+  const [speakerConfig, setSpeakerConfig] =
+    useState<SpeakerConfigSnapshot | null>(null);
 
   // Derived
   const selectedTemplates = useMemo(
-    () => templates.filter((t) => selectedTemplateIds.includes(t._id)),
-    [templates, selectedTemplateIds]
+    () =>
+      selectedTemplateIds
+        .map((id) => selectedTemplatesById[id])
+        .filter(Boolean) as Template[],
+    [selectedTemplateIds, selectedTemplatesById]
   );
 
   const selectedCustomer = useMemo(
@@ -208,10 +284,11 @@ export default function QuotationsPage() {
     mutationFn: deleteQuotation,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: quotationsKeys.all });
-      toast.success("Quotation deleted");
+      toast.success("Quotation moved to trash");
     },
-    onError: () => {
-      toast.error("Failed to delete quotation");
+    onError: (err) => {
+      const e = err as { response?: { data?: { error?: string } } };
+      toast.error(e?.response?.data?.error ?? "Failed to delete quotation");
     },
   });
 
@@ -231,18 +308,33 @@ export default function QuotationsPage() {
   function resetWizard() {
     setStep("list");
     setSelectedTemplateIds([]);
+    setSelectedTemplatesById({});
+    setTemplateSearch("");
+    setDebouncedTemplateSearch("");
+    setTemplatePage(1);
     setSelectedCustomerId("");
     setCustomerSearch("");
     setNotes("");
     setTermsAndConditions("50% advance required. Balance before delivery.");
     setQuotationDate(new Date().toISOString().split("T")[0]);
     setValidUntil("");
+    setSpeakerConfig(null);
   }
 
-  function toggleTemplate(id: string) {
+  function toggleTemplate(tpl: Template) {
     setSelectedTemplateIds((prev) =>
-      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
+      prev.includes(tpl._id)
+        ? prev.filter((t) => t !== tpl._id)
+        : [...prev, tpl._id]
     );
+    setSelectedTemplatesById((prev) => {
+      if (prev[tpl._id]) {
+        const next = { ...prev };
+        delete next[tpl._id];
+        return next;
+      }
+      return { ...prev, [tpl._id]: tpl };
+    });
   }
 
   function handleCreate() {
@@ -253,6 +345,7 @@ export default function QuotationsPage() {
       termsAndConditions: termsAndConditions.trim() || undefined,
       quotationDate,
       validUntil: validUntil || undefined,
+      speakerConfig: speakerConfig ?? undefined,
     };
     setStep("creating");
     createMutation.mutate(payload);
@@ -301,6 +394,37 @@ export default function QuotationsPage() {
           </p>
         </div>
 
+        {/* Selected templates — persist even while searching */}
+        {selectedTemplates.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-cine-primary/30 bg-cine-primary/5 p-3 dark:border-cine-primary/40 dark:bg-cine-primary/10">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              Selected ({selectedTemplates.length}):
+            </span>
+            {selectedTemplates.map((tpl, i) => (
+              <button
+                key={tpl._id}
+                type="button"
+                onClick={() => toggleTemplate(tpl)}
+                className="inline-flex items-center gap-1 rounded-full border border-cine-primary/30 bg-white px-2.5 py-1 text-xs font-medium text-cine-primary transition hover:bg-cine-primary/10 dark:bg-slate-900"
+              >
+                Option {i + 1}: {tpl.name}
+                <X className="h-3 w-3" />
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Search — latest templates shown first; type to find any */}
+        <div className="relative max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            placeholder="Search templates by name…"
+            value={templateSearch}
+            onChange={(e) => setTemplateSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
         {templatesQuery.isLoading ? (
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Loading templates...
@@ -308,62 +432,131 @@ export default function QuotationsPage() {
         ) : templates.length === 0 ? (
           <div className="rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              No templates available.{" "}
-              <Link href="/templates" className="text-cine-primary underline">
-                Create a template first
-              </Link>
-              .
+              {debouncedTemplateSearch ? (
+                `No templates match “${debouncedTemplateSearch}”.`
+              ) : (
+                <>
+                  No templates available.{" "}
+                  <Link href="/templates" className="text-cine-primary underline">
+                    Create a template first
+                  </Link>
+                  .
+                </>
+              )}
             </p>
           </div>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {templates.map((tpl) => {
-              const isSelected = selectedTemplateIds.includes(tpl._id);
-              return (
-                <button
-                  key={tpl._id}
-                  type="button"
-                  onClick={() => toggleTemplate(tpl._id)}
-                  className={`rounded-lg border p-4 text-left transition ${
-                    isSelected
-                      ? "border-cine-primary bg-cine-primary/5 ring-2 ring-cine-primary/30 dark:bg-cine-primary/10"
-                      : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                        {tpl.name}
-                      </p>
-                      {tpl.description && (
-                        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                          {tpl.description}
+          <>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {templates.map((tpl) => {
+                const isSelected = selectedTemplateIds.includes(tpl._id);
+                const totalProducts = tpl.groups.reduce(
+                  (s, g) => s + g.productItems.length,
+                  0
+                );
+                return (
+                  <button
+                    key={tpl._id}
+                    type="button"
+                    onClick={() => toggleTemplate(tpl)}
+                    className={`group flex flex-col gap-2 rounded-xl border bg-white p-3 text-left shadow-sm transition hover:shadow-md dark:bg-slate-900/60 ${
+                      isSelected
+                        ? "border-cine-primary ring-2 ring-cine-primary/30 dark:border-cine-primary"
+                        : "border-slate-200 hover:border-cine-primary/40 dark:border-slate-800 dark:hover:border-slate-700"
+                    }`}
+                  >
+                    {/* Header */}
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gradient-to-br text-xs font-bold text-white shadow-sm ${gradientFor(
+                          tpl._id
+                        )}`}
+                      >
+                        {tpl.name.trim().charAt(0).toUpperCase() || "T"}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
+                          {tpl.name}
                         </p>
+                        <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                          {tpl.description ||
+                            `${totalProducts} item${totalProducts !== 1 ? "s" : ""} · ${tpl.groups.length} grp`}
+                        </p>
+                      </div>
+                      <span
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${
+                          isSelected
+                            ? "border-cine-primary bg-cine-primary text-white"
+                            : "border-slate-300 dark:border-slate-600"
+                        }`}
+                      >
+                        {isSelected && <Check className="h-3 w-3" />}
+                      </span>
+                    </div>
+
+                    {/* Price */}
+                    <div className="flex items-baseline justify-between">
+                      <p className="text-base font-bold text-emerald-700 dark:text-emerald-300">
+                        {INR(tpl.grandTotal)}
+                      </p>
+                      {isSelected && (
+                        <span className="text-[11px] font-semibold text-cine-primary">
+                          Option {selectedTemplateIds.indexOf(tpl._id) + 1}
+                        </span>
                       )}
                     </div>
-                    <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
-                      {INR(tpl.grandTotal)}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {tpl.groups.map((g) => (
-                      <span
-                        key={g.name}
-                        className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600 dark:bg-slate-800 dark:text-slate-400"
-                      >
-                        {g.name}
-                      </span>
-                    ))}
-                  </div>
-                  {isSelected && (
-                    <p className="mt-2 text-xs font-semibold text-cine-primary">
-                      Selected as Option {selectedTemplateIds.indexOf(tpl._id) + 1}
-                    </p>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+
+                    {/* Group chips */}
+                    {tpl.groups.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {tpl.groups.slice(0, 3).map((g) => (
+                          <span
+                            key={g.name}
+                            className="truncate rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300"
+                          >
+                            {g.name}
+                          </span>
+                        ))}
+                        {tpl.groups.length > 3 && (
+                          <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-400 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-500">
+                            +{tpl.groups.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Pagination */}
+            {templatePagination && templatePagination.totalPages > 1 && (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Showing {templates.length} of {templatePagination.total} · page{" "}
+                  {templatePagination.page} of {templatePagination.totalPages}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!templatePagination.hasPrev}
+                    onClick={() => setTemplatePage((p) => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft className="h-4 w-4" /> Prev
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!templatePagination.hasNext}
+                    onClick={() => setTemplatePage((p) => p + 1)}
+                  >
+                    Next <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         <div className="flex gap-3">
@@ -394,61 +587,84 @@ export default function QuotationsPage() {
           </p>
         </div>
 
-        <Input
-          placeholder="Search by name, phone, or place..."
-          value={customerSearch}
-          onChange={(e) => setCustomerSearch(e.target.value)}
-        />
+        <div className="relative max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            placeholder="Search by name, phone, or place..."
+            value={customerSearch}
+            onChange={(e) => setCustomerSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
 
         {customersQuery.isLoading ? (
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Loading customers...
           </p>
         ) : filteredCustomers.length === 0 ? (
-          <div className="rounded-lg border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              No customers found.
-            </p>
+          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
+            No customers found.
           </div>
         ) : (
-          <div className="max-h-96 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filteredCustomers.map((cust) => {
-                const isSelected = selectedCustomerId === cust._id;
-                return (
-                  <label
-                    key={cust._id}
-                    className={`flex cursor-pointer items-center gap-4 px-6 py-3 transition ${
-                      isSelected
-                        ? "bg-cine-primary/5 dark:bg-cine-primary/10"
-                        : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="customer"
-                      checked={isSelected}
-                      onChange={() => setSelectedCustomerId(cust._id)}
-                      className="h-4 w-4 shrink-0 accent-cine-primary"
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            {filteredCustomers.map((cust) => {
+              const isSelected = selectedCustomerId === cust._id;
+              return (
+                <button
+                  key={cust._id}
+                  type="button"
+                  onClick={() => setSelectedCustomerId(cust._id)}
+                  className={`group flex h-full items-start gap-3 rounded-xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:bg-slate-900/60 ${
+                    isSelected
+                      ? "border-cine-primary ring-2 ring-cine-primary/30 dark:border-cine-primary"
+                      : "border-slate-200 hover:border-cine-primary/40 dark:border-slate-800 dark:hover:border-slate-700"
+                  }`}
+                >
+                  {cust.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={cust.imageUrl}
+                      alt={cust.name}
+                      className="h-12 w-12 shrink-0 rounded-full object-cover ring-2 ring-slate-100 dark:ring-slate-800"
                     />
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className={`text-sm truncate ${
-                          isSelected
-                            ? "font-semibold text-slate-900 dark:text-slate-50"
-                            : "font-medium text-slate-700 dark:text-slate-300"
-                        }`}
-                      >
-                        {cust.name}
+                  ) : (
+                    <div
+                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-sm font-bold text-white shadow-sm ${gradientFor(
+                        cust._id
+                      )}`}
+                    >
+                      {getInitials(cust.name)}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base font-semibold text-slate-900 dark:text-slate-50">
+                      {cust.name}
+                    </p>
+                    <div className="mt-1.5 space-y-1 text-sm text-slate-600 dark:text-slate-300">
+                      <p className="flex items-center gap-2">
+                        <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                        <span className="truncate">
+                          {formatPhone(cust.countryCode, cust.phone)}
+                        </span>
                       </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {cust.place} · {cust.phone}
+                      <p className="flex items-center gap-2">
+                        <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                        <span className="truncate">{cust.place}</span>
                       </p>
                     </div>
-                  </label>
-                );
-              })}
-            </div>
+                  </div>
+                  <span
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${
+                      isSelected
+                        ? "border-cine-primary bg-cine-primary text-white"
+                        : "border-slate-300 dark:border-slate-600"
+                    }`}
+                  >
+                    {isSelected && <Check className="h-3 w-3" />}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -470,13 +686,13 @@ export default function QuotationsPage() {
   // Step 3: Notes, T&C, dates
   if (step === "details") {
     return (
-      <div className="mx-auto max-w-lg space-y-6">
+      <div className="mx-auto max-w-2xl space-y-6">
         <div>
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
             Quotation Details
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Step 3 of 3 — Add notes, terms, and dates
+            Step 3 of 3 — Add notes, terms, speaker configuration & dates
           </p>
         </div>
 
@@ -522,6 +738,19 @@ export default function QuotationsPage() {
               onChange={(e) => setTermsAndConditions(e.target.value)}
             />
           </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Speaker Configuration
+            </label>
+            <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+              Pick a configuration — its diagram appears in the PDF. Add a new
+              one with “Add configuration”.
+            </p>
+            <SpeakerConfigPicker
+              value={speakerConfig}
+              onChange={setSpeakerConfig}
+            />
+          </div>
         </div>
 
         <div className="flex gap-3">
@@ -554,7 +783,7 @@ export default function QuotationsPage() {
           {/* Header */}
           <div className="border-b border-slate-200 px-8 py-6 text-center dark:border-slate-800">
             <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">
-              CinePanda — Quotation
+              Cinepanda — Quotation
             </h1>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               Date: {new Date(quotationDate).toLocaleDateString("en-IN", { dateStyle: "long" })}
@@ -572,7 +801,8 @@ export default function QuotationsPage() {
               {selectedCustomer?.name}
             </p>
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              {selectedCustomer?.place} · {selectedCustomer?.phone}
+              {selectedCustomer?.place} ·{" "}
+              {formatPhone(selectedCustomer?.countryCode, selectedCustomer?.phone)}
             </p>
             {notes && (
               <p className="mt-1 text-sm italic text-slate-500 dark:text-slate-400">
@@ -604,30 +834,57 @@ export default function QuotationsPage() {
                         Subtotal: {INR(group.subtotal)}
                       </p>
                     </div>
-                    <table className="mt-1 w-full text-sm">
+                    <table className="mt-1 w-full table-fixed text-sm">
                       <thead>
                         <tr className="text-left text-[10px] uppercase tracking-wider text-slate-400">
                           <th className="py-1 font-medium">Item</th>
-                          <th className="py-1 font-medium text-center">Qty</th>
-                          <th className="py-1 font-medium text-right">
+                          <th className="w-16 py-1 text-center font-medium">
+                            Qty
+                          </th>
+                          <th className="w-32 py-1 text-right font-medium">
                             Unit Price
                           </th>
-                          <th className="py-1 font-medium text-right">Total</th>
+                          <th className="w-32 py-1 text-right font-medium">
+                            Total
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="text-slate-700 dark:text-slate-300">
-                        {group.productItems.map((item, i) => (
+                        {group.productItems.map((item, i) => {
+                          const img = productItemImage(item.productId);
+                          return (
                           <tr key={i}>
-                            <td className="py-1">{item.productName}</td>
-                            <td className="py-1 text-center">{item.quantity}</td>
-                            <td className="py-1 text-right">
+                            <td className="py-1 pr-2">
+                              <div className="flex items-center gap-2">
+                                <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
+                                  {img ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={img}
+                                      alt={item.productName}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <Package className="h-3.5 w-3.5 text-slate-400" />
+                                  )}
+                                </span>
+                                <span className="truncate">
+                                  {item.productName}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-1 text-center tabular-nums">
+                              {item.quantity}
+                            </td>
+                            <td className="py-1 text-right tabular-nums">
                               {INR(item.unitPrice)}
                             </td>
-                            <td className="py-1 text-right font-medium">
+                            <td className="py-1 text-right font-medium tabular-nums">
                               {INR(item.lineTotal)}
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
 
@@ -726,7 +983,7 @@ export default function QuotationsPage() {
             Quotations
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Manage quotations and pricing for CinePanda projects.
+            Manage quotations and pricing for Cinepanda projects.
           </p>
         </div>
         <Button onClick={() => setStep("templates")}>
@@ -830,8 +1087,8 @@ export default function QuotationsPage() {
               onStatusChange={(id, status) =>
                 statusMutation.mutate({ id, status })
               }
-              onWhatsapp={(phone, name) =>
-                setWhatsappTarget({ phone, name })
+              onWhatsapp={(phone, name, countryCode) =>
+                setWhatsappTarget({ phone, name, countryCode })
               }
             />
           ))}
@@ -867,7 +1124,7 @@ export default function QuotationsPage() {
         open={deleteTarget !== null}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
         title="Delete quotation"
-        description="Are you sure you want to delete this quotation? This action cannot be undone."
+        description="Are you sure you want to delete this quotation? It will be moved to the Trash and can be restored later."
         confirmLabel="Delete"
         onConfirm={() => {
           if (deleteTarget) deleteMutation.mutate(deleteTarget);
@@ -892,7 +1149,8 @@ export default function QuotationsPage() {
           if (whatsappTarget) {
             const url = buildWhatsappUrl(
               whatsappTarget.phone,
-              defaultWhatsappMessage(whatsappTarget.name)
+              defaultWhatsappMessage(whatsappTarget.name),
+              whatsappTarget.countryCode
             );
             window.open(url, "_blank", "noopener,noreferrer");
           }
@@ -907,18 +1165,28 @@ export default function QuotationsPage() {
    WhatsApp helpers
    ──────────────────────────────────────────── */
 
-function buildWhatsappUrl(phone: string, message: string): string {
+function buildWhatsappUrl(
+  phone: string,
+  message: string,
+  countryCode?: string
+): string {
   // wa.me works across WhatsApp Web (macOS/Windows browser), desktop apps,
   // Android and iOS — it picks the right target based on the platform.
   const digits = phone.replace(/\D/g, "");
-  // Fall back to India country code for 10-digit local numbers (project default).
-  const normalized = digits.length === 10 ? `91${digits}` : digits;
+  const ccDigits = (countryCode ?? "").replace(/\D/g, "");
+  // Prefer the customer's saved country code; otherwise fall back to India for
+  // 10-digit local numbers (project default).
+  const normalized = ccDigits
+    ? `${ccDigits}${digits}`
+    : digits.length === 10
+      ? `91${digits}`
+      : digits;
   return `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
 }
 
 function defaultWhatsappMessage(customerName: string): string {
   const firstName = customerName.trim().split(/\s+/)[0] || "there";
-  return `Hi ${firstName}, this is regarding your quotation from CinePanda. Please let me know if you have any questions.`;
+  return `Hi ${firstName}, this is regarding your quotation from Cinepanda. Please let me know if you have any questions.`;
 }
 
 function WhatsappIcon({ className }: { className?: string }) {
@@ -948,7 +1216,7 @@ function QuotationCard({
   quotation: Quotation;
   onDelete: (id: string) => void;
   onStatusChange: (id: string, status: Quotation["status"]) => void;
-  onWhatsapp: (phone: string, name: string) => void;
+  onWhatsapp: (phone: string, name: string, countryCode?: string) => void;
 }) {
   const statusColor = STATUS_COLORS[quotation.status] ?? STATUS_COLORS.DRAFT;
   const statusMap: Record<Quotation["status"], Quotation["status"][]> = {
@@ -958,21 +1226,48 @@ function QuotationCard({
     REJECTED: [],
   };
   const nextStatuses = statusMap[quotation.status];
+  const initial = quotation.customerId.name.trim().charAt(0).toUpperCase() || "?";
+  const pid = quotationProjectId(quotation.projectId);
+  const proj = quotationProject(quotation.projectId);
+  // APPROVED / REJECTED quotations are final, and one already linked to a project
+  // can't be deleted (it would orphan the project).
+  const locked =
+    quotation.status === "APPROVED" ||
+    quotation.status === "REJECTED" ||
+    !!pid;
+  const lockTitle = pid
+    ? "Linked to a project — can't be deleted"
+    : `${quotation.status[0]}${quotation.status.slice(1).toLowerCase()} quotations can't be edited or deleted`;
+
+  const highest = Math.max(...quotation.sections.map((s) => s.grandTotal), 0);
 
   return (
-    <div className="flex h-full flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800/70 dark:bg-slate-900/60">
-      {/* Header — kept out of <Link> so the WhatsApp <button> is valid HTML */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+    <div className="group flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/60">
+      {/* Status-tinted header */}
+      <div
+        className={`flex items-center gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800 ${HEADER_TINT[quotation.status] ?? ""}`}
+      >
+        <div
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-base font-bold text-white shadow-sm ${gradientFor(
+            quotation.customerId._id
+          )}`}
+        >
+          {initial}
+        </div>
+        <div className="min-w-0 flex-1">
           <Link
             href={`/quotations/${quotation._id}`}
-            className="block truncate text-sm font-semibold text-slate-900 hover:text-cine-primary dark:text-slate-50"
+            className="block truncate text-base font-semibold text-slate-900 group-hover:text-cine-primary dark:text-slate-50"
           >
             {quotation.customerId.name}
           </Link>
-          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+          <div className="mt-0.5 flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400">
             <span className="truncate">
-              {quotation.customerId.place} · {quotation.customerId.phone}
+              {quotation.customerId.place} ·{" "}
+              {formatPhone(
+                quotation.customerId.countryCode,
+                quotation.customerId.phone
+              )}
             </span>
             {quotation.customerId.phone && (
               <button
@@ -980,7 +1275,8 @@ function QuotationCard({
                 onClick={() =>
                   onWhatsapp(
                     quotation.customerId.phone,
-                    quotation.customerId.name
+                    quotation.customerId.name,
+                    quotation.customerId.countryCode
                   )
                 }
                 aria-label={`Send WhatsApp message to ${quotation.customerId.name}`}
@@ -993,35 +1289,86 @@ function QuotationCard({
           </div>
         </div>
         <span
-          className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusColor}`}
+          className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${statusColor}`}
         >
           {quotation.status}
         </span>
       </div>
 
-      <Link href={`/quotations/${quotation._id}`} className="mt-3 block">
-        <div className="flex flex-wrap gap-1.5">
-          {quotation.sections.map((sec, i) => (
-            <span
-              key={i}
-              className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600 dark:bg-slate-800 dark:text-slate-400"
-            >
-              Option {i + 1}: {sec.sectionName} — {INR(sec.grandTotal)}
+      {/* Options as a priced list */}
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <Link href={`/quotations/${quotation._id}`} className="block">
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+            {quotation.sections.length} option
+            {quotation.sections.length !== 1 ? "s" : ""}
+          </p>
+          <div className="space-y-1">
+            {quotation.sections.map((sec, i) => {
+              const top =
+                quotation.sections.length > 1 && sec.grandTotal === highest;
+              return (
+                <div
+                  key={i}
+                  className="flex items-center justify-between gap-2 text-sm"
+                >
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                        top ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"
+                      }`}
+                    />
+                    <span className="truncate text-slate-600 dark:text-slate-300">
+                      Option {i + 1}: {sec.sectionName}
+                    </span>
+                  </span>
+                  <span className="shrink-0 font-semibold text-slate-800 dark:text-slate-100">
+                    {INR(sec.grandTotal)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
+            {new Date(quotation.quotationDate).toLocaleDateString()}
+            {quotation.validUntil &&
+              ` · valid until ${new Date(quotation.validUntil).toLocaleDateString()}`}
+          </p>
+        </Link>
+
+        {/* Project state */}
+        {pid ? (
+          <Link
+            href={`/projects/${pid}`}
+            className="mt-auto flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm transition hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/50"
+          >
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <span className="min-w-0 truncate font-medium text-emerald-800 dark:text-emerald-300">
+              Project: {proj?.clientName ?? "view"}
+              {proj?.status ? ` · ${proj.status}` : ""}
             </span>
-          ))}
-        </div>
+            <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-emerald-500" />
+          </Link>
+        ) : quotation.status === "APPROVED" ? (
+          <Link
+            href={`/quotations/${quotation._id}`}
+            className="mt-auto flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm transition hover:bg-amber-100 dark:border-amber-900/50 dark:bg-amber-950/30 dark:hover:bg-amber-950/50"
+          >
+            <Plus className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <span className="font-medium text-amber-800 dark:text-amber-300">
+              No project yet
+            </span>
+            <span className="ml-auto font-semibold text-amber-700 dark:text-amber-400">
+              Create →
+            </span>
+          </Link>
+        ) : null}
+      </div>
 
-        <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          {new Date(quotation.quotationDate).toLocaleDateString()}
-          {quotation.validUntil &&
-            ` · Valid until ${new Date(quotation.validUntil).toLocaleDateString()}`}
-        </div>
-      </Link>
-
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+      {/* Footer bar */}
+      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 bg-slate-50/70 px-4 py-2.5 text-sm dark:border-slate-800 dark:bg-slate-800/30">
         <Link
           href={`/quotations/${quotation._id}`}
-          className="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 font-semibold text-slate-800 shadow-sm transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 font-medium text-slate-700 transition hover:border-cine-primary hover:text-cine-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
         >
           View
         </Link>
@@ -1031,19 +1378,38 @@ function QuotationCard({
             key={s}
             type="button"
             onClick={() => onStatusChange(quotation._id, s)}
-            className="inline-flex items-center rounded-full border border-cine-primary/30 bg-cine-primary/5 px-3 py-1 font-semibold text-cine-primary transition hover:bg-cine-primary/10 dark:border-cine-primary/40 dark:bg-cine-primary/10"
+            className="inline-flex h-8 items-center rounded-md border border-cine-primary/30 bg-cine-primary/5 px-3 font-medium text-cine-primary transition hover:bg-cine-primary/10 dark:border-cine-primary/40 dark:bg-cine-primary/10"
           >
             Mark {s}
           </button>
         ))}
 
-        <button
-          type="button"
-          onClick={() => onDelete(quotation._id)}
-          className="ml-auto inline-flex items-center rounded-full border border-red-200 bg-white px-3 py-1 font-semibold text-red-600 shadow-sm transition hover:bg-red-50 dark:border-red-800 dark:bg-slate-900 dark:text-red-400"
-        >
-          Delete
-        </button>
+        {locked ? (
+          pid ? (
+            <Link
+              href={`/projects/${pid}`}
+              title={lockTitle}
+              className="ml-auto inline-flex h-8 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-3 font-medium text-amber-700 transition hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300 dark:hover:bg-amber-950/50"
+            >
+              <Lock className="h-3 w-3" /> Locked
+            </Link>
+          ) : (
+            <span
+              title={lockTitle}
+              className="ml-auto inline-flex h-8 items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-3 font-medium text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300"
+            >
+              <Lock className="h-3 w-3" /> Locked
+            </span>
+          )
+        ) : (
+          <button
+            type="button"
+            onClick={() => onDelete(quotation._id)}
+            className="ml-auto inline-flex h-8 items-center rounded-md border border-red-200 bg-white px-3 font-medium text-red-600 transition hover:bg-red-50 dark:border-red-800 dark:bg-slate-900 dark:text-red-400"
+          >
+            Delete
+          </button>
+        )}
       </div>
     </div>
   );

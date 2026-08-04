@@ -783,7 +783,7 @@ export const QuotationPreview = forwardRef<
             margin: "0 0 4px",
           }}
         >
-          CinePanda Entertainments
+          Cinepanda Entertainments
         </p>
         <p
           style={{
